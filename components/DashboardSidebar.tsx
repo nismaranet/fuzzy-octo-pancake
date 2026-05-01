@@ -7,18 +7,20 @@ import {
   LayoutDashboard,
   Truck,
   Briefcase,
-  Trophy,
+  Coins,
   Users,
   FileText,
   ShieldCheck,
   Settings,
+  TriangleAlert,
 } from "lucide-react";
 
 const menuItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "Fleet & Vehicles", href: "/dashboard/fleet", icon: Truck },
   { name: "Job History", href: "/dashboard/jobs", icon: Briefcase },
-  { name: "Points & Rank", href: "/dashboard/points", icon: Trophy },
+  { name: "Nismara Coin", href: "/dashboard/currency", icon: Coins },
+  { name: "Points Penalty", href: "/dashboard/points", icon: TriangleAlert },
   { name: "Profile Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
