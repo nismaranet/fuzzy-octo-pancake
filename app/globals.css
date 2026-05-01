@@ -1,26 +1,88 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* 1. Mendaftarkan warna kustom ke dalam sistem Tailwind v4 */
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-accent-sky: hsl(var(--accent-sky));
+  --color-accent-lilac: hsl(var(--accent-lilac));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+/* 2. Mendefinisikan nilai warna untuk Light Mode dan Dark Mode */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 240 20% 98%;
+    --foreground: 222 47% 7%;
+    --primary: 262 80% 50%;
+    --primary-foreground: 210 40% 98%;
+    --accent-sky: 199 89% 48%;
+    --accent-lilac: 270 60% 60%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 7%;
+    --border: 240 6% 90%;
+  }
+
+  .dark {
+    --background: 222 47% 7%; /* Dark Navy / #0d1117 */
+    --foreground: 210 40% 98%;
+    --primary: 262 80% 65%; /* Bright Lilac/Purple */
+    --primary-foreground: 222 47% 7%;
+    --accent-sky: 199 89% 60%; /* Bright Sky Blue */
+    --accent-lilac: 270 70% 70%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --border: 217 33% 25%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* 3. Menerapkan gaya dasar ke elemen HTML */
+@layer base {
+  /* Mengganti @apply border-border yang error dengan native CSS */
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Efek Gradien Background */
+    background-image:
+      radial-gradient(
+        circle at 15% 0%,
+        hsla(var(--primary), 0.15) 0%,
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 85% 0%,
+        hsla(var(--accent-sky), 0.12) 0%,
+        transparent 40%
+      );
+    background-attachment: fixed;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+}
+
+/* 4. Membuat utility class kustom */
+@layer utilities {
+  .text-gradient {
+    /* Ubah bg-gradient-to-r menjadi bg-linear-to-r */
+    @apply bg-clip-text text-transparent bg-linear-to-r from-primary to-accent-sky;
+  }
+
+  .glass-panel {
+    @apply bg-card/40 backdrop-blur-md border border-border shadow-lg;
+  }
 }
