@@ -23,6 +23,7 @@ export default async function PublicProfilePage(props: {
   const { truckyId } = await props.params;
   const client = await clientPromise;
   const db = client.db();
+  const GUILD_ID = "863959415702028318";
 
   // 1. Cari user di MongoDB
   const user = await db.collection("users").findOne({
@@ -43,7 +44,8 @@ export default async function PublicProfilePage(props: {
 
   const userDiscordId = driverLink?.userId;
   const currencies = await db.collection("currencies").findOne({
-    $or: [{ userId: userDiscordId }, { userId: Number(userDiscordId) }],
+    userId: userDiscordId,
+    guildId: GUILD_ID,
   });
 
   if (!currencies) {
@@ -51,7 +53,8 @@ export default async function PublicProfilePage(props: {
   }
 
   const points = await db.collection("points").findOne({
-    $or: [{ userId: userDiscordId }, { userId: Number(userDiscordId) }],
+    userId: userDiscordId,
+    guildId: GUILD_ID,
   });
 
   if (!points) {
