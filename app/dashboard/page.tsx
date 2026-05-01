@@ -73,14 +73,17 @@ export default async function DashboardPage() {
   const truckyId = session.user.driverData.truckyId;
   const truckyData = await getDriverStats(truckyId);
   const discordId = session.user.discordId;
+  const GUILD_ID = "863959415702028318";
 
   // 3. Ambil Data Points & NC User
   const userPoint = await db.collection("points").findOne({
-    $or: [{ userId: discordId }, { userId: Number(discordId) }],
+    userId: discordId,
+    guildId: GUILD_ID,
   });
 
   const userNC = await db.collection("currencies").findOne({
-    $or: [{ userId: discordId }, { userId: Number(discordId) }],
+    userId: discordId,
+    guildId: GUILD_ID,
   });
 
   const NISMARA_COMPANY_ID = 35643;
@@ -109,11 +112,16 @@ export default async function DashboardPage() {
     .limit(3)
     .toArray();
 
+  const allJobs = await db
+    .collection("jobhistories")
+    .find({ driverId: discordId, guildId: GUILD_ID })
+    .toArray();
+
   // 5. Ambil Data Insights Riwayat NC (Earn) & Poin Penalty
   // Ganti "histories" dengan nama collection riwayat Anda
   const ncIncomes = await db
     .collection("currencyhistories") // Sesuaikan collection
-    .find({ userId: discordId, type: "earn" })
+    .find({ userId: discordId, guildId: GUILD_ID })
     .sort({ createdAt: -1 })
     .limit(5)
     .toArray();
@@ -122,7 +130,7 @@ export default async function DashboardPage() {
     .collection("pointhistories") // Sesuaikan collection
     .find({
       userId: discordId,
-      $or: [{ type: "add" }, { amount: { $lt: 0 } }], // Logika untuk mengambil data penalti/minus
+      guildId: GUILD_ID, // Logika untuk mengambil data penalti/minus
     })
     .sort({ createdAt: -1 })
     .limit(5)
@@ -214,7 +222,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
-          <Trophy className="absolute top-4 right-4 w-12 h-12 text-green-500/20 group-hover:text-green-500/40 transition-colors" />
+          <TriangleAlert className="absolute top-4 right-4 w-12 h-12 text-red-500/20 group-hover:text-red-500/40 transition-colors" />
           <p className="text-sm text-gray-400 mb-1">Total Poin</p>
           <p className="text-4xl font-bold text-(-primary-foreground)">
             {stats.points} Pts
@@ -228,10 +236,10 @@ export default async function DashboardPage() {
           <Truck className="text-accent-lilac" /> Status Pekerjaan Terakhir
         </h2>
         <Link
-          href="/dashboard/jobhistories"
+          href="/dashboard/jobs"
           className="text-sm text-accent-lilac hover:text-white flex items-center gap-1 transition-colors"
         >
-          Lihat Semua Jobs <ArrowRight className="w-4 h-4" />
+          Lihat Semua Jobs ({allJobs.length}) <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
 
@@ -374,67 +382,89 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-        {/* Income NC History */}
+        {/* Riwayat NC */}
         <div className="glass-panel p-6 rounded-2xl">
           <h3 className="text-md font-bold mb-4 flex items-center gap-2 text-yellow-400">
-            <Coins className="w-5 h-5" /> Pendapatan NC Terakhir
+            <Coins className="w-5 h-5" /> Transaksi NC Terakhir
           </h3>
           <div className="space-y-3">
             {ncIncomes.length > 0 ? (
-              ncIncomes.map((history) => (
-                <div
-                  key={history._id.toString()}
-                  className="flex justify-between items-center p-3 bg-card/50 rounded-lg border border-border/50"
-                >
-                  <div className="overflow-hidden pr-3">
-                    <p className="text-sm text-white font-medium truncate">
-                      {history.reason || "Pemasukan"}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(history.createdAt).toLocaleDateString("id-ID")}
-                    </p>
+              ncIncomes.map((history) => {
+                // Menentukan logika warna dan tanda untuk NC
+                const isEarn = history.type === "earn";
+                const ncSign = isEarn ? "+" : "-";
+                const ncColor = isEarn ? "text-green-400" : "text-red-400";
+
+                return (
+                  <div
+                    key={history._id.toString()}
+                    className="flex justify-between items-center p-3 bg-card/50 rounded-lg border border-border/50"
+                  >
+                    <div className="overflow-hidden pr-3">
+                      <p className="text-sm text-white font-medium truncate">
+                        {history.reason ||
+                          (isEarn ? "Pemasukan NC" : "Pengeluaran NC")}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(history.createdAt).toLocaleDateString(
+                          "id-ID",
+                        )}
+                      </p>
+                    </div>
+                    <span className={`text-sm font-bold shrink-0 ${ncColor}`}>
+                      {ncSign}
+                      {history.amount} NC
+                    </span>
                   </div>
-                  <span className="text-sm font-bold text-green-400 shrink-0">
-                    +{history.amount} NC
-                  </span>
-                </div>
-              ))
+                );
+              })
             ) : (
               <p className="text-sm text-gray-500 italic">
-                Belum ada riwayat pendapatan.
+                Belum ada riwayat transaksi NC.
               </p>
             )}
           </div>
         </div>
 
-        {/* Penalty Point History */}
+        {/* Riwayat Poin Penalti */}
         <div className="glass-panel p-6 rounded-2xl">
           <h3 className="text-md font-bold mb-4 flex items-center gap-2 text-red-400">
-            <TriangleAlert className="w-5 h-5" /> Poin Penalti Terakhir
+            <TriangleAlert className="w-5 h-5" /> Riwayat Poin Terakhir
           </h3>
           <div className="space-y-3">
             {pointPenalties.length > 0 ? (
-              pointPenalties.map((penalty) => (
-                <div
-                  key={penalty._id.toString()}
-                  className="flex justify-between items-center p-3 bg-card/50 rounded-lg border border-border/50"
-                >
-                  <div className="overflow-hidden pr-3">
-                    <p className="text-sm text-white font-medium truncate">
-                      {penalty.reason || "Pengurangan Poin"}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(penalty.createdAt).toLocaleDateString("id-ID")}
-                    </p>
+              pointPenalties.map((penalty) => {
+                // Menentukan logika warna dan tanda untuk Poin Penalti
+                const isAdd = penalty.type === "add";
+                const ptsSign = isAdd ? "+" : "-";
+                const ptsColor = isAdd ? "text-red-400" : "text-green-400";
+
+                return (
+                  <div
+                    key={penalty._id.toString()}
+                    className="flex justify-between items-center p-3 bg-card/50 rounded-lg border border-border/50"
+                  >
+                    <div className="overflow-hidden pr-3">
+                      <p className="text-sm text-white font-medium truncate">
+                        {penalty.reason ||
+                          (isAdd ? "Penalti Ditambahkan" : "Penalti Dikurangi")}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(penalty.createdAt).toLocaleDateString(
+                          "id-ID",
+                        )}
+                      </p>
+                    </div>
+                    <span className={`text-sm font-bold shrink-0 ${ptsColor}`}>
+                      {ptsSign}
+                      {penalty.points} Pts
+                    </span>
                   </div>
-                  <span className="text-sm font-bold text-red-400 shrink-0">
-                    {penalty.points} Pts
-                  </span>
-                </div>
-              ))
+                );
+              })
             ) : (
               <p className="text-sm text-gray-500 italic">
-                Bersih! Tidak ada riwayat penalti.
+                Bersih! Tidak ada riwayat poin.
               </p>
             )}
           </div>
