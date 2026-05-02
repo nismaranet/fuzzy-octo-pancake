@@ -18,7 +18,7 @@ export const authOptions: NextAuthOptions = {
       const client = await clientPromise;
       const db = client.db();
 
-      // 1. Ambil ID Discord dari koleksi 'accounts'
+      // 1. Ambil data akun Discord dari koleksi 'accounts'
       const account = await db.collection("accounts").findOne({
         userId: new ObjectId(user.id),
         provider: "discord",
@@ -30,10 +30,30 @@ export const authOptions: NextAuthOptions = {
 
       if (account) {
         const discordId = account.providerAccountId;
-        const guildId = "863959415702028318"; // ID Server Nismara
-        const managerRoleId = "1406574228794507354"; // ID Role Transport Manager
 
-        // --- VERIFIKASI ROLE DISCORD (Manager Check) ---
+        // 2. PERBAIKAN: Gunakan $set untuk discordId dan lastSeen (Bukan $cache)
+        await db.collection("users").updateOne(
+          { _id: new ObjectId(user.id) },
+          {
+            $set: {
+              discordId: discordId,
+              lastSeen: new Date(),
+            },
+          },
+        );
+
+        // 3. Inisialisasi XP dan Level hanya jika belum ada
+        await db
+          .collection("users")
+          .updateOne(
+            { _id: new ObjectId(user.id), xp: { $exists: false } },
+            { $set: { xp: 0, level: 1 } },
+          );
+
+        // --- VERIFIKASI ROLE DISCORD ---[cite: 16]
+        const guildId = "863959415702028318";
+        const managerRoleId = "1406574228794507354";
+
         try {
           const response = await fetch(
             `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
@@ -55,9 +75,10 @@ export const authOptions: NextAuthOptions = {
           console.error("Gagal verifikasi role Discord:", error);
         }
 
-        // --- SYNC TRUCKY ID KE TABLE USERS ---
+        // --- SYNC TRUCKY ID ---[cite: 16]
         const driverLink = await db.collection("driverlinks").findOne({
           userId: discordId,
+          guildId,
         });
 
         if (driverLink) {
@@ -79,17 +100,22 @@ export const authOptions: NextAuthOptions = {
         session.user.discordId = discordId;
       }
 
-      // Masukkan semua data ke session NextAuth
+      // 4. Ambil data terbaru untuk session[cite: 16, 17]
+      const dbUser = await db
+        .collection("users")
+        .findOne({ _id: new ObjectId(user.id) });
+
       session.user.isDriver = isDriver;
       session.user.driverData = driverData;
       session.user.role = userRole;
+      session.user.xp = dbUser?.xp || 0;
+      session.user.level = dbUser?.level || 1;
+      session.user.teamId = dbUser?.teamId ? dbUser.teamId.toString() : null;
 
       return session;
     },
   },
-  pages: {
-    signIn: "/auth/signin",
-  },
+  pages: { signIn: "/auth/signin" },
   debug: process.env.NODE_ENV === "development",
 };
 
