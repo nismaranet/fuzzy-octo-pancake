@@ -4,25 +4,55 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 import { revalidatePath } from "next/cache";
+import { deleteFileFromR2 } from "@/lib/r2"; // Gunakan utility hapus R2 yang sudah dibuat sebelumnya
 
 export async function updateProfile(formData: FormData) {
   const session = await getServerSession(authOptions);
 
-  // Pastikan session dan email tersedia
   if (!session || !session.user?.email) {
     return { success: false, message: "Unauthorized: Silakan login kembali." };
   }
 
   const name = formData.get("name") as string;
-  const image = formData.get("image") as string;
-  const bannerUrl = formData.get("bannerUrl") as string;
-  const backgroundUrl = formData.get("backgroundUrl") as string;
+  const image = formData.get("image") as string; // URL Baru dari R2
+  const bannerUrl = formData.get("bannerUrl") as string; // URL Baru dari R2
+  const backgroundUrl = formData.get("backgroundUrl") as string; // URL Baru dari R2
 
   try {
     const client = await clientPromise;
     const db = client.db();
 
-    // KUNCI PERBAIKAN: Cari berdasarkan EMAIL, bukan ObjectId
+    // 1. Ambil data profil lama untuk mengecek URL foto lama
+    const oldUser = await db
+      .collection("users")
+      .findOne({ email: session.user.email });
+
+    if (!oldUser) {
+      return { success: false, message: "User tidak ditemukan." };
+    }
+
+    // 2. Logika Pembersihan: Jika URL baru berbeda dengan URL lama, hapus file lama dari R2[cite: 17]
+
+    // Cek Avatar
+    if (image && oldUser.image && image !== oldUser.image) {
+      await deleteFileFromR2(oldUser.image);
+    }
+
+    // Cek Banner
+    if (bannerUrl && oldUser.bannerUrl && bannerUrl !== oldUser.bannerUrl) {
+      await deleteFileFromR2(oldUser.bannerUrl);
+    }
+
+    // Cek Background
+    if (
+      backgroundUrl &&
+      oldUser.backgroundUrl &&
+      backgroundUrl !== oldUser.backgroundUrl
+    ) {
+      await deleteFileFromR2(oldUser.backgroundUrl);
+    }
+
+    // 3. Eksekusi Update ke Database[cite: 17]
     const updateResult = await db.collection("users").updateOne(
       { email: session.user.email },
       {
@@ -36,22 +66,17 @@ export async function updateProfile(formData: FormData) {
       },
     );
 
-    // Cek apakah data benar-benar ada yang berubah/ditemukan
     if (updateResult.matchedCount === 0) {
-      return { success: false, message: "Akun tidak ditemukan di database." };
+      return { success: false, message: "Gagal memperbarui profil." };
     }
 
-    // Refresh cache agar halaman langsung berubah tanpa perlu F5
     revalidatePath("/profile/[truckyId]", "page");
     revalidatePath("/dashboard/settings");
 
     return { success: true, message: "Profil berhasil diperbarui!" };
   } catch (error) {
     console.error("Update Profile Error:", error);
-    return {
-      success: false,
-      message: "Terjadi kesalahan saat menyimpan ke database.",
-    };
+    return { success: false, message: "Terjadi kesalahan sistem." };
   }
 }
 

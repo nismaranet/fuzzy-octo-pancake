@@ -44,7 +44,7 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  if (!session.user.isDriver || !session.user.driverData) {
+  if (!session.user?.isDriver || !session.user.driverData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center">
         <div className="glass-panel p-8 rounded-2xl max-w-md border-red-500/30">
