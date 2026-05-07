@@ -446,6 +446,91 @@ export default function ManageUserUI({
           </div>
         </div>
       </div>
+
+      {/* MODAL MANAGE LEAVE */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-[#161b22] w-full max-w-md border border-white/10 rounded-[2.5rem] p-8 space-y-6 shadow-2xl animate-in zoom-in duration-300">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-accent-lilac/10 rounded-lg text-accent-lilac">
+                  <Calendar size={20} />
+                </div>
+                <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">
+                  Manage Leave
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleLeaveSubmit} className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                    Mulai Cuti
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white outline-none focus:border-accent-lilac transition-all text-xs font-bold"
+                    value={formData.startDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startDate: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                    Selesai Cuti
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white outline-none focus:border-accent-lilac transition-all text-xs font-bold"
+                    value={formData.endDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, endDate: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                  Alasan Cuti
+                </label>
+                <textarea
+                  required
+                  placeholder="Contoh: Perbaikan PC atau urusan keluarga..."
+                  className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white outline-none focus:border-accent-lilac transition-all resize-none text-sm font-medium"
+                  rows={3}
+                  value={formData.reason}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reason: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-accent-lilac text-white font-black uppercase tracking-widest rounded-2xl hover:bg-accent-lilac/80 transition-all shadow-lg shadow-accent-lilac/20 flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 size={18} /> Ajukan Cuti
+                </button>
+                <p className="text-center mt-4 text-[9px] font-bold text-gray-500 uppercase tracking-widest italic">
+                  Data ini akan langsung diproses oleh sistem Nismara.
+                </p>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
