@@ -55,15 +55,17 @@ export default async function TeamDetailPage({ params }: PageProps) {
       }
     });
 
-    // 4. Cari detail User Members[cite: 16]
+    // Buat filter dengan tipe Filter<any> untuk fleksibilitas
+    const memberFilter: any = {
+      $or: [
+        { _id: { $in: validMemberIdsObj } },
+        { _id: { $in: validMemberIdsStr } },
+      ],
+    };
+
     const membersRaw = await db
       .collection("users")
-      .find({
-        $or: [
-          { _id: { $in: validMemberIdsObj } },
-          { _id: { $in: validMemberIdsStr } },
-        ],
-      })
+      .find(memberFilter)
       .toArray();
 
     const teamTotalXp = membersRaw.reduce(
@@ -75,9 +77,10 @@ export default async function TeamDetailPage({ params }: PageProps) {
     const progressToNextLevel =
       (teamTotalXp % XP_PER_LEVEL) / (XP_PER_LEVEL / 100);
 
-    // 5. Logic Recent Jobs Tangguh[cite: 16]
-    const validTruckyIds = [];
-    const validDiscordIds = [];
+    // 5. Logic Recent Jobs Tangguh
+    // Memberikan tipe data eksplisit agar build tidak error
+    const validTruckyIds: (string | number)[] = [];
+    const validDiscordIds: string[] = [];
 
     membersRaw.forEach((user) => {
       if (user.truckyId) {
@@ -89,15 +92,16 @@ export default async function TeamDetailPage({ params }: PageProps) {
       if (user.driverId) validDiscordIds.push(String(user.driverId));
     });
 
-    let recentJobsRaw = [];
+    // Berikan tipe any[] agar fleksibel menerima data dari MongoDB
+    let recentJobsRaw: any[] = [];
     if (membersRaw.length > 0) {
       recentJobsRaw = await db
         .collection("jobhistories")
         .find({
           jobStatus: { $regex: /^completed$/i },
           $or: [
-            { truckyId: { $in: validTruckyIds } },
-            { driverId: { $in: validDiscordIds } },
+            { truckyId: { $in: validTruckyIds as any } }, // Gunakan as any jika TS masih protes
+            { driverId: { $in: validDiscordIds as any } },
           ],
         })
         .sort({ completedAt: -1 })

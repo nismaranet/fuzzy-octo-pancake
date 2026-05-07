@@ -77,12 +77,25 @@ export default function TeamProfileUI({
                 Manage Team
               </Link>
             ) : (
+              // Periksa apakah user sudah bergabung atau belum
               !members.some((m) => m._id === currentUserId) && (
                 <button
-                  onClick={() => {}}
-                  className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-full shadow-lg hover:scale-105 transition-all"
+                  onClick={handleJoin}
+                  disabled={loading}
+                  className={`px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-full shadow-lg transition-all ${
+                    loading
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:scale-105 active:scale-95"
+                  }`}
                 >
-                  Join Team
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </div>
+                  ) : (
+                    "Join Team"
+                  )}
                 </button>
               )
             )}

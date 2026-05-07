@@ -4,6 +4,14 @@ import { getUserPointsData } from "./actions";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import PenaltyClientUI from "./PenaltyClientUI";
 
+interface HistoryItem {
+  _id: string;
+  points: number;
+  reason: string;
+  type: "add" | "remove";
+  createdAt: string | Date;
+}
+
 export const metadata = {
   title: "Poin & Penalti | Nismara Logistics",
   description: "Pantau dan kelola poin penalti Anda di Nismara Logistics.",
@@ -20,7 +28,7 @@ export default async function PointsPage() {
   }
 
   // Mengambil data dari database
-  const data = await getUserPointsData(userId);
+  const data = await getUserPointsData(String(userId));
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -41,7 +49,7 @@ export default async function PointsPage() {
         initialPoints={data.totalPoints}
         totalNC={data.totalNC}
         pointPrice={data.pointPrice}
-        history={data.history}
+        history={data.history as HistoryItem[]}
       />
     </div>
   );

@@ -73,11 +73,11 @@ export default function HeroSlider({ isDriver }: { isDriver: boolean }) {
           Musim Logistik 2026 Telah Dimulai
         </div>
 
-        <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 text-white drop-shadow-lg transition-all duration-500">
+        <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 text-(-foreground) drop-shadow-lg transition-all duration-500">
           {slides[current].title}
         </h1>
 
-        <p className="max-w-2xl text-lg sm:text-xl text-gray-300 mb-10 leading-relaxed transition-all duration-500">
+        <p className="max-w-2xl text-lg sm:text-xl text-(-foreground)-300 mb-10 leading-relaxed transition-all duration-500">
           {slides[current].subtitle}
         </p>
 
@@ -99,7 +99,7 @@ export default function HeroSlider({ isDriver }: { isDriver: boolean }) {
           )}
           <a
             href="#features"
-            className="flex items-center justify-center w-full py-3 px-6 glass-panel hover:bg-card/60 text-white font-medium rounded-lg transition-all"
+            className="flex items-center justify-center w-full py-3 px-6 glass-panel hover:bg-card/60 text-(-foreground) font-medium rounded-lg transition-all"
           >
             Pelajari Fitur
           </a>

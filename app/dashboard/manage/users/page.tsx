@@ -1,187 +1,150 @@
+// app/dashboard/manage/users/page.tsx
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import clientPromise from "@/lib/mongodb";
 import { getCompanyMembersMap } from "@/lib/trucky";
-import {
-  Users,
-  ShieldCheck,
-  ExternalLink,
-  Search,
-  Filter,
-  MoreVertical,
-  Truck,
-} from "lucide-react";
-import Image from "next/image";
+import ManageUsersTable from "./ManageUsersTable";
+import { Users, UserCheck, UserMinus, Globe, Shield, User } from "lucide-react";
 
 export default async function ManageUsersPage() {
   const session = await getServerSession(authOptions);
 
-  // PROTEKSI: Hanya Manager yang bisa akses
   if (!session || session.user.role !== "manager") {
     redirect("/dashboard");
   }
 
   const client = await clientPromise;
   const db = client.db();
+  const guildId = process.env.DISCORD_GUILD_ID;
 
-  // 1. Ambil semua akun dari driverlinks (Data Member VTC)
-  const driverLinks = await db.collection("driverlinks").find({}).toArray();
+  // 1. Fetch data secara paralel
+  const [driverLinks, webUsers] = await Promise.all([
+    db.collection("driverlinks").find({ guildId }).toArray(),
+    db.collection("users").find({}).toArray(),
+  ]);
 
-  // 2. Ambil semua user dari collection 'users' (Data Login Web)
-  // Kita ambil untuk mencocokkan siapa yang sudah pernah login ke web
-  const webUsers = await db.collection("users").find({}).toArray();
-
-  // 3. Ambil Map Member dari Trucky (Cached 1 jam)
   const membersMap = await getCompanyMembersMap(35643);
 
-  // 4. Gabungkan Data
-  const allMembers = driverLinks.map((link) => {
-    const truckyProfile = membersMap[Number(link.truckyId)];
-    // Cari apakah user ini punya akun di web (NextAuth)
-    // Biasanya dicocokkan lewat email atau discordId jika disimpan
-    const hasWebAccount = webUsers.find(
-      (u) => u.email === truckyProfile?.email,
+  // 2. Transformasi & Gabungkan Data
+  const combinedData = driverLinks.map((link) => {
+    const truckyData = membersMap[link.truckyId] || {};
+    const webData = webUsers.find(
+      (wu) => String(wu.truckyId) === String(link.truckyId),
     );
 
     return {
       id: link._id.toString(),
-      discordId: link.userId,
       truckyId: link.truckyId,
-      truckyName: truckyProfile?.name || link.truckyName || "Unknown",
-      avatarUrl: truckyProfile?.avatar_url || null,
-      role: truckyProfile?.role?.name || "Driver",
-      joinedAt: truckyProfile?.joined_at || link.createdAt,
-      isWebActive: !!hasWebAccount,
+      discordId: link.userId || webData?.discordId,
+      name:
+        webData?.name || link.truckyName || truckyData.username || "Unknown",
+      image: webData?.image || truckyData.avatar_url || null,
+      role:
+        typeof truckyData?.role === "object"
+          ? truckyData.role.name
+          : truckyData?.role || "Driver",
+      isWebActive: !!webData,
+      isOnLeave: webData?.isOnLeave || false,
+      joinDate: truckyData.joinDate || link.createdAt,
     };
   });
 
-  return (
-    <main className="min-h-screen pt-24 pb-12 bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Manajemen */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-          <div>
-            <h1 className="text-3xl font-black text-white flex items-center gap-3">
-              <Users className="text-primary" /> Member Management
-            </h1>
-            <p className="text-gray-400 mt-1">
-              Kelola dan pantau seluruh pengemudi Nismara Transport.
-            </p>
-          </div>
+  // 3. Perhitungan Statistik Berdasarkan Combined Data
+  const stats = [
+    {
+      label: "Total Drivers",
+      value: combinedData.length,
+      icon: <Users size={24} />,
+      color: "from-blue-600/20 to-blue-400/5",
+      border: "border-blue-500/20",
+      text: "text-blue-400",
+    },
+    {
+      label: "Active Drivers",
+      value: combinedData.filter((d) => !d.isOnLeave).length,
+      icon: <UserCheck size={24} />,
+      color: "from-emerald-600/20 to-emerald-400/5",
+      border: "border-emerald-500/20",
+      text: "text-emerald-400",
+    },
+    {
+      label: "On Leave",
+      value: combinedData.filter((d) => d.isOnLeave).length,
+      icon: <UserMinus size={24} />,
+      color: "from-orange-600/20 to-orange-400/5",
+      border: "border-orange-500/20",
+      text: "text-orange-400",
+    },
+    {
+      label: "Web Registered",
+      value: combinedData.filter((d) => d.isWebActive).length,
+      icon: <Globe size={24} />,
+      color: "from-accent-lilac/20 to-purple-400/5",
+      border: "border-accent-lilac/20",
+      text: "text-accent-lilac",
+    },
+  ];
 
-          <div className="flex items-center gap-4">
-            <div className="glass-panel px-4 py-2 rounded-xl flex items-center gap-3 border-primary/20">
-              <div className="text-right">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">
-                  Total Members
+  return (
+    <main className="p-6 space-y-10 animate-in fade-in duration-700">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-accent-lilac/10 rounded-lg text-accent-lilac">
+              <Users size={20} />
+            </div>
+            <h1 className="text-4xl font-black text-white tracking-tighter uppercase">
+              Driver Management
+            </h1>
+          </div>
+          <p className="text-white/40 font-bold uppercase text-[10px] tracking-[0.2em] ml-11">
+            Nismara Transport • Management Driver
+          </p>
+        </div>
+      </div>
+
+      {/* STATS GRID */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat, i) => (
+          <div
+            key={i}
+            className={`glass-panel p-6 rounded-[2rem] border ${stat.border} bg-gradient-to-br ${stat.color} relative overflow-hidden group hover:scale-[1.02] transition-all duration-300`}
+          >
+            <div className="flex justify-between items-start relative z-10">
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+                  {stat.label}
                 </p>
-                <p className="text-xl font-black text-white">
-                  {allMembers.length}
+                <p className="text-4xl font-black text-white italic tabular-nums">
+                  {stat.value}
                 </p>
               </div>
-              <Users className="text-primary w-5 h-5" />
+              <div
+                className={`p-3 rounded-2xl bg-white/5 ${stat.text} group-hover:rotate-12 transition-transform`}
+              >
+                {stat.icon}
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Toolbar: Search & Filter */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="md:col-span-2 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Cari berdasarkan nama atau Trucky ID..."
-              className="w-full bg-card/50 border border-border/50 rounded-2xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-primary/50 transition-all"
+            {/* Background Accent */}
+            <div
+              className={`absolute -bottom-4 -right-4 w-24 h-24 blur-3xl opacity-20 bg-current ${stat.text}`}
             />
           </div>
-          <button className="glass-panel flex items-center justify-center gap-2 font-bold text-gray-400 hover:text-white transition-colors">
-            <Filter className="w-4 h-4" /> Filter Status
-          </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Table View */}
-        <div className="glass-panel rounded-3xl overflow-hidden border-border/40 shadow-2xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-card/50 border-b border-border/50 text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                  <th className="px-6 py-5">Driver & ID</th>
-                  <th className="px-6 py-5">Discord ID</th>
-                  <th className="px-6 py-5">Role VTC</th>
-                  <th className="px-6 py-5">Web Status</th>
-                  <th className="px-6 py-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/30">
-                {allMembers.map((member) => (
-                  <tr
-                    key={member.id}
-                    className="hover:bg-white/[0.02] transition-colors group"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-border/50 bg-card shrink-0">
-                          {member.avatarUrl ? (
-                            <img
-                              src={member.avatarUrl}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-primary font-bold bg-primary/10">
-                              {member.truckyName.charAt(0)}
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-bold text-white leading-tight">
-                            {member.truckyName}
-                          </p>
-                          <p className="text-[10px] text-primary font-mono mt-1">
-                            TRUCKY: {member.truckyId}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <code className="text-xs text-gray-500 bg-black/20 px-2 py-1 rounded border border-white/5">
-                        {member.discordId}
-                      </code>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-gray-400 uppercase">
-                        {member.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {member.isWebActive ? (
-                        <div className="flex items-center gap-2 text-green-400 text-[10px] font-bold uppercase">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />{" "}
-                          Registered
-                        </div>
-                      ) : (
-                        <div className="text-gray-600 text-[10px] font-bold uppercase">
-                          Not Logged In
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button className="p-2 hover:bg-primary/20 rounded-lg text-gray-500 hover:text-primary transition-all">
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 hover:bg-card rounded-lg text-gray-500 hover:text-white transition-all">
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* TABLE SECTION */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-2">
+          <div className="h-px bg-white/10 flex-1" />
+          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">
+            Driver Directory
+          </span>
+          <div className="h-px bg-white/10 flex-1" />
         </div>
+        <ManageUsersTable initialData={combinedData} />
       </div>
     </main>
   );

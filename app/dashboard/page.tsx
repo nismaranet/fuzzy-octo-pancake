@@ -73,7 +73,7 @@ export default async function DashboardPage() {
   const truckyId = session.user.driverData.truckyId;
   const truckyData = await getDriverStats(truckyId);
   const discordId = session.user.discordId;
-  const GUILD_ID = "863959415702028318";
+  const GUILD_ID = process.env.DISCORD_GUILD_ID;
 
   // 3. Ambil Data Points & NC User
   const userPoint = await db.collection("points").findOne({
@@ -86,8 +86,11 @@ export default async function DashboardPage() {
     guildId: GUILD_ID,
   });
 
-  const NISMARA_COMPANY_ID = 35643;
-  const memberData = await getCompanyMemberStats(NISMARA_COMPANY_ID, truckyId);
+  const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID;
+  const memberData = await getCompanyMemberStats(
+    Number(NISMARA_COMPANY_ID),
+    truckyId,
+  );
 
   // 4. Ambil Data Insights Job (Ongoing, Completed, Canceled)
   // Ganti "jobs" dengan nama collection job Anda yang sebenarnya

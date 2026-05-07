@@ -15,7 +15,7 @@ interface HistoryItem {
   points: number;
   reason: string;
   type: "add" | "remove";
-  createdAt: string;
+  createdAt: string | Date;
 }
 
 interface PenaltyClientUIProps {

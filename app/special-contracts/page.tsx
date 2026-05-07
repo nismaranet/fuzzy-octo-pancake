@@ -25,13 +25,18 @@ export default async function SpecialContractsPage() {
   const client = await clientPromise;
   const db = client.db();
 
+  const guildId = process.env.DISCORD_GUILD_ID;
+
   // 1. Ambil Kontrak Aktif
-  const activeContracts = await db.collection("contracts").find({}).toArray();
+  const activeContracts = await db
+    .collection("contracts")
+    .find({ guildId })
+    .toArray();
 
   // 2. Ambil Riwayat Kontrak
   const historyContracts = await db
     .collection("contracthistories")
-    .find({})
+    .find({ guildId })
     .sort({ closedAt: -1 })
     .limit(10)
     .toArray();

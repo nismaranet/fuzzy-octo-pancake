@@ -13,10 +13,15 @@ import {
   ShieldCheck,
   Settings,
   TriangleAlert,
+  Sparkles,
+  Landmark,
+  ReceiptText,
+  BookOpen,
 } from "lucide-react";
 
 const menuItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Driver Guide", href: "/dashboard/driver-guide", icon: BookOpen },
   { name: "Fleet & Vehicles", href: "/dashboard/fleet", icon: Truck },
   { name: "Job History", href: "/dashboard/jobs", icon: Briefcase },
   { name: "Nismara Coin", href: "/dashboard/currency", icon: Coins },
@@ -31,6 +36,21 @@ const managementItems = [
     name: "Manage Contracts",
     href: "/dashboard/manage/contracts",
     icon: FileText,
+  },
+  {
+    name: "Manage Events",
+    href: "/dashboard/manage/events",
+    icon: Sparkles,
+  },
+  {
+    name: "Manage NC Data",
+    href: "/dashboard/manage/currency-data",
+    icon: Landmark,
+  },
+  {
+    name: "Manage Point Data",
+    href: "/dashboard/manage/point-data",
+    icon: ReceiptText,
   },
 ];
 

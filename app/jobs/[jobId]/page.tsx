@@ -137,15 +137,19 @@ export default async function JobDetailPage(props: {
     }
   }
 
+  // 1. Definisikan objek warna secara terpisah
+  const statusMap = {
+    COMPLETED:
+      "text-green-600 bg-green-100 border-green-200 dark:text-green-400 dark:bg-green-400/10 dark:border-green-400/20",
+    ONGOING:
+      "text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-400 dark:bg-blue-400/10 dark:border-blue-400/20 animate-pulse",
+    CANCELED:
+      "text-red-600 bg-red-100 border-red-200 dark:text-red-400 dark:bg-red-400/10 dark:border-red-400/20",
+  };
+
+  // 2. Ambil warnanya. TypeScript sekarang tidak akan protes.
   const statusColor =
-    {
-      COMPLETED:
-        "text-green-600 bg-green-100 border-green-200 dark:text-green-400 dark:bg-green-400/10 dark:border-green-400/20",
-      ONGOING:
-        "text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-400 dark:bg-blue-400/10 dark:border-blue-400/20 animate-pulse",
-      CANCELED:
-        "text-red-600 bg-red-100 border-red-200 dark:text-red-400 dark:bg-red-400/10 dark:border-red-400/20",
-    }[localJob?.jobStatus as keyof typeof statusColor] ||
+    statusMap[localJob?.jobStatus as keyof typeof statusMap] ||
     "text-slate-600 bg-slate-100 border-slate-200 dark:text-gray-400 dark:bg-gray-400/10 dark:border-gray-400/20";
 
   return (
