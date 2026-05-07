@@ -146,7 +146,7 @@ export default function Footer() {
                 className="h-6 w-auto object-contain"
               />
               <div className="flex items-center gap-2 text-white/50">
-                <DiscordIcon size={18} />
+                <DiscordIcon className="w-9 h-9" />
                 <span className="text-xs font-black tracking-widest">
                   DISCORD
                 </span>
