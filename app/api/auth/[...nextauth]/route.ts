@@ -90,12 +90,15 @@ export const authOptions: NextAuthOptions = {
           };
 
           // Update/Sync truckyId ke dokumen user agar bisa dibuat profile public
-          await db
-            .collection("users")
-            .updateOne(
-              { _id: new ObjectId(user.id) },
-              { $set: { truckyId: driverLink.truckyId } },
-            );
+          await db.collection("users").updateOne(
+            { _id: new ObjectId(user.id) },
+            {
+              $set: {
+                truckyId: driverLink.truckyId,
+                isDriver: true,
+              },
+            },
+          );
         }
 
         session.user.discordId = discordId;

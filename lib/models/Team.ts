@@ -36,7 +36,7 @@ const TeamSchema = new Schema<ITeam>(
       unique: true,
       trim: true,
       uppercase: true,
-      maxLength: [5, "Tag tim maksimal 5 karakter (contoh: NISM)"],
+      maxLength: [4, "Tag tim maksimal 5 karakter (contoh: NISM)"],
     },
     description: {
       type: String,

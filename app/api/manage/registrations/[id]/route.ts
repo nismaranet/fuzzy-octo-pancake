@@ -55,6 +55,7 @@ export async function PATCH(
         {
           $set: {
             truckyId: truckyId,
+            isDriver: true,
             updatedAt: new Date(),
           },
         },

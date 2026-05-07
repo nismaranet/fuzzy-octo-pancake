@@ -20,6 +20,7 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRight,
+  ShieldAlert,
 } from "lucide-react";
 
 function formatWIB(dateInput: string | Date | undefined) {
@@ -46,23 +47,39 @@ export default async function DashboardPage() {
 
   if (!session.user?.isDriver || !session.user.driverData) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center">
-        <div className="glass-panel p-8 rounded-2xl max-w-md border-red-500/30">
-          <h2 className="text-2xl font-bold text-red-400 mb-2">
-            Akses Ditolak
-          </h2>
-          <p className="text-gray-400 mb-6">
-            Kamu belum terdaftar sebagai pengemudi Nismara Logistics. Silakan
-            daftar melalui Discord kami.
-          </p>
-          <a
-            href="/register"
-            className="px-6 py-2 bg-card hover:bg-card/80 border border-border rounded-lg text-white transition-colors"
-          >
-            Register Sekarang
-          </a>
+      <main className="min-h-[80vh] w-full flex items-center justify-center p-6 bg-(-background)">
+        <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-700">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 bg-red-500/20 blur-3xl rounded-full" />
+            <div className="relative w-24 h-24 bg-card border border-red-500/30 text-red-500 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-2xl">
+              <ShieldAlert size={48} />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-4xl font-black text-(-primary-foreground) uppercase tracking-tighter">
+              Akses <span className="text-red-500">Ditolak</span>
+            </h2>
+            <p className="text-foreground/50 font-medium leading-relaxed">
+              Kamu belum terdaftar sebagai pengemudi resmi Nismara Logistics.
+              Fitur dashboard hanya tersedia untuk anggota aktif.
+            </p>
+          </div>
+          <div className="flex flex-col gap-4 items-center">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-3 px-10 py-4 bg-primary text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+            >
+              Daftar Sekarang <ArrowRight size={14} />
+            </Link>
+            <Link
+              href="/"
+              className="text-[10px] font-bold text-foreground/20 uppercase tracking-widest hover:text-foreground/50 transition-colors"
+            >
+              Kembali ke Beranda
+            </Link>
+          </div>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -129,6 +146,10 @@ export default async function DashboardPage() {
     .limit(5)
     .toArray();
 
+  const dLink = await db
+    .collection("driverlinks")
+    .findOne({ userId: discordId, guildId: GUILD_ID });
+
   const pointPenalties = await db
     .collection("pointhistories") // Sesuaikan collection
     .find({
@@ -150,8 +171,8 @@ export default async function DashboardPage() {
       memberData?.points?.toLocaleString() ||
       "0",
     userNc: userNC?.totalNC?.toLocaleString() || "0",
-    joinDate: memberData?.created_at
-      ? new Date(memberData.created_at).toLocaleDateString("id-ID")
+    joinDate: dLink?.createdAt
+      ? new Date(dLink.createdAt).toLocaleDateString("id-ID")
       : "-",
   };
 

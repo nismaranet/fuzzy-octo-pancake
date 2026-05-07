@@ -9,7 +9,7 @@ import { deleteFileFromR2 } from "@/lib/r2"; // Gunakan utility hapus R2 yang su
 export async function updateProfile(formData: FormData) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.email) {
+  if (!session || !session.user?.truckyId) {
     return { success: false, message: "Unauthorized: Silakan login kembali." };
   }
 

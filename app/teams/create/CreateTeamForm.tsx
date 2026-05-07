@@ -99,12 +99,13 @@ export default function CreateTeamForm() {
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Nama Tim *
+                  Nama Tim (Max 50 Karakter) *
                 </label>
                 <input
                   type="text"
                   name="name"
                   required
+                  maxLength={50}
                   onChange={(e) =>
                     !uriPreview && handleUriChange(e.target.value)
                   }
@@ -113,13 +114,13 @@ export default function CreateTeamForm() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Tag Tim *
+                  Tag Tim (Max 4 Karakter) *
                 </label>
                 <input
                   type="text"
                   name="tag"
                   required
-                  maxLength={5}
+                  maxLength={4}
                   className="w-full bg-background/50 border border-border rounded-xl px-4 py-3 uppercase outline-none focus:border-primary transition-all"
                 />
               </div>

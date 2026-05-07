@@ -17,6 +17,7 @@ import {
   Landmark,
   ReceiptText,
   BookOpen,
+  User2,
 } from "lucide-react";
 
 const menuItems = [
@@ -32,6 +33,11 @@ const menuItems = [
 const managementItems = [
   { name: "Manager Overview", href: "/dashboard/manage", icon: ShieldCheck },
   { name: "Manage Users", href: "/dashboard/manage/users", icon: Users },
+  {
+    name: "User Registration",
+    href: "/dashboard/manage/register-user",
+    icon: User2,
+  },
   {
     name: "Manage Contracts",
     href: "/dashboard/manage/contracts",

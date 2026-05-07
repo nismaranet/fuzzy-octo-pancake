@@ -1,296 +1,59 @@
-"use client";
+// app/dashboard/settings/page.tsx
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import SettingsClient from "./SettingsClient"; // Kita pindahkan logic form ke sini
+import { ShieldAlert, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
-import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react"; // Tambahkan useEffect
-import { updateProfile, getUserSettings } from "./actions"; // Import getUserSettings
-import {
-  User,
-  Image as ImageIcon,
-  Layout,
-  Monitor,
-  Save,
-  Loader2,
-  CheckCircle,
-  UploadCloud,
-} from "lucide-react";
+export default async function SettingsPage() {
+  const session = await getServerSession(authOptions);
 
-export default function SettingsPage() {
-  const { data: session, update } = useSession();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true); // State loading awal
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-
-  // State form
-  const [name, setName] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [bannerUrl, setBannerUrl] = useState("");
-  const [bgUrl, setBgUrl] = useState("");
-
-  const [isUploading, setIsUploading] = useState({
-    avatar: false,
-    banner: false,
-    background: false,
-  });
-
-  // LOGIKA PENGAMBILAN DATA AWAL
-  useEffect(() => {
-    async function fetchInitialData() {
-      const data = await getUserSettings();
-      if (data) {
-        setName(data.name);
-        setAvatarUrl(data.image);
-        setBannerUrl(data.bannerUrl);
-        setBgUrl(data.backgroundUrl);
-      }
-      setIsInitialLoading(false);
-    }
-
-    if (session) {
-      fetchInitialData();
-    }
-  }, [session]);
-
-  // Fungsi handleFileUpload tetap sama seperti sebelumnya...
-  const handleFileUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    type: "avatar" | "banner" | "background",
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("Format tidak didukung!");
-      return;
-    }
-
-    const MAX_SIZE = 4 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      alert(`Maksimal 4MB.`);
-      return;
-    }
-
-    setIsUploading((prev) => ({ ...prev, [type]: true }));
-
-    try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-          folder: "profiles",
-        }),
-      });
-      const { signedUrl, publicUrl } = await res.json();
-
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-
-      if (uploadRes.ok) {
-        if (type === "avatar") setAvatarUrl(publicUrl);
-        if (type === "banner") setBannerUrl(publicUrl);
-        if (type === "background") setBgUrl(publicUrl);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsUploading((prev) => ({ ...prev, [type]: false }));
-      e.target.value = "";
-    }
-  };
-
-  async function handleSubmit(formData: FormData) {
-    setIsLoading(true);
-    setMessage(null);
-
-    const result = await updateProfile(formData);
-
-    if (result.success) {
-      setMessage({ type: "success", text: result.message });
-      await update({
-        name: formData.get("name"),
-        image: formData.get("image"),
-      });
-    } else {
-      setMessage({ type: "error", text: result.message });
-    }
-
-    setIsLoading(false);
+  // 1. Cek apakah sudah login
+  if (!session) {
+    redirect("/login");
   }
 
-  // Tampilan saat loading data dari DB
-  if (isInitialLoading) {
+  // 2. Cek apakah sudah jadi Driver (isDriver)
+  // Kita gunakan isDriver sebagai gate utama
+  if (!session.user?.isDriver || !session.user.driverData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-      </div>
+      <main className="min-h-[80vh] w-full flex items-center justify-center p-6 bg-(-background)">
+        <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-700">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 bg-red-500/20 blur-3xl rounded-full" />
+            <div className="relative w-24 h-24 bg-card border border-red-500/30 text-red-500 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-2xl">
+              <ShieldAlert size={48} />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-4xl font-black text-(-primary-foreground) uppercase tracking-tighter">
+              Akses <span className="text-red-500">Ditolak</span>
+            </h2>
+            <p className="text-foreground/50 font-medium leading-relaxed">
+              Kamu belum terdaftar sebagai pengemudi resmi Nismara Logistics.
+              Fitur pengaturan profil hanya tersedia untuk anggota aktif.
+            </p>
+          </div>
+          <div className="flex flex-col gap-4 items-center">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-3 px-10 py-4 bg-primary text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+            >
+              Daftar Sekarang <ArrowRight size={14} />
+            </Link>
+            <Link
+              href="/"
+              className="text-[10px] font-bold text-foreground/20 uppercase tracking-widest hover:text-foreground/50 transition-colors"
+            >
+              Kembali ke Beranda
+            </Link>
+          </div>
+        </div>
+      </main>
     );
   }
 
-  return (
-    <main className="min-h-screen pt-24 pb-12 bg-background">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-black text-white">Profile Settings</h1>
-          <p className="text-gray-400">
-            Kustomisasi identitas publik Nismara kamu.
-          </p>
-        </div>
-
-        {/* ... Message Alert ... */}
-
-        <form action={handleSubmit} className="space-y-8">
-          <div className="glass-panel p-8 rounded-[2rem] border-border/50">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <User className="text-primary w-5 h-5" /> Identitas Dasar
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                  Display Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4" /> Avatar Profile
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full border-2 border-border/50 overflow-hidden bg-black/20 shrink-0">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon className="text-gray-500 w-5 h-5" />
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    id="avatarUpload"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, "avatar")}
-                  />
-                  <label
-                    htmlFor="avatarUpload"
-                    className="cursor-pointer px-4 py-2 bg-card border border-border text-white text-sm font-bold rounded-xl hover:border-primary/50 transition-colors"
-                  >
-                    {isUploading.avatar ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      "Ganti Avatar"
-                    )}
-                  </label>
-                </div>
-                <input type="hidden" name="image" value={avatarUrl} />
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-panel p-8 rounded-[2rem] border-border/50">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Layout className="text-accent-sky w-5 h-5" /> Kustomisasi Tema
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Banner Section */}
-              <div className="space-y-2">
-                <div className="w-full h-24 rounded-xl border-2 border-border/50 overflow-hidden bg-black/20 mb-4">
-                  {bannerUrl ? (
-                    <img
-                      src={bannerUrl}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
-                      No Banner
-                    </div>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  id="bannerUpload"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileUpload(e, "banner")}
-                />
-                <label
-                  htmlFor="bannerUpload"
-                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-white text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
-                >
-                  {isUploading.banner ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Upload Banner"
-                  )}
-                </label>
-                <input type="hidden" name="bannerUrl" value={bannerUrl} />
-              </div>
-
-              {/* Background Section */}
-              <div className="space-y-2">
-                <div className="w-full h-24 rounded-xl border-2 border-border/50 overflow-hidden bg-black/20 mb-4">
-                  {bgUrl ? (
-                    <img src={bgUrl} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
-                      No Background
-                    </div>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  id="bgUpload"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileUpload(e, "background")}
-                />
-                <label
-                  htmlFor="bgUpload"
-                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-white text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
-                >
-                  {isUploading.background ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Upload Background"
-                  )}
-                </label>
-                <input type="hidden" name="backgroundUrl" value={bgUrl} />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-8 py-4 bg-primary text-white font-bold rounded-2xl hover:bg-primary/80 transition-all flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-primary/20"
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Save className="w-5 h-5" />
-              )}
-              {isLoading ? "Menyimpan..." : "Simpan Perubahan"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </main>
-  );
+  // 3. Jika lolos validasi, tampilkan Client Component (Form)
+  return <SettingsClient />;
 }
