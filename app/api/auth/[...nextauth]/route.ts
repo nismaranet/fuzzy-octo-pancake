@@ -11,6 +11,7 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
       authorization: { params: { scope: "identify email" } },
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
   callbacks: {
@@ -115,7 +116,7 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  pages: { signIn: "/auth/signin" },
+  pages: { signIn: "/dashboard/" },
   debug: process.env.NODE_ENV === "development",
 };
 
