@@ -56,10 +56,10 @@ export default async function DashboardPage() {
             daftar melalui Discord kami.
           </p>
           <a
-            href="/"
+            href="/register"
             className="px-6 py-2 bg-card hover:bg-card/80 border border-border rounded-lg text-white transition-colors"
           >
-            Kembali ke Beranda
+            Register Sekarang
           </a>
         </div>
       </div>
