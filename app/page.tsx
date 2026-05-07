@@ -1,57 +1,132 @@
+// app/page.tsx
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./api/auth/[...nextauth]/route";
+import clientPromise from "@/lib/mongodb";
 import HeroSlider from "@/components/HeroSlider";
-// Menggunakan Named Import (dengan kurung kurawal {})
 import { ScrollReveal } from "@/components/ScrollReveal";
 import Link from "next/link";
+import { NismaraIcon } from "@/components/icons/SocialMedia";
 import {
   ShieldCheck,
-  TrendingUp,
   Trophy,
-  Globe,
   Truck,
-  Plane,
-  CarFront,
+  Zap,
+  Calendar,
+  Star,
+  Activity,
   ArrowRight,
   Radio,
+  CheckCircle,
   Map,
-  CheckCircle, // <-- Pastikan ini ada
+  Plane,
+  CarFront,
 } from "lucide-react";
+
+const getGameInfo = (id: string) => {
+  return id === "2"
+    ? { name: "American Truck Simulator" }
+    : { name: "Euro Truck Simulator 2" };
+};
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
   const isDriver = session?.user?.isDriver || false;
+
+  const client = await clientPromise;
+  const db = client.db();
+  const guildId = process.env.DISCORD_GUILD_ID;
+  const now = new Date();
+
+  // 1. Fetch Real Data Secara Paralel
+  const [
+    totalDrivers,
+    completedJobs,
+    kmStats,
+    ncStats,
+    activeEvents,
+    activeContracts,
+  ] = await Promise.all([
+    db.collection("driverlinks").countDocuments({ guildId }),
+    db
+      .collection("jobhistories")
+      .countDocuments({ guildId, jobStatus: "COMPLETED" }),
+    db
+      .collection("jobhistories")
+      .aggregate([
+        { $match: { guildId, jobStatus: "COMPLETED" } },
+        { $group: { _id: null, total: { $sum: "$distanceKm" } } },
+      ])
+      .toArray(),
+    db
+      .collection("currencies")
+      .aggregate([
+        { $match: { guildId } },
+        { $group: { _id: null, total: { $sum: "$totalNC" } } },
+      ])
+      .toArray(),
+    // Ambil Event yang rentang waktunya sekarang (startDate <= now <= endDate)
+    db
+      .collection("ncevents")
+      .find({
+        guildId,
+        startDate: { $lte: now },
+        endDate: { $gte: now },
+      })
+      .toArray(),
+    // Ambil Contract yang rentang waktunya sekarang (setAt <= now <= endAt)
+    db
+      .collection("contracts")
+      .find({
+        guildId,
+        setAt: { $lte: now },
+        endAt: { $gte: now },
+      })
+      .toArray(),
+  ]);
+
+  const totalKm = kmStats[0]?.total || 0;
+  const totalNC = ncStats[0]?.total || 0;
+  const hasLiveOps = activeEvents.length > 0 || activeContracts.length > 0;
+  const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, "-");
 
   return (
     <main className="flex flex-col w-full bg-background overflow-hidden">
       {/* 1. HERO SECTION */}
       <HeroSlider isDriver={isDriver} />
 
-      {/* 2. STATISTIK */}
+      {/* 2. REAL-TIME STATS BAR */}
       <section className="border-y border-border/50 bg-card/30 backdrop-blur-sm relative z-20 -mt-1">
         <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-border/50">
           <ScrollReveal delay={0.1}>
-            <p className="text-4xl font-black text-gradient mb-2">2,500+</p>
+            <p className="text-4xl font-black text-gradient mb-2">
+              {completedJobs.toLocaleString("id-ID")}
+            </p>
             <p className="text-sm text-gray-400 font-medium uppercase tracking-widest">
               Pengiriman Sukses
             </p>
           </ScrollReveal>
           <ScrollReveal delay={0.2}>
-            <p className="text-4xl font-black text-gradient mb-2">1.2M</p>
+            <p className="text-4xl font-black text-gradient mb-2">
+              {totalKm.toLocaleString("id-ID")}
+            </p>
             <p className="text-sm text-gray-400 font-medium uppercase tracking-widest">
-              Kilometer Ditempuh
+              KM Jarak Tempuh
             </p>
           </ScrollReveal>
           <ScrollReveal delay={0.3}>
-            <p className="text-4xl font-black text-gradient mb-2">150+</p>
+            <p className="text-4xl font-black text-gradient mb-2">
+              {totalDrivers}
+            </p>
             <p className="text-sm text-gray-400 font-medium uppercase tracking-widest">
               Driver Aktif
             </p>
           </ScrollReveal>
           <ScrollReveal delay={0.4}>
-            <p className="text-4xl font-black text-gradient mb-2">99.8%</p>
+            <p className="text-4xl font-black text-gradient mb-2">
+              {totalNC.toLocaleString("id-ID")}
+            </p>
             <p className="text-sm text-gray-400 font-medium uppercase tracking-widest">
-              Zero Damage
+              Pendapatan NC
             </p>
           </ScrollReveal>
         </div>
@@ -75,7 +150,7 @@ export default async function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-bold border border-primary/20">
               <Radio className="w-4 h-4 animate-pulse" /> Telemetri Real-Time
             </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-(-foreground) leading-tight">
               Sistem pencatatan <br />
               otomatis tanpa ribet.
             </h2>
@@ -114,7 +189,7 @@ export default async function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-sky/10 text-accent-sky text-sm font-bold border border-accent-sky/20">
               <Map className="w-4 h-4" /> Global Assignment
             </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-(-foreground) leading-tight">
               Special Contracts & <br />
               Papan Peringkat Adil.
             </h2>
@@ -127,7 +202,7 @@ export default async function Home() {
             <div className="flex items-center gap-4 pt-4">
               <Link
                 href="/special-contracts"
-                className="flex items-center gap-2 text-white font-bold hover:text-accent-sky transition-colors group"
+                className="flex items-center gap-2 text-(-foreground) font-bold hover:text-accent-sky transition-colors group"
               >
                 Lihat Kontrak Aktif{" "}
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -146,7 +221,7 @@ export default async function Home() {
             direction="up"
             className="text-center max-w-3xl mx-auto mb-20"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            <h2 className="text-4xl md:text-5xl font-bold text-(-foreground) mb-6">
               Satu Identitas. <br />
               Membuka Seluruh <span className="text-primary">Ekosistem</span>.
             </h2>
@@ -160,9 +235,13 @@ export default async function Home() {
             <ScrollReveal delay={0.1}>
               <div className="glass-panel p-10 rounded-[2.5rem] border-primary/20 hover:border-primary/50 transition-colors text-center group">
                 <div className="w-20 h-20 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center mb-8 group-hover:-translate-y-2 transition-transform">
-                  <Truck className="w-10 h-10 text-primary" />
+                  <img
+                    src="/nismara.svg"
+                    alt="Nismara Transport Logo"
+                    className="w-10 h-10 object-contain"
+                  />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">
+                <h3 className="text-2xl font-bold text-(-foreground) mb-4">
                   Nismara Transport
                 </h3>
                 <p className="text-gray-400">
@@ -174,9 +253,9 @@ export default async function Home() {
             <ScrollReveal delay={0.2}>
               <div className="glass-panel p-10 rounded-[2.5rem] border-accent-sky/20 hover:border-accent-sky/50 transition-colors text-center group">
                 <div className="w-20 h-20 mx-auto bg-accent-sky/10 rounded-2xl flex items-center justify-center mb-8 group-hover:-translate-y-2 transition-transform">
-                  <Plane className="w-10 h-10 text-accent-sky" />
+                  <NismaraIcon className="w-10 h-10 text-accent-sky"></NismaraIcon>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">
+                <h3 className="text-2xl font-bold text-(-foreground) mb-4">
                   Nismara Airlines
                 </h3>
                 <p className="text-gray-400">
@@ -186,52 +265,172 @@ export default async function Home() {
               </div>
             </ScrollReveal>
             <ScrollReveal delay={0.3}>
-              <div className="glass-panel p-10 rounded-[2.5rem] border-accent-lilac/20 hover:border-accent-lilac/50 transition-colors text-center group">
-                <div className="w-20 h-20 mx-auto bg-accent-lilac/10 rounded-2xl flex items-center justify-center mb-8 group-hover:-translate-y-2 transition-transform">
-                  <CarFront className="w-10 h-10 text-accent-lilac" />
+              <Link href={`https://racing.nismara.web.id`}>
+                <div className="glass-panel p-10 rounded-[2.5rem] border-accent-lilac/20 hover:border-accent-lilac/50 transition-colors text-center group">
+                  <div className="w-20 h-20 mx-auto bg-accent-lilac/10 rounded-2xl flex items-center justify-center mb-8 group-hover:-translate-y-2 transition-transform">
+                    <img
+                      src="/nismara-racing.svg"
+                      alt="Nismara Racing Logo"
+                      className="w-15 h-15 object-contain"
+                    />
+                  </div>
+                  <h3 className="text-2xl font-bold text-(-foreground) mb-4">
+                    Nismara Racing
+                  </h3>
+                  <p className="text-gray-400">
+                    Divisi motorsport kompetitif. Berpacu di sirkuit kelas dunia
+                    melalui Assetto Corsa.
+                  </p>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">
-                  Nismara Racing
-                </h3>
-                <p className="text-gray-400">
-                  Divisi motorsport kompetitif. Berpacu di sirkuit kelas dunia
-                  melalui Assetto Corsa.
-                </p>
-              </div>
+              </Link>
             </ScrollReveal>
           </div>
         </div>
       </section>
 
-      {/* 5. CALL TO ACTION */}
+      {/* 3. LIVE OPERATIONS (CONDITIONAL RENDER) */}
+      {hasLiveOps && (
+        <section className="py-24 bg-gradient-to-b from-transparent to-primary/5">
+          <div className="max-w-7xl mx-auto px-4">
+            <ScrollReveal className="text-center mb-16">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-4">
+                <Activity size={14} className="animate-pulse" /> Live Status
+              </div>
+              <h2 className="text-5xl font-black text-(-foreground) uppercase tracking-tighter">
+                Current <span className="text-primary">Operations</span>
+              </h2>
+            </ScrollReveal>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Event Aktif */}
+              {activeEvents.map((event: any) => (
+                <div
+                  key={event._id}
+                  className="group relative glass-panel p-1 rounded-[2.5rem] overflow-hidden border border-white/5 bg-gradient-to-br from-primary/20 to-transparent"
+                >
+                  <div className="bg-card/90 backdrop-blur-xl p-8 rounded-[2.4rem] h-full flex flex-col sm:flex-row items-center gap-8">
+                    <img
+                      src={event.imageUrl}
+                      alt=""
+                      className="w-24 h-24 rounded-3xl object-cover border border-white/10 shadow-2xl group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="flex-1 text-center sm:text-left">
+                      <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] flex items-center justify-center sm:justify-start gap-2">
+                        <Zap size={12} className="fill-current" /> Special Event
+                      </span>
+                      <h3 className="text-2xl font-black text-(-foreground) uppercase italic mt-1 tracking-tight">
+                        {event.nameEvent}
+                      </h3>
+                      <div className="flex items-center justify-center sm:justify-start gap-4 mt-3 text-gray-400">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={14} />
+                          <span className="text-[10px] font-bold uppercase">
+                            {new Date(event.endDate).toLocaleDateString(
+                              "id-ID",
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-yellow-500">
+                          <Star size={14} className="fill-current" />
+                          <span className="text-[10px] font-black uppercase">
+                            x{event.multiplier} Multiplier
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Contract Aktif */}
+              {activeContracts.map((contract: any) => {
+                const game = getGameInfo(contract.gameId);
+                return (
+                  <div
+                    key={contract._id}
+                    className="group relative glass-panel p-1 rounded-[2.5rem] overflow-hidden border border-white/5 bg-gradient-to-br from-accent-sky/20 to-transparent"
+                  >
+                    <div className="bg-card/90 backdrop-blur-xl p-8 rounded-[2.4rem] h-full flex flex-col sm:flex-row items-center gap-8">
+                      <img
+                        src={contract.imageUrl}
+                        alt=""
+                        className="w-24 h-24 rounded-3xl object-cover border border-white/10 shadow-2xl group-hover:scale-110 transition-transform duration-500"
+                      />
+                      <div className="flex-1 text-center sm:text-left">
+                        <span className="text-[10px] font-black text-accent-sky uppercase tracking-[0.4em] flex items-center justify-center sm:justify-start gap-2">
+                          <Truck size={12} /> Live Contract
+                        </span>
+                        <h3 className="text-2xl font-black text-(-foreground) uppercase mt-1 tracking-tight">
+                          {contract.contractName}
+                        </h3>
+                        <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                          {contract.companyName} - {game.name}
+                        </p>
+                        <div className="mt-4 flex justify-center sm:justify-start">
+                          <Link
+                            href={`/special-contracts/${slugify(contract.contractName)}`}
+                            className="text-[10px] font-black text-white bg-accent-sky px-4 py-2 rounded-xl uppercase tracking-widest hover:scale-105 transition-transform"
+                          >
+                            Lihat Detail
+                          </Link>
+                        </div>
+                        <div className="flex items-center justify-center sm:justify-start gap-4 mt-3 text-gray-400">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar size={14} />
+                            <span className="font-bold uppercase">
+                              {new Date(contract.setAt).toLocaleDateString(
+                                "id-ID",
+                              )}{" "}
+                              -{" "}
+                              {new Date(contract.endAt).toLocaleDateString(
+                                "id-ID",
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 4. CALL TO ACTION (REGISTER) */}
       <section className="py-32 relative overflow-hidden">
+        {/* Background Accent */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-200 h-200 bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
+
         <ScrollReveal
           direction="up"
           className="max-w-4xl mx-auto px-4 text-center relative z-10"
         >
-          <ShieldCheck className="w-20 h-20 text-primary mx-auto mb-8" />
-          <h2 className="text-5xl font-black text-white mb-8">
-            Siap Menghidupkan Mesin?
+          <NismaraIcon className="w-20 h-20 text-primary mx-auto mb-8 animate-pulse" />
+          <h2 className="text-6xl font-black text-(-foreground) mb-8 tracking-tighter leading-none">
+            Siap Menghidupkan <br />{" "}
+            <span className="text-primary">Mesin Anda?</span>
           </h2>
-          <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
-            Tidak ada syarat rumit. Cukup hubungkan Discord Anda, instal Trucky,
-            dan mulai karir logistik virtual Anda bersama komunitas simulasi
-            terbesar.
+          <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto font-medium">
+            Bergabunglah dengan komunitas logistik virtual paling terorganisir.
+            Hubungkan akun Trucky Anda dan mulai kumpulkan Nismara Coin hari
+            ini.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-6">
             {isDriver ? (
               <Link
                 href="/dashboard"
-                className="px-10 py-5 bg-primary text-white font-bold text-lg rounded-2xl hover:bg-primary/80 transition-colors shadow-[0_0_30px_rgba(126,87,194,0.4)]"
+                className="px-10 py-5 bg-primary text-white font-black text-sm uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-[0_0_40px_rgba(126,87,194,0.3)] flex items-center gap-3"
               >
-                Buka Dashboard Utama
+                Buka Dashboard Utama <ArrowRight size={18} />
               </Link>
             ) : (
               <Link
                 href="/login"
-                className="px-10 py-5 bg-primary text-white font-bold text-lg rounded-2xl hover:bg-primary/80 transition-colors shadow-[0_0_30px_rgba(126,87,194,0.4)]"
+                className="px-10 py-5 bg-primary text-white font-black text-sm uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-[0_0_40px_rgba(126,87,194,0.3)] flex items-center gap-3"
               >
-                Daftar & Login via Discord
+                Daftar Sekarang <ArrowRight size={18} />
               </Link>
             )}
           </div>
