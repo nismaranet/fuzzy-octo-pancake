@@ -67,7 +67,7 @@ export default async function DashboardPage() {
           <div className="flex flex-col gap-4 items-center">
             <Link
               href="/register"
-              className="inline-flex items-center gap-3 px-10 py-4 bg-primary text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+              className="inline-flex items-center gap-3 px-10 py-4 bg-primary text-foreground text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
             >
               Daftar Sekarang <ArrowRight size={14} />
             </Link>
@@ -224,7 +224,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Grid Statistik VTC */}
-      <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
+      <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-foreground">
         <Shield className="text-accent-lilac" /> Statistik Nismara
       </h2>
 
@@ -256,12 +256,12 @@ export default async function DashboardPage() {
 
       {/* --- SECTION: Insights Pekerjaan (Jobs) --- */}
       <div className="flex items-center justify-between mb-6 mt-12">
-        <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+        <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
           <Truck className="text-accent-lilac" /> Status Pekerjaan Terakhir
         </h2>
         <Link
           href="/dashboard/jobs"
-          className="text-sm text-accent-lilac hover:text-white flex items-center gap-1 transition-colors"
+          className="text-sm text-accent-lilac hover:text-foreground flex items-center gap-1 transition-colors"
         >
           Lihat Semua Jobs ({allJobs.length}) <ArrowRight className="w-4 h-4" />
         </Link>
@@ -288,7 +288,7 @@ export default async function DashboardPage() {
                        hover:bg-blue-500/10 hover:border-blue-500/40 
                        hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10"
                   >
-                    <p className="font-medium text-sm text-white truncate">
+                    <p className="font-medium text-sm text-foreground truncate">
                       {`Job #${job.jobId}` || "Kargo Tidak Diketahui"}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
@@ -328,7 +328,7 @@ export default async function DashboardPage() {
                        hover:bg-green-500/10 hover:border-green-500/40 
                        hover:-translate-y-1 hover:shadow-lg hover:shadow-green-500/10"
                   >
-                    <p className="font-medium text-sm text-white truncate">
+                    <p className="font-medium text-sm text-foreground truncate">
                       {`Job #${job?.jobId}` || "Kargo Selesai"}
                     </p>
                     <p className="text-xs text-green-500/80 mt-1">
@@ -371,7 +371,7 @@ export default async function DashboardPage() {
                        hover:bg-red-500/10 hover:border-red-500/40 
                        hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10"
                   >
-                    <p className="font-medium text-sm text-white truncate">
+                    <p className="font-medium text-sm text-foreground truncate">
                       Job #{job.jobId || "Kargo Dibatalkan"}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
@@ -394,12 +394,12 @@ export default async function DashboardPage() {
 
       {/* --- SECTION: Insights Histori Transaksi & Poin --- */}
       <div className="flex items-center justify-between mb-6 mt-12">
-        <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+        <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
           <TrendingUp className="text-accent-lilac" /> Riwayat NC & Penalti
         </h2>
         <Link
           href="/dashboard/histories"
-          className="text-sm text-accent-lilac hover:text-white flex items-center gap-1 transition-colors"
+          className="text-sm text-accent-lilac hover:text-foreground flex items-center gap-1 transition-colors"
         >
           Lihat Semua Histori <ArrowRight className="w-4 h-4" />
         </Link>
@@ -425,7 +425,7 @@ export default async function DashboardPage() {
                     className="flex justify-between items-center p-3 bg-card/50 rounded-lg border border-border/50"
                   >
                     <div className="overflow-hidden pr-3">
-                      <p className="text-sm text-white font-medium truncate">
+                      <p className="text-sm text-foreground font-medium truncate">
                         {history.reason ||
                           (isEarn ? "Pemasukan NC" : "Pengeluaran NC")}
                       </p>
@@ -469,7 +469,7 @@ export default async function DashboardPage() {
                     className="flex justify-between items-center p-3 bg-card/50 rounded-lg border border-border/50"
                   >
                     <div className="overflow-hidden pr-3">
-                      <p className="text-sm text-white font-medium truncate">
+                      <p className="text-sm text-foreground font-medium truncate">
                         {penalty.reason ||
                           (isAdd ? "Penalti Ditambahkan" : "Penalti Dikurangi")}
                       </p>

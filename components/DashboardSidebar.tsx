@@ -86,7 +86,7 @@ export default function DashboardSidebar() {
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 font-medium"
-                    : "text-gray-400 hover:text-white hover:bg-card/80"
+                    : "text-gray-400 hover:text-primary hover:bg-card/80"
                 }`}
               >
                 <Icon className="w-5 h-5" />

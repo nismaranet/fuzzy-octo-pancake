@@ -252,7 +252,7 @@ export default async function JobsIndexPage({ searchParams }: JobsPageProps) {
                         <span className="text-xs font-mono text-gray-500">
                           #{job.jobId}
                         </span>
-                        <h3 className="text-lg font-bold text-white mt-1 line-clamp-1">
+                        <h3 className="text-lg font-bold text-foreground mt-1 line-clamp-1">
                           {job.cargo}
                         </h3>
                       </div>
@@ -280,7 +280,7 @@ export default async function JobsIndexPage({ searchParams }: JobsPageProps) {
                           <p className="text-gray-400 text-xs uppercase tracking-wider">
                             Ke
                           </p>
-                          <p className="text-white">{job.destination}</p>
+                          <p className="text-foreground">{job.destination}</p>
                         </div>
                       </div>
                     </div>
@@ -311,7 +311,7 @@ export default async function JobsIndexPage({ searchParams }: JobsPageProps) {
               {currentPage > 1 ? (
                 <Link
                   href={createPageUrl(currentPage - 1)}
-                  className="p-2 rounded-lg bg-card/50 border border-border/50 text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                  className="p-2 rounded-lg bg-card/50 border border-border/50 text-gray-400 hover:text-foreground hover:bg-white/5 transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </Link>
@@ -322,14 +322,14 @@ export default async function JobsIndexPage({ searchParams }: JobsPageProps) {
               )}
 
               <span className="text-sm font-medium text-gray-400">
-                Halaman <span className="text-white">{currentPage}</span> dari{" "}
-                <span className="text-white">{totalPages}</span>
+                Halaman <span className="text-foreground">{currentPage}</span> dari{" "}
+                <span className="text-foreground">{totalPages}</span>
               </span>
 
               {currentPage < totalPages ? (
                 <Link
                   href={createPageUrl(currentPage + 1)}
-                  className="p-2 rounded-lg bg-card/50 border border-border/50 text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                  className="p-2 rounded-lg bg-card/50 border border-border/50 text-gray-400 hover:text-foreground hover:bg-white/5 transition-colors"
                 >
                   <ChevronRight className="w-5 h-5" />
                 </Link>
@@ -347,7 +347,7 @@ export default async function JobsIndexPage({ searchParams }: JobsPageProps) {
           <div className="w-16 h-16 bg-card/50 rounded-full flex items-center justify-center mb-4">
             <Package className="w-8 h-8 text-gray-500" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">
+          <h3 className="text-xl font-bold text-foreground mb-2">
             Tidak Ada Data Ditemukan
           </h3>
           <p className="text-gray-400 max-w-md">

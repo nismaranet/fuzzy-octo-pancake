@@ -95,11 +95,11 @@ export default async function ManageUsersPage() {
             <div className="p-2 bg-accent-lilac/10 rounded-lg text-accent-lilac">
               <Users size={20} />
             </div>
-            <h1 className="text-4xl font-black text-white tracking-tighter uppercase">
+            <h1 className="text-4xl font-black text-foreground tracking-tighter uppercase">
               Driver Management
             </h1>
           </div>
-          <p className="text-white/40 font-bold uppercase text-[10px] tracking-[0.2em] ml-11">
+          <p className="text-foreground/40 font-bold uppercase text-[10px] tracking-[0.2em] ml-11">
             Nismara Transport • Management Driver
           </p>
         </div>
@@ -114,10 +114,10 @@ export default async function ManageUsersPage() {
           >
             <div className="flex justify-between items-start relative z-10">
               <div className="space-y-1">
-                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+                <p className="text-[10px] font-black text-foreground/40 uppercase tracking-widest">
                   {stat.label}
                 </p>
-                <p className="text-4xl font-black text-white italic tabular-nums">
+                <p className="text-4xl font-black text-foreground italic tabular-nums">
                   {stat.value}
                 </p>
               </div>
@@ -139,7 +139,7 @@ export default async function ManageUsersPage() {
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-2">
           <div className="h-px bg-white/10 flex-1" />
-          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">
+          <span className="text-[10px] font-black text-foreground/20 uppercase tracking-[0.3em]">
             Driver Directory
           </span>
           <div className="h-px bg-white/10 flex-1" />

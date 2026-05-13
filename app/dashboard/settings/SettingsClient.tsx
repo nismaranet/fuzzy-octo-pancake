@@ -136,7 +136,7 @@ export default function SettingsClient() {
     <main className="min-h-screen pt-24 pb-12 bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-black text-white">Profile Settings</h1>
+          <h1 className="text-3xl font-black text-foreground">Profile Settings</h1>
           <p className="text-gray-400">
             Kustomisasi identitas publik Nismara kamu.
           </p>
@@ -146,7 +146,7 @@ export default function SettingsClient() {
 
         <form action={handleSubmit} className="space-y-8">
           <div className="glass-panel p-8 rounded-[2rem] border-border/50">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <User className="text-primary w-5 h-5" /> Identitas Dasar
             </h2>
 
@@ -161,7 +161,7 @@ export default function SettingsClient() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
 
@@ -189,7 +189,7 @@ export default function SettingsClient() {
                   />
                   <label
                     htmlFor="avatarUpload"
-                    className="cursor-pointer px-4 py-2 bg-card border border-border text-white text-sm font-bold rounded-xl hover:border-primary/50 transition-colors"
+                    className="cursor-pointer px-4 py-2 bg-card border border-border text-foreground text-sm font-bold rounded-xl hover:border-primary/50 transition-colors"
                   >
                     {isUploading.avatar ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -204,7 +204,7 @@ export default function SettingsClient() {
           </div>
 
           <div className="glass-panel p-8 rounded-[2rem] border-border/50">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <Layout className="text-accent-sky w-5 h-5" /> Kustomisasi Tema
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -231,7 +231,7 @@ export default function SettingsClient() {
                 />
                 <label
                   htmlFor="bannerUpload"
-                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-white text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
+                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-foreground text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
                 >
                   {isUploading.banner ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -262,7 +262,7 @@ export default function SettingsClient() {
                 />
                 <label
                   htmlFor="bgUpload"
-                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-white text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
+                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-foreground text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
                 >
                   {isUploading.background ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

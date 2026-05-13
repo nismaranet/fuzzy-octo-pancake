@@ -54,7 +54,7 @@ export default function CurrencyClient({
               onClick={() => setFilterType(type)}
               className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
                 filterType === type
-                  ? "bg-accent-lilac border-accent-lilac text-white"
+                  ? "bg-accent-lilac border-accent-lilac text-foreground"
                   : "bg-card/50 border-border/50 text-gray-400 hover:border-accent-lilac"
               }`}
             >
@@ -95,7 +95,7 @@ export default function CurrencyClient({
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-foreground">
                         {item.reason}
                       </span>
                     </td>

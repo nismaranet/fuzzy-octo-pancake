@@ -40,7 +40,7 @@ export default async function CurrencyPage() {
           <div className="flex flex-col gap-4 items-center">
             <Link
               href="/register"
-              className="inline-flex items-center gap-3 px-10 py-4 bg-primary text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+              className="inline-flex items-center gap-3 px-10 py-4 bg-primary text-foreground text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
             >
               Daftar Sekarang <ArrowRight size={14} />
             </Link>
@@ -61,7 +61,7 @@ export default async function CurrencyPage() {
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+        <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <Wallet className="text-accent-lilac" /> Nismara Coin Histories
         </h2>
       </div>
@@ -71,7 +71,7 @@ export default async function CurrencyPage() {
           <p className="text-sm font-medium text-gray-400">Total Saldo</p>
           <div className="flex items-center gap-2 mt-2">
             <Coins className="text-yellow-400 w-8 h-8" />
-            <h3 className="text-4xl font-bold text-white">
+            <h3 className="text-4xl font-bold text-foreground">
               {data.balance.toLocaleString("id-ID")}{" "}
               <span className="text-lg font-normal text-gray-500">NC</span>
             </h3>
