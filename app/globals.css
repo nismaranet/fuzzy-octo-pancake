@@ -78,7 +78,6 @@
 /* 4. Membuat utility class kustom */
 @layer utilities {
   .text-gradient {
-    /* Ubah bg-gradient-to-r menjadi bg-linear-to-r */
     @apply bg-clip-text text-transparent bg-linear-to-r from-primary to-accent-sky;
   }
 

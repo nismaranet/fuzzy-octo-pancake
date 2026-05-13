@@ -23,7 +23,7 @@ export default async function PublicJobsPage(props: {
           <div className="inline-flex items-center justify-center p-3 bg-primary/20 rounded-2xl mb-4 border border-primary/30">
             <Map className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-4xl font-extrabold text-white mb-2">
+          <h1 className="text-4xl font-extrabold text-foreground mb-2">
             Live <span className="text-gradient">Logbook</span>
           </h1>
           <p className="text-gray-400 text-lg">
@@ -39,7 +39,7 @@ export default async function PublicJobsPage(props: {
               className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 currentTab === "ongoing"
                   ? "bg-accent-sky text-white shadow-lg"
-                  : "text-gray-400 hover:text-white"
+                  : "text-gray-400 hover:text-foreground"
               }`}
             >
               Ongoing
@@ -49,7 +49,7 @@ export default async function PublicJobsPage(props: {
               className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 currentTab === "completed"
                   ? "bg-primary text-white shadow-lg"
-                  : "text-gray-400 hover:text-white"
+                  : "text-gray-400 hover:text-foreground"
               }`}
             >
               Completed
@@ -59,7 +59,7 @@ export default async function PublicJobsPage(props: {
               className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 currentTab === "canceled"
                   ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                  : "text-gray-400 hover:text-white"
+                  : "text-gray-400 hover:text-foreground"
               }`}
             >
               Canceled

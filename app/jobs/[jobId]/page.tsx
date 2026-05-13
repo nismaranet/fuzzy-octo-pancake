@@ -64,7 +64,7 @@ function HardcoreStars({ rating }: { rating: number }) {
           }
         />
       ))}
-      <span className="text-xs font-bold ml-2 text-slate-900 dark:text-white">
+      <span className="text-xs font-bold ml-2 text-foreground">
         {rating.toFixed(2)}
       </span>
     </div>
@@ -194,7 +194,7 @@ export default async function JobDetailPage(props: {
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
                 Assigned Driver
               </p>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <h3 className="text-lg font-black text-foreground flex items-center gap-2">
                 {driverName}
                 <span
                   className="text-[9px] px-2 py-0.5 rounded uppercase tracking-wider border"
@@ -215,7 +215,7 @@ export default async function JobDetailPage(props: {
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">
                 Source
               </p>
-              <h2 className="text-3xl font-black text-slate-900 dark:text-white">
+              <h2 className="text-3xl font-black text-foreground">
                 {localJob?.sourceCity || details?.source_city}
               </h2>
               <p className="text-primary font-bold text-sm">
@@ -236,7 +236,7 @@ export default async function JobDetailPage(props: {
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">
                 Destination
               </p>
-              <h2 className="text-3xl font-black text-slate-900 dark:text-white">
+              <h2 className="text-3xl font-black text-foreground">
                 {localJob?.destinationCity || details?.destination_city}
               </h2>
               <p className="text-primary font-bold text-sm">
@@ -284,7 +284,7 @@ export default async function JobDetailPage(props: {
         {isCompleted && (localJob?.nc || localJob?.penalty) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div className="glass-panel p-8 rounded-[2.5rem] border-green-200 bg-green-50 dark:border-green-500/20 dark:bg-green-500/5">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
+              <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-3">
                 <Coins className="text-green-600 dark:text-green-400 w-5 h-5" />{" "}
                 Pendapatan Nismara Coins
               </h3>
@@ -310,7 +310,7 @@ export default async function JobDetailPage(props: {
                   color="text-blue-600 dark:text-blue-400"
                 />
                 <div className="border-t border-green-200 dark:border-green-500/20 pt-3 mt-3 flex justify-between items-center">
-                  <span className="font-bold text-slate-900 dark:text-white uppercase text-xs">
+                  <span className="font-bold text-foreground uppercase text-xs">
                     Total NC Didapat
                   </span>
                   <span className="text-2xl font-black text-green-600 dark:text-green-400">
@@ -321,7 +321,7 @@ export default async function JobDetailPage(props: {
             </div>
 
             <div className="glass-panel p-8 rounded-[2.5rem] border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/5">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
+              <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-3">
                 <TrendingDown className="text-red-600 dark:text-red-400 w-5 h-5" />{" "}
                 Penalti Poin (Pelanggaran)
               </h3>
@@ -352,7 +352,7 @@ export default async function JobDetailPage(props: {
                   isPenalty
                 />
                 <div className="border-t border-red-200 dark:border-red-500/20 pt-3 mt-3 flex justify-between items-center">
-                  <span className="font-bold text-slate-900 dark:text-white uppercase text-xs">
+                  <span className="font-bold text-foreground uppercase text-xs">
                     Total Poin Penalti
                   </span>
                   <span className="text-2xl font-black text-red-600 dark:text-red-400">
@@ -368,7 +368,7 @@ export default async function JobDetailPage(props: {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             <div className="glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/5 bg-card">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-8 flex items-center gap-3">
+              <h3 className="text-xl font-bold text-foreground mb-8 flex items-center gap-3">
                 <AlertCircle className="text-red-500 dark:text-red-400 w-5 h-5" />{" "}
                 Catatan Insiden
               </h3>
@@ -378,7 +378,7 @@ export default async function JobDetailPage(props: {
 
           <div className="space-y-6">
             <div className="glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/5 bg-card">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">
+              <h3 className="text-lg font-bold text-foreground mb-6">
                 Waktu Pengiriman
               </h3>
               <div className="space-y-4">
@@ -388,7 +388,7 @@ export default async function JobDetailPage(props: {
                     <p className="text-[10px] text-slate-500 font-bold uppercase">
                       Mulai
                     </p>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    <p className="text-xs font-bold text-foreground">
                       {formatWIB(localJob?.startedAt || details?.created_at)}
                     </p>
                   </div>
@@ -396,10 +396,10 @@ export default async function JobDetailPage(props: {
                 <div className="flex items-center gap-4 py-2">
                   <Calendar className="text-slate-400 w-4 h-4" />
                   <div className="flex-1">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">
+                    <p className="text-[10px] text-foreground/50 font-bold uppercase">
                       Selesai
                     </p>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    <p className="text-xs font-bold text-foreground">
                       {formatWIB(localJob?.completedAt || details?.updated_at)}
                     </p>
                   </div>
@@ -408,7 +408,7 @@ export default async function JobDetailPage(props: {
             </div>
 
             <div className="glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/5 bg-card">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">
+              <h3 className="text-lg font-bold text-foreground mb-6">
                 Mode
               </h3>
               <div className="space-y-4">
@@ -438,7 +438,7 @@ export default async function JobDetailPage(props: {
             </div>
 
             <div className="glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/5 bg-card">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">
+              <h3 className="text-lg font-bold text-foreground mb-6">
                 Detail Kendaraan
               </h3>
               <div className="space-y-4">
@@ -518,7 +518,7 @@ function StatBox({
           {label}
         </p>
       </div>
-      <p className="text-xl font-black text-slate-900 dark:text-white truncate">
+      <p className="text-xl font-black text-foreground truncate">
         {value}
       </p>
     </div>
@@ -531,7 +531,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
         {label}
       </p>
-      <p className="text-sm font-bold text-slate-900 dark:text-white">
+      <p className="text-sm font-bold text-foreground">
         {value}
       </p>
     </div>
@@ -541,7 +541,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 function BreakdownRow({
   label,
   value,
-  color = "text-slate-900 dark:text-white",
+  color = "text-foreground",
   isPenalty = false,
 }: {
   label: string;

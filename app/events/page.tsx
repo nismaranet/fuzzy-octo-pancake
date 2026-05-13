@@ -36,7 +36,7 @@ export default async function EventsPage() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-4">
             <Sparkles className="w-4 h-4" /> Nismara Special Program
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">
+          <h1 className="text-4xl md:text-5xl font-extrabold text-(-foreground) mb-4">
             Event Nismara <span className="text-gradient">Transport</span>
           </h1>
           <p className="text-gray-400 max-w-2xl mx-auto">
@@ -50,7 +50,7 @@ export default async function EventsPage() {
             <div className="p-2 bg-green-500/20 rounded-lg">
               <Zap className="w-6 h-6 text-green-400 animate-pulse" />
             </div>
-            <h2 className="text-2xl font-bold text-white">Event Aktif</h2>
+            <h2 className="text-2xl font-bold text-primary">Event Aktif</h2>
           </div>
 
           {activeEvents.length === 0 ? (
@@ -75,14 +75,14 @@ export default async function EventsPage() {
                       alt={event.nameEvent}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
-                    <div className="absolute top-4 right-4 z-20 px-4 py-2 rounded-xl bg-primary text-white font-bold shadow-lg flex items-center gap-2">
+                    <div className="absolute top-4 right-4 z-20 px-4 py-2 rounded-xl bg-primary text-(-foreground) font-bold shadow-lg flex items-center gap-2">
                       <Zap className="w-4 h-4" /> {event.multiplier}x Bonus
                     </div>
                   </div>
 
                   {/* Event Content */}
                   <div className="p-8 relative z-20">
-                    <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-primary transition-colors">
+                    <h3 className="text-2xl font-bold text-(-foreground) mb-4 group-hover:text-primary transition-colors">
                       {event.nameEvent}
                     </h3>
                     <div className="grid grid-cols-2 gap-4 mb-6">
@@ -100,7 +100,7 @@ export default async function EventsPage() {
                         <User className="w-3 h-3" />
                         <span>Organizer ID: {event.setBy}</span>
                       </div>
-                      <button className="px-6 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary/80 transition-all">
+                      <button className="px-6 py-2 bg-primary text-(-foreground) text-sm font-bold rounded-xl hover:bg-primary/80 transition-all">
                         Lihat Detail
                       </button>
                     </div>
@@ -117,7 +117,7 @@ export default async function EventsPage() {
             <div className="p-2 bg-card rounded-lg">
               <History className="w-6 h-6 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white">Riwayat Event</h2>
+            <h2 className="text-2xl font-bold text-(-foreground)">Riwayat Event</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -138,7 +138,7 @@ export default async function EventsPage() {
                   </div>
                 </div>
                 <div className="p-5">
-                  <h4 className="font-bold text-white mb-2 truncate">
+                  <h4 className="font-bold text-(-foreground) mb-2 truncate">
                     {event.nameEvent}
                   </h4>
                   <div className="flex items-center justify-between text-[11px] text-gray-500">

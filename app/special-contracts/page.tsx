@@ -98,7 +98,7 @@ export default async function SpecialContractsPage() {
               Global Assignment
             </h2>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-6">
+          <h1 className="text-4xl md:text-5xl font-extrabold text-foreground mb-6">
             Special <span className="text-gradient">Contracts</span>
           </h1>
           <p className="text-gray-400 max-w-3xl text-lg leading-relaxed">
@@ -112,7 +112,7 @@ export default async function SpecialContractsPage() {
         <section className="mb-24">
           <div className="flex items-center gap-2 mb-8">
             <div className="w-2 h-8 bg-primary rounded-full" />
-            <h2 className="text-2xl font-bold text-white">Kontrak Berjalan</h2>
+            <h2 className="text-2xl font-bold text-foreground">Kontrak Berjalan</h2>
           </div>
 
           {activeContracts.length === 0 ? (
@@ -125,7 +125,7 @@ export default async function SpecialContractsPage() {
                 <div className="w-20 h-20 rounded-3xl bg-card border border-border/50 flex items-center justify-center mb-6 shadow-2xl">
                   <ShieldAlert className="w-10 h-10 text-primary/50" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-3">
+                <h3 className="text-2xl font-bold text-foreground mb-3">
                   Belum ada Special Contract
                 </h3>
                 <p className="text-gray-400 leading-relaxed mb-8">
@@ -163,7 +163,7 @@ export default async function SpecialContractsPage() {
                       >
                         {getGameName(contract.gameId)}
                       </span>
-                      <h3 className="text-2xl font-bold text-white mb-1">
+                      <h3 className="text-2xl font-bold text-foreground mb-1">
                         {contract.contractName}
                       </h3>
                       <p className="text-accent-sky font-medium mb-6 flex items-center gap-2 text-sm uppercase">
@@ -186,7 +186,7 @@ export default async function SpecialContractsPage() {
             <div className="p-2 bg-card rounded-lg border border-border">
               <History className="w-6 h-6 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-bold text-foreground">
               Special Contract History
             </h2>
           </div>
@@ -226,7 +226,7 @@ export default async function SpecialContractsPage() {
                             Selesai pada {formatDate(history.closedAt)}
                           </span>
                         </div>
-                        <h4 className="text-2xl font-extrabold text-white">
+                        <h4 className="text-2xl font-extrabold text-foreground">
                           {history.contractName}
                         </h4>
                         <p className="text-accent-sky text-sm font-medium mt-1 uppercase tracking-wider">
@@ -240,7 +240,7 @@ export default async function SpecialContractsPage() {
                         <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
                           Partisipan
                         </p>
-                        <p className="text-xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
+                        <p className="text-xl font-bold text-foreground flex items-center justify-center md:justify-start gap-2">
                           <Users className="w-4 h-4 text-accent-sky" />{" "}
                           {history.contributors?.length || 0}
                         </p>
@@ -249,7 +249,7 @@ export default async function SpecialContractsPage() {
                         <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
                           Total NC
                         </p>
-                        <p className="text-xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
+                        <p className="text-xl font-bold text-foreground flex items-center justify-center md:justify-start gap-2">
                           <TrendingUp className="w-4 h-4 text-primary" />{" "}
                           {history.totalNCEarned?.toLocaleString("id-ID")}
                         </p>
@@ -258,7 +258,7 @@ export default async function SpecialContractsPage() {
                         <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
                           Jarak Tempuh
                         </p>
-                        <p className="text-xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
+                        <p className="text-xl font-bold text-foreground flex items-center justify-center md:justify-start gap-2">
                           <Truck className="w-4 h-4 text-accent-lilac" />{" "}
                           {history.totalDistance?.toLocaleString("id-ID")}km
                         </p>
@@ -267,7 +267,7 @@ export default async function SpecialContractsPage() {
                         <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
                           Massa Kargo
                         </p>
-                        <p className="text-xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
+                        <p className="text-xl font-bold text-foreground flex items-center justify-center md:justify-start gap-2">
                           <Package className="w-4 h-4 text-green-400" />{" "}
                           {history.totalMass?.toLocaleString("id-ID")}t
                         </p>
@@ -299,7 +299,7 @@ export default async function SpecialContractsPage() {
                             <p className="text-[10px] text-primary font-bold uppercase tracking-widest flex items-center gap-1.5">
                               <Award className="w-3 h-3" /> MVP Contributor
                             </p>
-                            <p className="text-lg font-bold text-white leading-tight">
+                            <p className="text-lg font-bold text-foreground leading-tight">
                               {mvpName}
                             </p>
                           </div>

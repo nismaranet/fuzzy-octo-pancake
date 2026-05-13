@@ -138,7 +138,7 @@ export default function JobList({
                             )}
                           </div>
                           <div>
-                            <div className="font-bold text-white text-sm group-hover:text-primary transition-colors">
+                            <div className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">
                               {job.driverName}
                             </div>
                             <div className="text-[10px] text-gray-500 font-mono">
@@ -217,7 +217,7 @@ export default function JobList({
         <button
           onClick={loadMore}
           disabled={isLoading}
-          className="px-8 py-3 bg-card border border-border text-white rounded-xl hover:bg-card/80 transition-all flex items-center gap-2 text-sm font-semibold"
+          className="px-8 py-3 bg-card border border-border text-foreground rounded-xl hover:bg-card/80 transition-all flex items-center gap-2 text-sm font-semibold"
         >
           {isLoading && (
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
