@@ -35,19 +35,19 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-4">
               <a
-                href="#"
+                href="https://link.nismara.web.id/discord"
                 className="p-2.5 bg-white/5 rounded-xl text-foreground/40 hover:text-primary hover:bg-primary/10 transition-all"
               >
                 <DiscordIcon className="w-5 h-5" />
               </a>
               <a
-                href="#"
+                href="https://link.nismara.web.id/instagram"
                 className="p-2.5 bg-white/5 rounded-xl text-foreground/40 hover:text-pink-500 hover:bg-pink-500/10 transition-all"
               >
                 <InstagramIcon className="w-5 h-5" />
               </a>
               <a
-                href="#"
+                href="https://link.nismara.web.id/youtube"
                 className="p-2.5 bg-white/5 rounded-xl text-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-all"
               >
                 <YoutubeIcon className="w-5 h-5" />
