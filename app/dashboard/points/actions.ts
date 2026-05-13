@@ -8,6 +8,29 @@ import { ObjectId } from "mongodb";
 
 const GUILD_ID = "863959415702028318";
 
+async function sendDiscordLog(embed: any) {
+  const webhookUrl = process.env.DISCORD_LOG_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [
+          {
+            ...embed,
+            timestamp: new Date().toISOString(),
+            footer: { text: "Nismara Logistics Logging System" },
+          },
+        ],
+      }),
+    });
+  } catch (err) {
+    console.error("Gagal mengirim Discord Log:", err);
+  }
+}
+
 export async function getUserPointsData(userId: string) {
   try {
     const client = await clientPromise;
@@ -51,6 +74,7 @@ export async function payPenaltyPoints(pointsToPay: number) {
     if (!session?.user?.discordId) throw new Error("Unauthorized");
 
     const userId = session.user.discordId;
+    const userName = session.user.name || userId;
     const client = await clientPromise;
     const db = client.db();
 
@@ -107,6 +131,16 @@ export async function payPenaltyPoints(pointsToPay: number) {
         createdAt: new Date(),
       }),
     ]);
+
+    await sendDiscordLog({
+      title: "💰 Pembayaran Poin Penalti (NC)",
+      color: 0xFFAA00, // Warna Amber
+      fields: [
+        { name: "Driver", value: `<@${userId}>`, inline: true },
+        { name: "Poin Ditebus", value: `${pointsToPay} Poin`, inline: true },
+        { name: "Biaya", value: `${totalCost.toLocaleString()} NC`, inline: true },
+      ],
+    });
 
     revalidatePath("/dashboard/points");
     return { success: true, message: "Berhasil membayar poin penalti!" };
@@ -168,6 +202,7 @@ export async function validateJobPoints(jobId: string) {
     if (!session?.user?.discordId) throw new Error("Unauthorized");
 
     const userId = session.user.discordId;
+    const userName = session.user.name || userId;
     const client = await clientPromise;
     const db = client.db();
 
@@ -224,6 +259,18 @@ export async function validateJobPoints(jobId: string) {
         createdAt: new Date(),
       })
     ]);
+
+    await sendDiscordLog({
+      title: `✅ Validasi Job Hardcore ${job.jobId}`,
+      color: 0x5865F2, // Warna Blurple
+      fields: [
+        { name: "Driver", value: `<@${userId}> (${userName})`, inline: true },
+        { name: "Job ID", value: `#${job.jobId}`, inline: true },
+        { name: "Rute", value: `${job.sourceCity} ➡️ ${job.destinationCity}` },
+        { name: "Jarak", value: `${distance} km`, inline: true },
+        { name: "Poin Berkurang", value: `-${reduction} Poin`, inline: true },
+      ],
+    });
 
     revalidatePath("/dashboard/points");
     return { success: true, message: `Berhasil! Poin berkurang ${reduction}.` };

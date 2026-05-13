@@ -10,8 +10,12 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  Wallet,
+  X,
+  Info,
 } from "lucide-react";
 import { payPenaltyPoints, validateJobPoints } from "./actions";
+import { createPenaltyPayment } from "@/app/actions/payment";
 
 interface HistoryItem {
   _id: string;
@@ -39,6 +43,7 @@ export default function PenaltyClientUI({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pointsToPay, setPointsToPay] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRupiahModalOpen, setIsRupiahModalOpen] = useState(false);
   const [message, setMessage] = useState<{
     text: string;
     type: "success" | "error";
@@ -50,6 +55,11 @@ export default function PenaltyClientUI({
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const currentJobs = eligibleJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const PRICE_PER_POINT = 3000;
+  const ADMIN_FEE = 4000;
+  const subtotal = pointsToPay * PRICE_PER_POINT;
+  const totalRupiah = subtotal + ADMIN_FEE;
 
   const totalCost = pointsToPay * pointPrice;
   const MAX_POINTS = 50;
@@ -101,6 +111,36 @@ const handleValidation = async (jobId: string) => {
       alert(res.message);
     }
     setIsLoading(false);
+  };
+
+const handleRupiahPayment = async () => {
+    setIsLoading(true);
+    try {
+      const res = await createPenaltyPayment(pointsToPay);
+      
+      if (res.token) {
+        (window as any).snap.pay(res.token, {
+          onSuccess: (result: any) => {
+            alert("Pembayaran Berhasil!");
+            setIsRupiahModalOpen(false);
+          },
+          onPending: (result: any) => {
+            alert("Menunggu pembayaran...");
+          },
+          onError: (result: any) => {
+            alert("Pembayaran gagal!");
+          },
+          onClose: () => {
+            setIsLoading(false);
+          }
+        });
+      }
+    } catch (error) {
+      alert("Terjadi kesalahan sistem.");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -414,6 +454,70 @@ const handleValidation = async (jobId: string) => {
                   {isLoading ? "Memproses..." : "Konfirmasi Bayar"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRupiahModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-md rounded-[2.5rem] border shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+            {/* Header */}
+            <div className="p-6 border-b flex justify-between items-center">
+              <h2 className="text-xl font-black flex items-center gap-2">
+                <Wallet className="text-blue-500" /> Tebus Poin IDR
+              </h2>
+              <button onClick={() => setIsRupiahModalOpen(false)} className="text-foreground/40 hover:text-foreground">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-8 space-y-6">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Jumlah Poin yang Ditebus</label>
+                <div className="flex items-center gap-4 mt-2">
+                  <input 
+                    type="number"
+                    min="1"
+                    max={initialPoints}
+                    value={pointsToPay}
+                    onChange={(e) => setPointsToPay(Number(e.target.value))}
+                    className="flex-1 p-4 bg-foreground/5 rounded-2xl border-0 focus:ring-2 ring-blue-500 font-bold"
+                  />
+                  <span className="font-bold text-sm text-foreground/60">Poin</span>
+                </div>
+              </div>
+
+              {/* Rincian Biaya */}
+              <div className="space-y-3 bg-foreground/[0.03] p-5 rounded-3xl border border-dashed">
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground/50 font-medium">Harga Poin ({pointsToPay} x 5rb)</span>
+                  <span className="font-bold">Rp {subtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm text-blue-500">
+                  <span className="font-medium flex items-center gap-1">
+                    Biaya Admin <Info size={12} />
+                  </span>
+                  <span className="font-bold">Rp {ADMIN_FEE.toLocaleString()}</span>
+                </div>
+                <div className="pt-3 border-t flex justify-between items-center">
+                  <span className="font-black text-xs uppercase">Total Bayar</span>
+                  <span className="text-2xl font-black text-blue-600">Rp {totalRupiah.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-center text-foreground/40 leading-relaxed px-4">
+                Pembayaran menggunakan Midtrans. Poin akan berkurang secara otomatis setelah status pembayaran menjadi <span className="font-bold italic">Settlement</span>.
+              </p>
+
+              <button 
+                onClick={handleRupiahPayment}
+                disabled={isLoading || pointsToPay <= 0 || pointsToPay > initialPoints}
+                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg shadow-blue-500/20"
+              >
+                {isLoading ? "Menghubungkan..." : "Lanjutkan Pembayaran"}
+              </button>
             </div>
           </div>
         </div>
