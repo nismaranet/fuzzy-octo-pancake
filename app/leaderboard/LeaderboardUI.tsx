@@ -117,7 +117,7 @@ export default function LeaderboardUI({
           bg: "bg-white/5",
           border: "border-white/5",
           text: "text-foreground/20",
-          icon: <span className="font-black italic">#{index + 1}</span>,
+          icon: <span className="font-black">#{index + 1}</span>,
         };
     }
   };
@@ -243,7 +243,7 @@ export default function LeaderboardUI({
                     )}
                   </div>
                   <div>
-                    <p className="font-black text-(-primary-foreground) uppercase italic text-lg tracking-tight leading-none mb-1 group-hover:text-accent-sky transition-colors">
+                    <p className="font-black text-(-primary-foreground) uppercase text-lg tracking-tight leading-none mb-1 group-hover:text-accent-sky transition-colors">
                       {row.name}
                     </p>
                     <p className="text-[10px] font-bold text-foreground/30 uppercase tracking-widest">
@@ -255,7 +255,7 @@ export default function LeaderboardUI({
 
               <div className="text-right">
                 <p
-                  className={`text-3xl font-black italic tabular-nums leading-none mb-1 ${index < 3 ? style.text : "text-(-primary-foreground)"}`}
+                  className={`text-3xl font-black tabular-nums leading-none mb-1 ${index < 3 ? style.text : "text-(-primary-foreground)"}`}
                 >
                   {category === "nc" && (
                     <span className="text-sm mr-1 not-italic">N¢</span>
@@ -273,7 +273,7 @@ export default function LeaderboardUI({
         })}
 
         {leaderboardData.length === 0 && (
-          <div className="py-20 text-center opacity-10 font-black uppercase italic tracking-widest">
+          <div className="py-20 text-center opacity-10 font-black uppercase tracking-widest">
             No record data found for this period
           </div>
         )}
