@@ -7,8 +7,11 @@ import {
   History,
   ShieldAlert,
   CheckCircle2,
+  Zap,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { payPenaltyPoints } from "./actions";
+import { payPenaltyPoints, validateJobPoints } from "./actions";
 
 interface HistoryItem {
   _id: string;
@@ -23,6 +26,7 @@ interface PenaltyClientUIProps {
   totalNC: number;
   pointPrice: number;
   history: HistoryItem[];
+  eligibleJobs: any[];
 }
 
 export default function PenaltyClientUI({
@@ -30,6 +34,7 @@ export default function PenaltyClientUI({
   totalNC,
   pointPrice,
   history,
+  eligibleJobs,
 }: PenaltyClientUIProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pointsToPay, setPointsToPay] = useState<number>(1);
@@ -38,6 +43,13 @@ export default function PenaltyClientUI({
     text: string;
     type: "success" | "error";
   } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
+  const totalItems = eligibleJobs.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const currentJobs = eligibleJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const totalCost = pointsToPay * pointPrice;
   const MAX_POINTS = 50;
@@ -72,6 +84,22 @@ export default function PenaltyClientUI({
       setMessage({ text: result.message, type: "error" });
     }
 
+    setIsLoading(false);
+  };
+
+const handleValidation = async (jobId: string) => {
+    if (!confirm("Validasi job ini untuk pengurangan poin penalti?")) return;
+    setIsLoading(true);
+    const res = await validateJobPoints(jobId);
+    if (res.success) {
+      alert(res.message);
+      // Jika job di halaman terakhir habis setelah divalidasi, mundur 1 halaman
+      if (currentJobs.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+    } else {
+      alert(res.message);
+    }
     setIsLoading(false);
   };
 
@@ -153,6 +181,96 @@ export default function PenaltyClientUI({
           </span>
           <span>50 (Pen. 3)</span>
         </div>
+      </div>
+
+      <div className="rounded-xl border bg-card p-6 shadow-sm transition-all">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-primary" />
+            <h3 className="font-bold">Validasi Job Hardcore</h3>
+            <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-black rounded-full">
+              TOTAL: {totalItems} JOBS
+            </span>
+          </div>
+
+          {/* Kontrol Navigasi Atas (Opsional/Mobile Friendly) */}
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border hover:bg-secondary disabled:opacity-30 transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs font-bold">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border hover:bg-secondary disabled:opacity-30 transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {totalItems === 0 ? (
+          <div className="p-8 text-center border-2 border-dashed rounded-xl text-muted-foreground bg-foreground/[0.01]">
+            Tidak ada job hardcore ({'>'}4 HC) yang tersedia untuk divalidasi.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {currentJobs.map((job) => (
+              <div key={job._id} className="flex items-center justify-between p-4 border rounded-xl bg-foreground/[0.02] hover:border-primary/30 transition-colors group">
+                <div>
+                  <p className="font-bold text-sm group-hover:text-primary transition-colors">
+                    #{job.jobId} - {job.sourceCity} ke {job.destinationCity}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {job.distance} km • {job.hardcorePoints} HC Points
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleValidation(job._id)}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-primary text-white md:bg-primary/10 md:text-primary md:hover:bg-primary md:hover:text-white rounded-lg text-xs font-black transition-all"
+                >
+                  VALIDASI (-{job.potentialReduction})
+                </button>
+              </div>
+            ))}
+
+            {/* Footer Informasi & Navigasi Bawah */}
+            <div className="flex items-center justify-between mt-6 pt-6 border-t border-dashed">
+              <p className="text-[10px] text-muted-foreground italic">
+                * Menampilkan {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)} dari {totalItems} job.
+              </p>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  {/* Tombol halaman nomor bisa ditambahkan di sini jika perlu */}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold border rounded-lg hover:bg-secondary disabled:opacity-30 transition-colors"
+                  >
+                    <ChevronLeft size={14} /> Prev
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold border rounded-lg hover:bg-secondary disabled:opacity-30 transition-colors"
+                  >
+                    Next <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabel Riwayat */}

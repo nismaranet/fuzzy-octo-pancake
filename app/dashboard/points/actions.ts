@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import clientPromise from "@/lib/mongodb"; // Import Promise native MongoDB
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { ObjectId } from "mongodb";
 
 const GUILD_ID = "863959415702028318";
 
@@ -115,5 +116,118 @@ export async function payPenaltyPoints(pointsToPay: number) {
       success: false,
       message: error.message || "Terjadi kesalahan sistem.",
     };
+  }
+}
+
+// Tambahkan fungsi helper untuk pengecekan legacy data
+export async function getEligibleJobsForValidation(userId: string) {
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+
+    // 1. Ambil semua jobId yang sudah pernah divalidasi oleh user ini dari koleksi validatedjobs
+    const validatedRecords = await db.collection("validatedjobs")
+      .find({ userId: userId, guildId: GUILD_ID }, { projection: { jobId: 1 } })
+      .toArray();
+    
+    const validatedIds = validatedRecords.map(rec => rec.jobId);
+
+    // 2. Cari job yang layak, tapi TIDAK ada di daftar validatedIds
+    const jobs = await db.collection("jobhistories")
+      .find({
+        driverId: userId,
+        jobStatus: "COMPLETED",
+        hardcoreRating: { $gt: 4 },
+        jobId: { $nin: validatedIds }, // Pastikan jobId tidak ada di koleksi validatedjobs
+        isPointValidated: { $ne: true } // Double check dengan flag baru
+      })
+      .sort({ completedAt: -1 })
+      .toArray();
+
+    return jobs.map(job => {
+      const distance = job.distanceKm || 0;
+      return {
+        _id: job._id.toString(),
+        jobId: job.jobId,
+        sourceCity: job.sourceCity,
+        destinationCity: job.destinationCity,
+        distance: distance,
+        hardcorePoints: job.hardcoreRating,
+        potentialReduction: Math.floor(distance / 500)
+      };
+    }).filter(job => job.potentialReduction > 0);
+  } catch (error) {
+    console.error("Gagal mengambil job layak validasi:", error);
+    return [];
+  }
+}
+
+export async function validateJobPoints(jobId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.discordId) throw new Error("Unauthorized");
+
+    const userId = session.user.discordId;
+    const client = await clientPromise;
+    const db = client.db();
+
+    // 1. Ambil data job asli
+    const job = await db.collection("jobhistories").findOne({ 
+      _id: new ObjectId(jobId),
+      driverId: userId 
+    });
+
+    if (!job) throw new Error("Job tidak ditemukan.");
+
+    // 2. Cek apakah jobId ini sudah ada di koleksi validatedjobs (keamanan ganda)
+    const alreadyValidated = await db.collection("validatedjobs").findOne({ jobId: job.jobId });
+    if (alreadyValidated || job.isPointValidated) {
+      throw new Error("Job ini sudah pernah divalidasi sebelumnya.");
+    }
+    
+    const distance = job.distanceKm || 0;
+    const reduction = Math.floor(distance / 500);
+    
+    if (reduction <= 0) throw new Error("Jarak job tidak mencukupi untuk pengurangan poin.");
+
+    // 3. Jalankan operasi atomik
+    await Promise.all([
+      // Update koleksi jobs (untuk fitur baru)
+      db.collection("jobhistories").updateOne(
+        { _id: job._id },
+        { $set: { isPointValidated: true, validatedAt: new Date() } }
+      ),
+      // Insert ke koleksi validatedjobs (untuk menjaga kompatibilitas database lama kamu)
+      db.collection("validatedjobs").insertOne({
+        guildId: GUILD_ID,
+        userId: userId,
+        jobId: job.jobId,
+        distance: distance,
+        deducted: reduction,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        __v: 0
+      }),
+      // Kurangi poin penalti
+      db.collection("points").updateOne(
+        { userId, guildId: GUILD_ID },
+        { $inc: { totalPoints: -reduction } }
+      ),
+      // Catat sejarah poin
+      db.collection("pointhistories").insertOne({
+        userId,
+        guildId: GUILD_ID,
+        managerId: userId,
+        points: reduction,
+        reason: `Validasi Job Hardcore #${job.jobId} (-${reduction} Poin)`,
+        type: "remove",
+        createdAt: new Date(),
+      })
+    ]);
+
+    revalidatePath("/dashboard/points");
+    return { success: true, message: `Berhasil! Poin berkurang ${reduction}.` };
+  } catch (error: any) {
+    return { success: false, message: error.message };
   }
 }

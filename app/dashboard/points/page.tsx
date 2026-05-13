@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { getUserPointsData } from "./actions";
+import { getUserPointsData, getEligibleJobsForValidation } from "./actions";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import PenaltyClientUI from "./PenaltyClientUI";
 import Link from "next/link";
@@ -69,6 +69,7 @@ export default async function PointsPage() {
 
   // Mengambil data dari database
   const data = await getUserPointsData(String(userId));
+  const eligibleJobs = await getEligibleJobsForValidation(String(userId));
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -90,6 +91,7 @@ export default async function PointsPage() {
         totalNC={data.totalNC}
         pointPrice={data.pointPrice}
         history={data.history as HistoryItem[]}
+        eligibleJobs={eligibleJobs}
       />
     </div>
   );
