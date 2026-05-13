@@ -91,6 +91,8 @@ export default async function JobDetailPage(props: {
   const isCompleted =
     localJob?.jobStatus === "COMPLETED" || details?.status === "completed";
 
+  const gameMode = localJob?.gameMode || "Unknown Lobby";
+
   // Kalkulasi Rata-rata Damage (Truk + Trailer + Kargo)
   const vDamage = details?.vehicle_damage || 0;
   const tDamage = details?.trailers_damage || 0;
@@ -152,6 +154,22 @@ export default async function JobDetailPage(props: {
     statusMap[localJob?.jobStatus as keyof typeof statusMap] ||
     "text-slate-600 bg-slate-100 border-slate-200 dark:text-gray-400 dark:bg-gray-400/10 dark:border-gray-400/20";
 
+  const getLobbyInfo = (id: string) => {
+    return id === "truckersmp"
+      ? {
+          name: "Truckers MP",
+          color: "text-accent-sky",
+          bg: "bg-accent-sky/10",
+        }
+      : {
+          name: "SinglePlayer / Convoy",
+          color: "text-accent-lilac",
+          bg: "bg-accent-lilac/10",
+        };
+  };
+
+  const gameLobby = getLobbyInfo(gameMode);
+
   return (
     <main className="min-h-screen pt-32 pb-20 px-4 bg-background transition-colors duration-300">
       <div className="max-w-6xl mx-auto">
@@ -165,9 +183,14 @@ export default async function JobDetailPage(props: {
             Kembali ke Daftar Job
           </Link>
           <div
-            className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${statusColor}`}
+            className={`px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${statusColor}`}
           >
             {localJob?.jobStatus || details?.status || "UNKNOWN"}
+          </div>
+          <div
+            className={`px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${gameLobby.color}`}
+          >
+            {gameLobby.name}
           </div>
         </div>
 
@@ -408,9 +431,7 @@ export default async function JobDetailPage(props: {
             </div>
 
             <div className="glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/5 bg-card">
-              <h3 className="text-lg font-bold text-foreground mb-6">
-                Mode
-              </h3>
+              <h3 className="text-lg font-bold text-foreground mb-6">Mode</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5">
                   <span className="text-[10px] text-slate-500 font-bold uppercase">
@@ -518,9 +539,7 @@ function StatBox({
           {label}
         </p>
       </div>
-      <p className="text-xl font-black text-foreground truncate">
-        {value}
-      </p>
+      <p className="text-xl font-black text-foreground truncate">{value}</p>
     </div>
   );
 }
@@ -531,9 +550,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
         {label}
       </p>
-      <p className="text-sm font-bold text-foreground">
-        {value}
-      </p>
+      <p className="text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }
