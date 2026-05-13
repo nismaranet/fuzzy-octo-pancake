@@ -9,7 +9,7 @@ const slides = [
     id: 1,
     // Kita gunakan placeholder gambar HD, nantinya bisa diganti dengan aset dari https://img.nismara.my.id/
     image:
-      "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=2070&auto=format&fit=crop",
+      "https://images.nismara.my.id/ets2_20251223_205632_00.webp",
     title: "Menghubungkan Benua",
     subtitle:
       "Bergabunglah dengan armada Nismara Transport. Taklukkan rute lintas benua di ETS2 dan ATS dengan sistem logistik virtual terdepan.",
@@ -17,7 +17,7 @@ const slides = [
   {
     id: 2,
     image:
-      "https://images.unsplash.com/photo-1519003722824-194d4455a60c?q=80&w=2075&auto=format&fit=crop",
+      "https://images.nismara.my.id/eut2_hq_68a2aa1f.webp",
     title: "Sistem Telemetri Real-Time",
     subtitle:
       "Pantau performa, konsumsi bahan bakar, dan rute secara presisi langsung dari dashboard Anda.",
@@ -25,7 +25,7 @@ const slides = [
   {
     id: 3,
     image:
-      "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?q=80&w=2070&auto=format&fit=crop",
+      "https://images.nismara.my.id/ets2_20251223_213322_00.webp",
     title: "Komunitas Tersolid",
     subtitle:
       "Satu identitas Discord untuk seluruh ekosistem simulasi. Berkendara, berkompetisi, dan berkembang bersama.",

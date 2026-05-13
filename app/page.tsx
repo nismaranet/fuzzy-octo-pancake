@@ -140,9 +140,9 @@ export default async function Home() {
             <div className="relative rounded-[3rem] overflow-hidden shadow-2xl border border-primary/20 group">
               <div className="absolute inset-0 bg-primary/10 group-hover:bg-transparent transition-colors z-10" />
               <img
-                src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=2070&auto=format&fit=crop"
+                src="https://images.nismara.my.id/227300_188.jpg"
                 alt="Trucking Operation"
-                className="w-full h-[500px] object-cover group-hover:scale-105 transition-transform duration-1000"
+                className="w-full h-[450px] object-cover group-hover:scale-105 transition-transform duration-1000"
               />
             </div>
           </ScrollReveal>
@@ -179,7 +179,7 @@ export default async function Home() {
             <div className="relative rounded-[3rem] overflow-hidden shadow-2xl border border-accent-sky/20 group">
               <div className="absolute inset-0 bg-accent-sky/10 group-hover:bg-transparent transition-colors z-10" />
               <img
-                src="https://images.unsplash.com/photo-1519003722824-194d4455a60c?q=80&w=2075&auto=format&fit=crop"
+                src="https://images.nismara.my.id/eut2_hq_68a9a9fe.webp"
                 alt="Global Logistics"
                 className="w-full h-[500px] object-cover group-hover:scale-105 transition-transform duration-1000"
               />
