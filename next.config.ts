@@ -1,3 +1,5 @@
+import { output } from "framer-motion/client";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Jika Anda menggunakan image dari domain tunnel
@@ -23,14 +25,14 @@ const nextConfig = {
         hostname: "dev.nismara.my.id",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "transport.nismara.my.id",
+        pathname: "/**",
+      },
     ],
   },
-  // Izinkan tunnel untuk bypass proteksi host jika diperlukan
-  experimental: {
-    serverActions: {
-      allowedOrigins: ["dev.nismara.my.id"],
-    },
-  },
+  output: "standalone",
 };
 
 module.exports = nextConfig;

@@ -11,8 +11,8 @@ export async function createPenaltyPayment(points: number) {
 
   const snap = new midtransClient.Snap({
     isProduction: false, // Set ke true jika sudah live
-    serverKey: process.env.MIDTRANS_SERVER_KEY,
-    clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
+    serverKey: String(process.env.MIDTRANS_SERVER_KEY),
+    clientKey: String(process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY),
   });
 
   const PRICE_PER_POINT = 3000; // Contoh: 1 Poin = Rp 5.000
@@ -49,7 +49,7 @@ export async function createPenaltyPayment(points: number) {
     metadata: {
       discordId: session.user.discordId,
       pointsToReduce: points,
-    }
+    },
   };
 
   const transaction = await snap.createTransaction(parameter);
