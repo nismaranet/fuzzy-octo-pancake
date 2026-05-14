@@ -88,11 +88,11 @@ export default async function EventsPage() {
                     <div className="grid grid-cols-2 gap-4 mb-6">
                       <div className="flex items-center gap-2 text-sm text-gray-400">
                         <Calendar className="w-4 h-4 text-accent-sky" />
-                        <span>Mulai: {formatDate(event.startDate)}</span>
+                        <span>Mulai: {formatDate(event.setAt)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-400">
                         <Clock className="w-4 h-4 text-accent-sky" />
-                        <span>Selesai: {formatDate(event.endDate)}</span>
+                        <span>Selesai: {formatDate(event.endAt)}</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between pt-4 border-t border-border/50">
@@ -100,9 +100,6 @@ export default async function EventsPage() {
                         <User className="w-3 h-3" />
                         <span>Organizer ID: {event.setBy}</span>
                       </div>
-                      <button className="px-6 py-2 bg-primary text-(-foreground) text-sm font-bold rounded-xl hover:bg-primary/80 transition-all">
-                        Lihat Detail
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -117,7 +114,9 @@ export default async function EventsPage() {
             <div className="p-2 bg-card rounded-lg">
               <History className="w-6 h-6 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-bold text-(-foreground)">Riwayat Event</h2>
+            <h2 className="text-2xl font-bold text-(-foreground)">
+              Riwayat Event
+            </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
