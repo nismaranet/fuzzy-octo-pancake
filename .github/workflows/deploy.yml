@@ -64,16 +64,23 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: 22
           script: |
+            source ~/.bashrc || true
+            source ~/.profile || true
+
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
             cd /root/website
 
-            # Ekstrak file yang baru dikirim
-            tar -xzvf deploy.tar.gz
+            git pull origin main
 
-            # Hapus file zip agar tidak menuhin storage VPS
-            rm deploy.tar.gz
+            if [ -f deploy.tar.gz ]; then
+              tar -xzvf deploy.tar.gz
+              rm deploy.tar.gz
+            fi
 
             # Install npm khusus untuk production (menghemat memori)
-            git pull origin main
+            npm install --production
 
             # Restart PM2 atau jalankan untuk pertama kali
             pm2 restart nismara-web || pm2 start npm --name "nismara-web" -- start
