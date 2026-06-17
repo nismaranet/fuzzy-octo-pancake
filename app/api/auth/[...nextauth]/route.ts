@@ -6,6 +6,11 @@ import { ObjectId } from "mongodb";
 
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
+  session: {
+    strategy: "database",
+    maxAge: 7 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
+  },
   providers: [
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
@@ -115,6 +120,7 @@ export const authOptions: NextAuthOptions = {
       session.user.xp = dbUser?.xp || 0;
       session.user.level = dbUser?.level || 1;
       session.user.teamId = dbUser?.teamId ? dbUser.teamId.toString() : null;
+      session.user.truckyId = dbUser?.truckyId;
 
       return session;
     },
