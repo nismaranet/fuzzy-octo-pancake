@@ -1,0 +1,61 @@
+name: Deploy Nismara Transport to VPS
+
+on:
+  push:
+    branches:
+      - main # Ubah ke 'master' jika default branch kamu master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "24.15.0" # Sesuaikan dengan versi Node yang kamu pakai
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Next.js Project
+        run: npm run build
+
+      - name: Compress Build Files
+        run: tar -czvf deploy.tar.gz .next public
+
+      - name: Copy Files to VPS via SCP
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          source: "deploy.tar.gz"
+          target: "/root/website"
+
+      - name: Execute Remote SSH to Extract & Restart PM2
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          script: |
+            cd /root/website
+
+            # Ekstrak file yang baru dikirim
+            tar -xzvf deploy.tar.gz
+
+            # Hapus file zip agar tidak menuhin storage VPS
+            rm deploy.tar.gz
+
+            # Install npm khusus untuk production (menghemat memori)
+            git pull origin main
+            npm install --production
+
+            # Restart PM2 atau jalankan untuk pertama kali
+            pm2 restart nismara-web || pm2 start npm --name "nismara-web" -- start
