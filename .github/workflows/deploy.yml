@@ -74,7 +74,6 @@ jobs:
 
             # Install npm khusus untuk production (menghemat memori)
             git pull origin main
-            npm install --production
 
             # Restart PM2 atau jalankan untuk pertama kali
             pm2 restart nismara-web || pm2 start npm --name "nismara-web" -- start
