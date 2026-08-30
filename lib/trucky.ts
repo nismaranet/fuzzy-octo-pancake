@@ -133,6 +133,31 @@ export async function getCompanyMembersMap(companyId: number) {
   }
 }
 
+export async function getCompanyDetails(companyId: string | number) {
+  try {
+    const res = await fetch(
+      `https://e.truckyapp.com/api/v1/company/${companyId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-token": process.env.TRUCKY_API_KEY as string,
+          "User-Agent": "NismaraLogistics/1.0",
+          Referer: "https://nismara.web.id",
+          Origin: "https://nismara.web.id",
+        },
+        next: { revalidate: 1800 }, // Cache 30 menit
+      },
+    );
+
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    console.error("Error fetching Company Details:", error);
+    return null;
+  }
+}
+
 export async function getMonthlyStats(companyId: string | number) {
   try {
     const res = await fetch(

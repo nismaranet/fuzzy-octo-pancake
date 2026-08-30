@@ -72,6 +72,8 @@ export const authOptions: NextAuthOptions = {
         const now = Date.now();
         const tenMinutes = 10 * 60 * 1000;
 
+        let isInDiscordGuild: boolean | null = null;
+
         // 2. Jika data sudah kedaluwarsa (lebih dari 10 menit) ATAU belum pernah sync, fetch ke Discord
         if (now - lastDiscordSync > tenMinutes) {
           try {
@@ -85,11 +87,16 @@ export const authOptions: NextAuthOptions = {
             );
 
             if (response.ok) {
+              isInDiscordGuild = true;
               const memberData = await response.json();
 
               if (memberData.roles.includes(managerRoleId))
                 userRole = "manager";
+              else
+                userRole = "user";
+
               if (memberData.premium_since) isBooster = true;
+              else isBooster = false;
               
               // NOTE: nismaraplus dikelola di DB, tidak dari Discord API
 
@@ -104,16 +111,36 @@ export const authOptions: NextAuthOptions = {
                   },
                 },
               );
+            } else if (response.status === 404) {
+              // ❌ User SUDAH KELUAR / BUKAN Member Server Discord Nismara
+              isInDiscordGuild = false;
+              userRole = "user";
+              isBooster = false;
+
+              await db.collection("users").updateOne(
+                { _id: new ObjectId(user.id) },
+                {
+                  $set: {
+                    isDriver: false,
+                    discordRole: "user",
+                    isBooster: false,
+                    lastDiscordSync: new Date(),
+                  },
+                },
+              );
             } else {
               console.error("❌ [API DISCORD] Error Status:", response.status);
+              isInDiscordGuild = dbUser?.isDriver !== false;
             }
           } catch (error) {
             console.error("❌ [FETCH] Gagal menghubungi Discord API:", error);
+            isInDiscordGuild = dbUser?.isDriver !== false;
           }
         } else {
           // 3. JIKA BELUM 10 MENIT, GUNAKAN DATA DARI DATABASE (TIDAK SPAM API)
           userRole = dbUser?.discordRole || "user";
           isBooster = dbUser?.isBooster || false;
+          isInDiscordGuild = dbUser?.isDriver !== false;
         }
 
         // --- FETCH NISMARA+ DARI DB (SELALU) ---
@@ -169,7 +196,7 @@ export const authOptions: NextAuthOptions = {
           guildId,
         });
 
-        if (driverLink) {
+        if (driverLink && isInDiscordGuild !== false) {
           isDriver = true;
           driverData = {
             truckyId: driverLink.truckyId,
@@ -187,7 +214,7 @@ export const authOptions: NextAuthOptions = {
 
           if (now - lastTruckySync > twelveHours) {
             try {
-              const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "4138";
+              const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "35643";
               const truckyStats = await getCompanyMemberStats(Number(NISMARA_COMPANY_ID), driverLink.truckyId);
               
               // Simpan Role (jabatan)
@@ -217,6 +244,17 @@ export const authOptions: NextAuthOptions = {
               { _id: new ObjectId(user.id) },
               { $set: updateData },
             );
+        } else {
+          isDriver = false;
+          driverData = null;
+          if (dbUser?.isDriver) {
+            await db
+              .collection("users")
+              .updateOne(
+                { _id: new ObjectId(user.id) },
+                { $set: { isDriver: false } },
+              );
+          }
         }
 
         session.user.discordId = discordId;

@@ -7,7 +7,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import Link from "next/link";
 import { NismaraIcon } from "@/components/icons/SocialMedia";
 import NismaraPlusBadge from "@/components/icons/NismaraPlusBadge";
-import { getMonthlyStats } from "@/lib/trucky";
+import { getMonthlyStats, getCompanyDetails } from "@/lib/trucky";
 import { redis } from "@/lib/redis";
 import UserBadges from "@/components/icons/UserBadges";
 import HomeEventsWrapper from "@/components/HomeEventsWrapper";
@@ -42,7 +42,7 @@ export default async function Home() {
   const db = client.db();
   const guildId = process.env.DISCORD_GUILD_ID;
   const now = new Date();
-  const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "4138";
+  const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "35643";
 
   // 1. Fetch Real Data Secara Paralel
   const [
@@ -53,6 +53,7 @@ export default async function Home() {
     activeEvents,
     activeContracts,
     monthlyStats,
+    companyDetails,
     supporters,
     allDrivers,
     top3Drivers,
@@ -87,6 +88,8 @@ export default async function Home() {
       .toArray(),
     // This Month Stats from Trucky
     getMonthlyStats(NISMARA_COMPANY_ID),
+    // Company Info (Total Official Members Count)
+    getCompanyDetails(NISMARA_COMPANY_ID),
     // Supporters Nismara+
     (async () => {
       const cached = await redis.get("nismaraplus:supporters");
@@ -193,6 +196,7 @@ export default async function Home() {
 
   const totalKm = kmStats[0]?.total || 0;
   const totalNC = ncStats[0]?.total || 0;
+  const finalTotalDrivers = companyDetails?.members_count ?? totalDrivers;
 
   const hasLiveOps = activeEvents.length > 0 || activeContracts.length > 0;
   const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, "-");
@@ -442,7 +446,7 @@ export default async function Home() {
                 </ScrollReveal>
                 <ScrollReveal delay={0.3}>
                   <p className="text-4xl font-black text-gradient mb-2">
-                    {totalDrivers}
+                    {finalTotalDrivers}
                   </p>
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
                     Total Anggota

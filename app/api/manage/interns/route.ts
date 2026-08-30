@@ -19,7 +19,7 @@ export async function GET() {
     const db = client.db();
 
     // 1. Fetch data Trucky
-    const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "4138";
+    const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "35643";
     const membersMap = await getCompanyMembersMap(Number(NISMARA_COMPANY_ID));
 
     // 2. Ambil driverlinks

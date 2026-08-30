@@ -16,63 +16,72 @@ export default async function DriversPage() {
   const db = client.db();
   const guildId = process.env.DISCORD_GUILD_ID;
 
-  // Fetch driverlinks
+  // Ambil data Trucky VTC resmi sebagai sumber utama (136 driver)
+  const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "35643";
+  const membersMap = await getCompanyMembersMap(Number(NISMARA_COMPANY_ID));
+  const truckyMembers = Object.values(membersMap);
+
+  // Fetch driverlinks dan webUsers untuk memperkaya data profil & badge Nismara+
   const driverLinks = await db
     .collection("driverlinks")
     .find({ guildId })
     .toArray();
 
-  // Extract user IDs to fetch their details efficiently
   const userIds = driverLinks.map((link) => link.userId);
-
-  // Fetch only users who are in driverlinks to get names, nismaraplus status, avatars, etc.
   const webUsers = await db
     .collection("users")
     .find({ discordId: { $in: userIds } })
     .toArray();
 
-  // Ambil data Trucky menggunakan map cached
-  const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "4138";
-  const membersMap = await getCompanyMembersMap(Number(NISMARA_COMPANY_ID));
+  const driverLinkByTruckyId = new Map<number, any>();
+  for (const dl of driverLinks) {
+    driverLinkByTruckyId.set(Number(dl.truckyId), dl);
+  }
 
-  // Map Data
-  const drivers = driverLinks.map((link) => {
-    const webUser = webUsers.find((u) => u.discordId === link.userId);
-    const truckyData = membersMap[link.truckyId] || {};
+  const webUserByDiscordId = new Map<string, any>();
+  for (const u of webUsers) {
+    webUserByDiscordId.set(String(u.discordId), u);
+  }
+
+  // Map seluruh 136 anggota resmi Trucky VTC
+  const drivers = truckyMembers.map((member: any) => {
+    const link = driverLinkByTruckyId.get(Number(member.id));
+    const webUser = link ? webUserByDiscordId.get(String(link.userId)) : null;
 
     // Role (Prioritaskan dari Trucky API, fallback ke users DB, fallback ke Trucky fallback)
-    const truckyRoleName = truckyData.role
-      ? typeof truckyData.role === "object"
-        ? truckyData.role.name
-        : truckyData.role
+    const truckyRoleName = member.role
+      ? typeof member.role === "object"
+        ? member.role?.name
+        : member.role
       : null;
     const truckyRoleColor =
-      truckyData.role && typeof truckyData.role === "object"
-        ? truckyData.role.color
+      member.role && typeof member.role === "object"
+        ? member.role?.color
         : "#64748b";
 
     // Rank (Prioritaskan dari Trucky API, fallback ke users DB, fallback ke Trucky fallback)
-    const truckyRankName = truckyData.rank
-      ? typeof truckyData.rank === "object"
-        ? truckyData.rank.name
-        : truckyData.rank
+    const truckyRankName = member.rank
+      ? typeof member.rank === "object"
+        ? member.rank?.name
+        : member.rank
       : null;
     const truckyRankColor =
-      truckyData.rank && typeof truckyData.rank === "object"
-        ? truckyData.rank.color
+      member.rank && typeof member.rank === "object"
+        ? member.rank?.color
         : "#64748b";
 
     return {
-      truckyId: link.truckyId,
+      truckyId: member.id,
       name:
         webUser?.name ||
-        link.truckyName ||
-        truckyData.username ||
+        link?.truckyName ||
+        member.name ||
+        member.username ||
         "Unknown Driver",
       image:
         webUser?.image ||
         webUser?.avatarUrl ||
-        truckyData.avatar_url ||
+        member.avatar_url ||
         "https://cdn.truckyapp.com/public/default-avatar.png",
       role: truckyRoleName || webUser?.truckyRole || "Driver",
       roleColor: truckyRoleColor || webUser?.truckyRoleColor || "#64748b",
