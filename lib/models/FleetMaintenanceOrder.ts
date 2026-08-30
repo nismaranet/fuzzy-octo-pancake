@@ -12,7 +12,7 @@ const fleetMaintenanceOrderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "waiting", "in_service", "completed", "cancelled"],
+      enum: ["pending", "processing", "waiting", "in_service", "completed", "cancelled"],
       default: "pending",
     },
     managerId: { type: String, default: null },
@@ -27,11 +27,15 @@ const fleetMaintenanceOrderSchema = new mongoose.Schema(
     adminFee: { type: Number, required: true, default: 500 },
     totalPrice: { type: Number, required: true },
     serviceDuration: { type: Number, required: true }, // in days
-    slotNumber: { type: Number, default: null }, // 1, 2, or 3
+    slotNumber: { type: String, default: null }, // e.g. "ets2-vip-1", "ets2-reg-2"
     maintenanceStartAt: { type: Date, default: null },
     maintenanceEndAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
+
+if (process.env.NODE_ENV !== "production") {
+  delete mongoose.models.FleetMaintenanceOrder;
+}
 
 export default mongoose.models.FleetMaintenanceOrder || mongoose.model("FleetMaintenanceOrder", fleetMaintenanceOrderSchema);

@@ -21,6 +21,17 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const isManager =
+      session.user.role === "manager" ||
+      session.user.role === "admin";
+
+    if (!isManager) {
+      return NextResponse.json(
+        { error: "Hanya Manager atau Admin yang memiliki akses untuk menolak servis armada" },
+        { status: 403 }
+      );
+    }
+
     await dbConnect();
 
     // Use findOneAndUpdate to prevent race conditions

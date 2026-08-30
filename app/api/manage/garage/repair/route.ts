@@ -46,11 +46,12 @@ export async function POST(request: Request) {
     let matchedWaiting = null;
     
     for (const w of allWaiting) {
-      const wFleet = await Fleet.findById(w.fleetId);
+      const wFleet = await Fleet.findById(w.fleetId).populate("model");
       if (wFleet) {
-        let wGameId = wFleet.game_id.toLowerCase();
-        if (wGameId === "1") wGameId = "ets2";
-        if (wGameId === "2") wGameId = "ats";
+        let rawGameId = wFleet.model?.game_id ?? wFleet.game_id;
+        let wGameId = String(rawGameId).toLowerCase();
+        if (wGameId === "1" || wGameId.includes("ets")) wGameId = "ets2";
+        if (wGameId === "2" || wGameId.includes("ats")) wGameId = "ats";
         
         if (wGameId === slot.game_id) {
           if (slot.type === "vip") {

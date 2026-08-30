@@ -47,20 +47,23 @@ export async function GET(request: Request) {
       let slotGameId = null;
       let slotType = null;
 
-      if (freedSlotId) {
-        const garageSlot = await mongoose.model("GarageSlot").findOne({ slotId: freedSlotId });
-        if (garageSlot) {
-          const newCondition = Math.max(0, garageSlot.condition - 2);
-          garageSlot.condition = newCondition;
-          garageSlot.status = newCondition > 0 ? "available" : "broken";
-          garageSlot.currentOrderId = null;
-          garageSlot.fleetId = null;
-          await garageSlot.save();
+      const garageSlot = await mongoose.model("GarageSlot").findOne({
+        $or: [
+          ...(freedSlotId ? [{ slotId: freedSlotId }] : []),
+          { currentOrderId: order._id }
+        ]
+      });
+      if (garageSlot) {
+        const newCondition = Math.max(0, garageSlot.condition - 2);
+        garageSlot.condition = newCondition;
+        garageSlot.status = newCondition > 0 ? "available" : "broken";
+        garageSlot.currentOrderId = null;
+        garageSlot.fleetId = null;
+        await garageSlot.save();
 
-          slotStillUsable = newCondition > 0;
-          slotGameId = garageSlot.game_id;
-          slotType = garageSlot.type;
-        }
+        slotStillUsable = newCondition > 0;
+        slotGameId = garageSlot.game_id;
+        slotType = garageSlot.type;
       }
 
       // Update fleet wear & maintenance thresholds
@@ -107,7 +110,7 @@ export async function GET(request: Request) {
         `Truk/Fleet ID ${fleet?.fleet_number || 'Anda'} telah selesai diservis dan sudah siap beroperasi kembali!`,
         "success",
         `/dashboard/garage/fleet/${fleet?.get("id") || ''}`
-      );
+      ).catch(err => console.error("Notification Error:", err));
 
       if (DISCORD_BOT_TOKEN && order.discordChannelId) {
         await fetch(`https://discord.com/api/v10/channels/${order.discordChannelId}`, {
@@ -127,11 +130,12 @@ export async function GET(request: Request) {
         let matchedWaiting = null;
         
         for (const w of allWaiting) {
-          const wFleet = await Fleet.findById(w.fleetId);
+          const wFleet = await Fleet.findById(w.fleetId).populate("model");
           if (wFleet) {
-            let wGameId = wFleet.game_id.toLowerCase();
-            if (wGameId === "1") wGameId = "ets2";
-            if (wGameId === "2") wGameId = "ats";
+            let rawGameId = wFleet.model?.game_id ?? wFleet.game_id;
+            let wGameId = String(rawGameId).toLowerCase();
+            if (wGameId === "1" || wGameId.includes("ets")) wGameId = "ets2";
+            if (wGameId === "2" || wGameId.includes("ats")) wGameId = "ats";
             
             if (wGameId === slotGameId) {
               // Check VIP constraint: if slot is VIP, user must be VIP.
@@ -177,7 +181,7 @@ export async function GET(request: Request) {
             `Kendaraan Anda telah masuk ke Garasi Slot ${freedSlotId} dari daftar tunggu. Estimasi selesai pada ${endAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB.`,
             "info",
             `/dashboard/garage/fleet/${matchedWaiting.fleetId}`
-          );
+          ).catch(err => console.error("Notification Error:", err));
 
           if (DISCORD_BOT_TOKEN && matchedWaiting.discordChannelId) {
             await fetch(`https://discord.com/api/v10/channels/${matchedWaiting.discordChannelId}/messages`, {
@@ -225,7 +229,7 @@ export async function GET(request: Request) {
             `Kendaraan ${f.fleet_number} membutuhkan servis segera karena telah melewati batas aman penggunaan komponen.`,
             "warning",
             `/dashboard/garage/fleet/${f.get("id")}`
-          );
+          ).catch(err => console.error("Notification Error:", err));
         }
       }
     }

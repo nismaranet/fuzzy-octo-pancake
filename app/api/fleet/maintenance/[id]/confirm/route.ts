@@ -21,12 +21,35 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  let orderId: string | null = null;
+  let driverDiscordId: string | null = null;
+  let deductAmount = 0;
+  let isDeducted = false;
+  let adminFeeAmount = 0;
+  let isFeeGiven = false;
+  let managerDiscordId: string | null = null;
+  let acquiredSlotId: string | null = null;
+
   try {
     const params = await context.params;
+    orderId = params.id;
     const session = await getServerSession(authOptions);
     if (!session?.user?.discordId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const isManager =
+      session.user.role === "manager" ||
+      session.user.role === "admin";
+
+    if (!isManager) {
+      return NextResponse.json(
+        { error: "Hanya Manager atau Admin yang memiliki akses untuk mengonfirmasi servis armada" },
+        { status: 403 }
+      );
+    }
+
+    managerDiscordId = String(session.user.discordId);
 
     await dbConnect();
 
@@ -47,6 +70,10 @@ export async function POST(
       );
     }
 
+    driverDiscordId = order.discordId;
+    deductAmount = order.totalPrice;
+    adminFeeAmount = order.adminFee;
+
     // 2. 🛡️ ATOMIC DEDUCTION: Potong saldo dari driver secara atomik
     const deductRes = await db
       .collection("currencies")
@@ -63,6 +90,8 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    isDeducted = true;
       
     await db.collection("currencyhistories").insertOne({
       userId: order.discordId,
@@ -98,51 +127,57 @@ export async function POST(
       }
     }
 
-    // 3. Add admin fee to manager
-    await db.collection("currencies").updateOne(
-      { userId: session.user.discordId, guildId: GUILD_ID },
-      { $inc: { totalNC: order.adminFee } },
-      { upsert: true }
-    );
-    await db.collection("currencyhistories").insertOne({
-      userId: session.user.discordId,
-      guildId: GUILD_ID,
-      amount: order.adminFee,
-      type: "earn",
-      reason: `Admin Fee Servis Armada`,
-      createdAt: new Date(),
-    });
+    // 3. Add admin fee to manager (Hanya jika manager mengonfirmasi armada milik user lain)
+    const isSelfService = String(session.user.discordId) === String(order.discordId);
+
+    if (!isSelfService && order.adminFee > 0) {
+      await db.collection("currencies").updateOne(
+        { userId: session.user.discordId, guildId: GUILD_ID },
+        { $inc: { totalNC: order.adminFee } },
+        { upsert: true }
+      );
+      isFeeGiven = true;
+
+      await db.collection("currencyhistories").insertOne({
+        userId: session.user.discordId,
+        guildId: GUILD_ID,
+        amount: order.adminFee,
+        type: "earn",
+        reason: `Admin Fee Servis Armada`,
+        createdAt: new Date(),
+      });
+    }
 
     // 4. Assign Slot if available
-    const fleet = await Fleet.findById(order.fleetId);
+    const fleet = await Fleet.findById(order.fleetId).populate("model");
     if (!fleet) {
-      return NextResponse.json({ error: "Kendaraan (Fleet) tidak ditemukan" }, { status: 404 });
+      throw new Error("Kendaraan (Fleet) tidak ditemukan di database");
     }
-    let gameId = fleet.game_id.toLowerCase();
+    let rawGameId = fleet.model?.game_id ?? fleet.game_id;
+    let gameId = String(rawGameId).toLowerCase();
     
-    // Trucky API sometimes uses '1' for ETS2 and '2' for ATS
-    if (gameId === "1") gameId = "ets2";
-    if (gameId === "2") gameId = "ats";
+    // Trucky API / Model uses '1' for ETS2 and '2' for ATS
+    if (gameId === "1" || gameId.includes("ets")) gameId = "ets2";
+    if (gameId === "2" || gameId.includes("ats")) gameId = "ats";
     
     const isVip = userObj?.nismaraplus?.status === true;
 
-    // Find available slot based on game and VIP status
-    // If VIP, check VIP slots first, then regular
-    // If regular, check only regular slots
+    // Slot priority: Prioritaskan Regular Slot terlebih dahulu.
+    // Jika Regular penuh dan user adalah Nismara+ (VIP), gunakan VIP Slot.
     let assignedSlot = null;
     let assignedSlotDoc = null;
 
-    if (isVip) {
+    // 1. Coba Regular Slot terlebih dahulu
+    assignedSlotDoc = await mongoose.model("GarageSlot").findOneAndUpdate(
+      { game_id: gameId, type: "regular", status: "available", condition: { $gt: 0 } },
+      { $set: { status: "in_use", currentOrderId: order._id, fleetId: order.fleetId } },
+      { new: true, sort: { slotId: 1 } }
+    );
+
+    // 2. Jika Regular penuh, gunakan VIP Slot khusus untuk user Nismara+
+    if (!assignedSlotDoc && isVip) {
       assignedSlotDoc = await mongoose.model("GarageSlot").findOneAndUpdate(
         { game_id: gameId, type: "vip", status: "available", condition: { $gt: 0 } },
-        { $set: { status: "in_use", currentOrderId: order._id, fleetId: order.fleetId } },
-        { new: true, sort: { slotId: 1 } }
-      );
-    }
-
-    if (!assignedSlotDoc) {
-      assignedSlotDoc = await mongoose.model("GarageSlot").findOneAndUpdate(
-        { game_id: gameId, type: "regular", status: "available", condition: { $gt: 0 } },
         { $set: { status: "in_use", currentOrderId: order._id, fleetId: order.fleetId } },
         { new: true, sort: { slotId: 1 } }
       );
@@ -152,9 +187,10 @@ export async function POST(
 
     if (assignedSlotDoc) {
       assignedSlot = assignedSlotDoc.slotId;
+      acquiredSlotId = assignedSlot;
+
       // Masuk garasi (in_service)
       order.status = "in_service";
-      // We still store slotNumber/Id as string now
       order.slotNumber = assignedSlot;
       order.maintenanceStartAt = new Date();
       
@@ -169,19 +205,22 @@ export async function POST(
         maintenance_end_date: endAt
       }, { new: true });
       
-      // Notifikasi Servis Dimulai (Masuk Garasi)
-      await sendPersonalNotification(
+      // Save order state
+      await order.save();
+
+      // Notifikasi Servis Dimulai (Masuk Garasi) - Non-blocking
+      sendPersonalNotification(
         order.discordId,
         "Servis Dimulai 🛠️",
         `Permintaan servis disetujui. Kendaraan masuk ke Garasi Slot ${assignedSlot}. Estimasi selesai pada ${endAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB.`,
         "info",
         `/dashboard/garage/fleet/${updatedFleet?.get("id") || order.fleetId}`
-      );
+      ).catch(console.error);
       
-      // Notify discord
+      // Notify discord - Non-blocking
       if (DISCORD_BOT_TOKEN && order.discordChannelId) {
         const typeText = order.type === "replace" ? "penggantian komponen" : "servis";
-        await fetch(`https://discord.com/api/v10/channels/${order.discordChannelId}/messages`, {
+        fetch(`https://discord.com/api/v10/channels/${order.discordChannelId}/messages`, {
           method: "POST",
           headers: {
             "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
@@ -190,27 +229,31 @@ export async function POST(
           body: JSON.stringify({
             content: `✅ Permintaan ${typeText} telah dikonfirmasi oleh <@${session.user.discordId}>. Kendaraan telah masuk ke Garasi Slot ${assignedSlot}. Estimasi selesai pada **${endAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB**.`
           })
-        });
+        }).catch(console.error);
       }
 
     } else {
       // Masuk waiting list
       order.status = "waiting";
+      order.slotNumber = null;
       
       const waitFleet = await Fleet.findByIdAndUpdate(order.fleetId, { status: "onservice" }, { new: true });
 
-      // Notifikasi Masuk Waiting List
-      await sendPersonalNotification(
+      // Save order state
+      await order.save();
+
+      // Notifikasi Masuk Waiting List - Non-blocking
+      sendPersonalNotification(
         order.discordId,
         "Daftar Tunggu Servis ⏳",
         `Permintaan disetujui, namun garasi penuh. Kendaraan Anda masuk ke dalam Daftar Tunggu (Waiting List).`,
         "warning",
         `/dashboard/garage/fleet/${waitFleet?.get("id") || order.fleetId}`
-      );
+      ).catch(console.error);
 
       if (DISCORD_BOT_TOKEN && order.discordChannelId) {
         const typeText = order.type === "replace" ? "penggantian komponen" : "servis";
-        await fetch(`https://discord.com/api/v10/channels/${order.discordChannelId}/messages`, {
+        fetch(`https://discord.com/api/v10/channels/${order.discordChannelId}/messages`, {
           method: "POST",
           headers: {
             "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
@@ -219,15 +262,58 @@ export async function POST(
           body: JSON.stringify({
             content: `⏳ Permintaan ${typeText} telah dikonfirmasi oleh <@${session.user.discordId}>. Saat ini garasi penuh, kendaraan Anda masuk ke dalam Daftar Tunggu (Waiting List).`
           })
-        });
+        }).catch(console.error);
       }
     }
-
-    await order.save();
 
     return NextResponse.json({ success: true, status: order.status });
   } catch (error: any) {
     console.error("Fleet Maintenance Confirm Error:", error);
+
+    // 🛡️ Automatic Rollback if any unexpected exception occurred
+    try {
+      const client = await clientPromise;
+      const db = client.db();
+
+      if (isDeducted && driverDiscordId && deductAmount > 0) {
+        await db.collection("currencies").updateOne(
+          { userId: driverDiscordId, guildId: GUILD_ID },
+          { $inc: { totalNC: deductAmount } }
+        );
+        await db.collection("currencyhistories").insertOne({
+          userId: driverDiscordId,
+          guildId: GUILD_ID,
+          amount: deductAmount,
+          type: "earn",
+          reason: `Rollback Servis Armada Gagal (Order ID: ${orderId})`,
+          createdAt: new Date(),
+        });
+      }
+
+      if (isFeeGiven && managerDiscordId && adminFeeAmount > 0) {
+        await db.collection("currencies").updateOne(
+          { userId: managerDiscordId, guildId: GUILD_ID },
+          { $inc: { totalNC: -adminFeeAmount } }
+        );
+      }
+
+      if (acquiredSlotId) {
+        await mongoose.model("GarageSlot").updateOne(
+          { slotId: acquiredSlotId },
+          { $set: { status: "available", currentOrderId: null, fleetId: null } }
+        );
+      }
+
+      if (orderId) {
+        await FleetMaintenanceOrder.updateOne(
+          { _id: orderId, status: "processing" },
+          { $set: { status: "pending", managerId: null, slotNumber: null } }
+        );
+      }
+    } catch (rollbackErr) {
+      console.error("Critical Rollback Error:", rollbackErr);
+    }
+
     return NextResponse.json(
       { error: error.message || "Terjadi kesalahan internal saat mengonfirmasi order" },
       { status: 500 },
