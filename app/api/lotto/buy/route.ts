@@ -7,7 +7,7 @@ import LottoTicket from "@/lib/models/LottoTicket";
 import { getCurrencyDataLogic } from "@/lib/currency";
 import { checkRateLimit } from "@/lib/rateLimit";
 
-const GUILD_ID = "863959415702028318";
+const GUILD_ID = process.env.DISCORD_GUILD_ID || process.env.GUILD_ID || "863959415702028318";
 
 export async function POST(req: NextRequest) {
   try {
@@ -142,6 +142,46 @@ export async function POST(req: NextRequest) {
       { _id: activePeriod._id },
       { $inc: { accumulatedPrize: ticketPrice * 0.8 } }
     );
+
+    // Discord Bot Integration (Grant Lotto Role if not already granted)
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    const guildId = process.env.DISCORD_GUILD_ID || GUILD_ID;
+    const lottoRoleId = process.env.DISCORD_LOTTO_ROLE_ID;
+
+    if (botToken && guildId && lottoRoleId) {
+      try {
+        const memberRes = await fetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
+          {
+            headers: {
+              Authorization: `Bot ${botToken}`,
+            },
+          }
+        );
+
+        if (memberRes.ok) {
+          const memberData = await memberRes.json();
+          const hasRole =
+            Array.isArray(memberData.roles) &&
+            memberData.roles.includes(lottoRoleId);
+
+          if (!hasRole) {
+            await fetch(
+              `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${lottoRoleId}`,
+              {
+                method: "PUT",
+                headers: {
+                  Authorization: `Bot ${botToken}`,
+                  "X-Audit-Log-Reason": `Nismara Lotto Ticket Purchase (Periode #${activePeriod.periodNumber})`,
+                },
+              }
+            );
+          }
+        }
+      } catch (roleErr) {
+        console.error("Discord Lotto Role Grant Error:", roleErr);
+      }
+    }
 
     return NextResponse.json({
       message: "Ticket purchased successfully",
