@@ -7,7 +7,7 @@ const fleetOrderSchema = new mongoose.Schema(
     fleetStoreId: { type: mongoose.Schema.Types.ObjectId, ref: "FleetStore", required: true },
     status: {
       type: String,
-      enum: ["pending", "claimed", "completed", "cancelled"],
+      enum: ["pending", "claimed", "processing", "completed", "cancelled"],
       default: "pending",
     },
     managerId: { type: String, default: null }, // Discord ID of the manager who claimed this order
@@ -23,5 +23,9 @@ const fleetOrderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+if (process.env.NODE_ENV !== "production") {
+  delete mongoose.models.FleetOrder;
+}
 
 export default mongoose.models.FleetOrder || mongoose.model("FleetOrder", fleetOrderSchema);

@@ -14,25 +14,37 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const isManager =
+      session.user.role === "manager" ||
+      session.user.role === "admin";
+
+    if (!isManager) {
+      return NextResponse.json(
+        { error: "Hanya Manager atau Admin yang memiliki akses untuk mengambil order armada" },
+        { status: 403 }
+      );
+    }
+
     await dbConnect();
 
-    const order = await FleetOrder.findById(params.id);
+    // 🛡️ ATOMIC CLAIM: Kunci order hanya jika status masih pending
+    const order = await FleetOrder.findOneAndUpdate(
+      { _id: params.id, status: "pending" },
+      { $set: { status: "claimed", managerId: String(session.user.discordId) } },
+      { new: true }
+    );
+
     if (!order) {
-      return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Order tidak ditemukan atau sudah diambil oleh staff lain" },
+        { status: 400 }
+      );
     }
 
-    if (order.status !== "pending") {
-      return NextResponse.json({ error: "Order sudah diambil oleh staff lain" }, { status: 400 });
-    }
-
-    order.managerId = session.user.discordId;
-    order.status = "claimed";
-    await order.save();
-
-    // Optionally notify in discord
+    // Optionally notify in discord - Non-blocking
     const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
     if (DISCORD_BOT_TOKEN && order.discordChannelId) {
-      await fetch(`https://discord.com/api/v10/channels/${order.discordChannelId}/messages`, {
+      fetch(`https://discord.com/api/v10/channels/${order.discordChannelId}/messages`, {
         method: "POST",
         headers: {
           "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
@@ -41,12 +53,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         body: JSON.stringify({
           content: `Tiket ini telah diambil oleh <@${session.user.discordId}>. Pemesanan sedang diproses.`
         })
-      });
+      }).catch(console.error);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Fleet Order Claim Error:", error);
-    return NextResponse.json({ error: "Terjadi kesalahan internal" }, { status: 500 });
+    return NextResponse.json({ error: "Terjadi kesalahan internal saat mengambil order" }, { status: 500 });
   }
 }

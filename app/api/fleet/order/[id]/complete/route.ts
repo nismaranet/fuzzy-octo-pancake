@@ -19,12 +19,38 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  let orderId: string | null = null;
+  let buyerDiscordId: string | null = null;
+  let buyerUserId: string | null = null;
+  let deductAmount = 0;
+  let isDeducted = false;
+  let isFeeGiven = false;
+  let adminFeeAmount = 0;
+  let managerDiscordId: string | null = null;
+  let createdFleetDbId: string | null = null;
+  let garageUpdated = false;
+  let addedSlots = 0;
+
   try {
     const params = await context.params;
+    orderId = params.id;
     const session = await getServerSession(authOptions);
     if (!session?.user?.discordId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const isManager =
+      session.user.role === "manager" ||
+      session.user.role === "admin";
+
+    if (!isManager) {
+      return NextResponse.json(
+        { error: "Hanya Manager atau Admin yang memiliki akses untuk menyelesaikan order armada" },
+        { status: 403 }
+      );
+    }
+
+    managerDiscordId = String(session.user.discordId);
 
     const body = await request.json();
     let rawPlatNumber = body.platNumber || "";
@@ -54,6 +80,7 @@ export async function POST(
     const client = await clientPromise;
     const db = client.db();
 
+    // 🛡️ ATOMIC GATE: Kunci status order dari claimed menjadi processing
     const order = await FleetOrder.findOneAndUpdate(
       { _id: params.id, status: "claimed" },
       { $set: { status: "processing" } },
@@ -68,24 +95,14 @@ export async function POST(
 
     if (!order) {
       return NextResponse.json(
-        { error: "Order tidak ditemukan, belum diambil (claimed), atau sudah diproses" },
+        { error: "Order tidak ditemukan, belum diambil (claimed), atau sedang diproses oleh staff lain" },
         { status: 400 },
       );
     }
 
-    // Uniqueness check
-    const existingFleetById = await Fleet.findOne({ id: truckyId });
-    if (existingFleetById) {
-      // Revert status back to claimed since we abort
-      order.status = "claimed";
-      await order.save();
-      return NextResponse.json(
-        { error: "Kendaraan dengan ID Trucky tersebut sudah terdaftar di sistem!" },
-        { status: 400 }
-      );
-    }
-
-    if (order.managerId !== session.user.discordId) {
+    if (order.managerId !== String(session.user.discordId)) {
+      // Kembalikan status ke claimed jika manager yang login berbeda
+      await FleetOrder.updateOne({ _id: order._id }, { $set: { status: "claimed" } });
       return NextResponse.json(
         {
           error:
@@ -95,13 +112,36 @@ export async function POST(
       );
     }
 
+    // Uniqueness check: pastikan ID Trucky dan Plat Nomor belum pernah dipakai
+    const duplicateFleet = await Fleet.findOne({
+      $or: [
+        { id: String(truckyId) },
+        { fleet_number: platNumber }
+      ]
+    });
+
+    if (duplicateFleet) {
+      await FleetOrder.updateOne({ _id: order._id }, { $set: { status: "claimed" } });
+      const isIdDup = duplicateFleet.id === String(truckyId);
+      return NextResponse.json(
+        { error: isIdDup ? `Kendaraan dengan ID Trucky ${truckyId} sudah terdaftar di sistem!` : `Plat nomor ${platNumber} sudah digunakan oleh armada lain!` },
+        { status: 400 }
+      );
+    }
+
     const buyer = await User.findById(order.userId);
     if (!buyer) {
+      await FleetOrder.updateOne({ _id: order._id }, { $set: { status: "claimed" } });
       return NextResponse.json(
         { error: "Pembeli tidak ditemukan" },
         { status: 404 },
       );
     }
+
+    buyerDiscordId = buyer.discordId;
+    buyerUserId = String(buyer._id);
+    deductAmount = order.totalPrice;
+    adminFeeAmount = order.adminFee;
 
     // 1 & 2. 🛡️ ATOMIC DEDUCTION: Potong saldo pembeli secara atomik
     const deductRes = await db
@@ -112,8 +152,7 @@ export async function POST(
       );
 
     if (deductRes.modifiedCount === 0) {
-      order.status = "claimed";
-      await order.save();
+      await FleetOrder.updateOne({ _id: order._id }, { $set: { status: "claimed" } });
       return NextResponse.json(
         {
           error: "Saldo NC pembeli tidak mencukupi saat ini. Beritahu pembeli.",
@@ -121,6 +160,9 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    isDeducted = true;
+
     await db.collection("currencyhistories").insertOne({
       userId: buyer.discordId,
       guildId: GUILD_ID,
@@ -152,27 +194,33 @@ export async function POST(
       });
     }
 
-    // 3. Add admin fee to manager
-    await db.collection("currencies").updateOne(
-      { userId: order.managerId, guildId: GUILD_ID },
-      { $inc: { totalNC: order.adminFee } },
-      { upsert: true }, // just in case manager currency doesn't exist yet
-    );
-    await db.collection("currencyhistories").insertOne({
-      userId: order.managerId,
-      guildId: GUILD_ID,
-      amount: order.adminFee,
-      type: "earn",
-      reason: `Admin Fee Pembelian Fleet (User: ${buyer.name})`,
-      createdAt: new Date(),
-    });
+    // 3. Add admin fee to manager (Hanya jika manager memproses order milik user lain)
+    const isSelfPurchase = String(session.user.discordId) === String(buyer.discordId);
+
+    if (!isSelfPurchase && order.adminFee > 0) {
+      await db.collection("currencies").updateOne(
+        { userId: order.managerId, guildId: GUILD_ID },
+        { $inc: { totalNC: order.adminFee } },
+        { upsert: true },
+      );
+      isFeeGiven = true;
+
+      await db.collection("currencyhistories").insertOne({
+        userId: order.managerId,
+        guildId: GUILD_ID,
+        amount: order.adminFee,
+        type: "earn",
+        reason: `Admin Fee Pembelian Fleet (User: ${buyer.name})`,
+        createdAt: new Date(),
+      });
+    }
 
     // 4. Create Fleet for user
     const brandName = order.fleetStoreId.brand?.name ? `${order.fleetStoreId.brand.name} ` : "";
     const fleetName = `${brandName}${order.fleetStoreId.name}`.trim();
 
-    await Fleet.create({
-      id: truckyId,
+    const createdFleet = await Fleet.create({
+      id: String(truckyId),
       fleet_name: fleetName,
       game_id: String(order.fleetStoreId.game_id),
       fleet_number: platNumber,
@@ -192,6 +240,8 @@ export async function POST(
       },
     });
 
+    createdFleetDbId = String(createdFleet._id);
+
     // 4.5 Update Garage
     let garage = await Garage.findOne({ discordId: buyer.discordId });
 
@@ -204,11 +254,11 @@ export async function POST(
         mechanics: { umum: {}, ban: {}, mesin: {} },
         operational_cost: 0,
       });
-      // If requiresGarageUpgrade was somehow true without garage existing, apply it
       if (order.requiresGarageUpgrade) {
         const slotsToAdd = order.upgradeSlotCount || 1;
         garage.fleetSlot += slotsToAdd;
         garage.fleetSlotLevel += slotsToAdd;
+        addedSlots = slotsToAdd;
       }
     } else {
       garage.fleetSlotUsed += 1;
@@ -216,6 +266,7 @@ export async function POST(
         const slotsToAdd = order.upgradeSlotCount || 1;
         garage.fleetSlot += slotsToAdd;
         garage.fleetSlotLevel += slotsToAdd;
+        addedSlots = slotsToAdd;
       }
     }
 
@@ -231,14 +282,15 @@ export async function POST(
     const fuelCost = garage.fuel_operational_cost || 0;
     garage.operational_cost = garage.fleet_operational_cost + fuelCost;
     await garage.save();
+    garageUpdated = true;
 
     // 5. Update Order status
     order.status = "completed";
     await order.save();
 
-    // 6. Delete Discord Channel
+    // 6. Delete Discord Channel - Non-blocking
     if (DISCORD_BOT_TOKEN && order.discordChannelId) {
-      await fetch(
+      fetch(
         `https://discord.com/api/v10/channels/${order.discordChannelId}`,
         {
           method: "DELETE",
@@ -246,22 +298,64 @@ export async function POST(
             Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
           },
         },
-      );
+      ).catch(err => console.error("Failed to delete discord order channel:", err));
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Fleet Order Complete Error:", error);
     
-    // Attempt rollback if error occurs
+    // 🛡️ Comprehensive Rollback
     try {
-      const params = await context.params;
-      await FleetOrder.updateOne(
-        { _id: params.id, status: "processing" },
-        { $set: { status: "claimed" } }
-      );
-    } catch (e) {
-      console.error("Rollback error:", e);
+      const client = await clientPromise;
+      const db = client.db();
+
+      if (isDeducted && buyerDiscordId && deductAmount > 0) {
+        await db.collection("currencies").updateOne(
+          { userId: buyerDiscordId, guildId: GUILD_ID },
+          { $inc: { totalNC: deductAmount } }
+        );
+        await db.collection("currencyhistories").insertOne({
+          userId: buyerDiscordId,
+          guildId: GUILD_ID,
+          amount: deductAmount,
+          type: "earn",
+          reason: `Rollback Pembelian Fleet Gagal (Order ID: ${orderId})`,
+          createdAt: new Date(),
+        });
+      }
+
+      if (isFeeGiven && managerDiscordId && adminFeeAmount > 0) {
+        await db.collection("currencies").updateOne(
+          { userId: managerDiscordId, guildId: GUILD_ID },
+          { $inc: { totalNC: -adminFeeAmount } }
+        );
+      }
+
+      if (createdFleetDbId) {
+        await Fleet.deleteOne({ _id: createdFleetDbId });
+      }
+
+      if (garageUpdated && buyerDiscordId) {
+        const garage = await Garage.findOne({ discordId: buyerDiscordId });
+        if (garage) {
+          garage.fleetSlotUsed = Math.max(0, (garage.fleetSlotUsed || 1) - 1);
+          if (addedSlots > 0) {
+            garage.fleetSlot = Math.max(1, garage.fleetSlot - addedSlots);
+            garage.fleetSlotLevel = Math.max(1, garage.fleetSlotLevel - addedSlots);
+          }
+          await garage.save();
+        }
+      }
+
+      if (orderId) {
+        await FleetOrder.updateOne(
+          { _id: orderId, status: "processing" },
+          { $set: { status: "claimed" } }
+        );
+      }
+    } catch (rollbackErr) {
+      console.error("Critical Fleet Order Rollback Error:", rollbackErr);
     }
 
     return NextResponse.json(
