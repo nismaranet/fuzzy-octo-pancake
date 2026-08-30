@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
       }
 
-      if (String(ticketData.isScratched) === "true") {
+      // 🛡️ ATOMIC GATE: Kunci status gesek tiket di Redis menggunakan hsetnx
+      const markScratched = await redis.hsetnx(`ticket:${ticketId}`, "isScratched_locked", "true");
+      if (markScratched === 0 || String(ticketData.isScratched) === "true") {
         return NextResponse.json({ error: "Ticket has already been scratched" }, { status: 400 });
       }
 
@@ -66,26 +68,28 @@ export async function POST(req: NextRequest) {
       // 2. Tangani Tiket dari MongoDB (Fallback untuk sinkronisasi / tiket lama)
       await clientPromise;
 
-      const ticket = await ScratchTicket.findOne({
-        _id: ticketId,
-        discordId: discordId,
-      });
+      // 🛡️ ATOMIC GATE: Kunci status gesek di MongoDB
+      const ticket = await ScratchTicket.findOneAndUpdate(
+        {
+          _id: ticketId,
+          discordId: discordId,
+          isScratched: { $ne: true },
+        },
+        {
+          $set: {
+            isScratched: true,
+            scratchedAt: new Date(),
+          },
+        },
+        { new: true }
+      );
 
       if (!ticket) {
-        return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
-      }
-
-      if (ticket.isScratched) {
         return NextResponse.json(
-          { error: "Ticket has already been scratched" },
+          { error: "Ticket not found or has already been scratched" },
           { status: 400 }
         );
       }
-
-      // Mark as scratched
-      ticket.isScratched = true;
-      ticket.scratchedAt = new Date();
-      await ticket.save();
 
       // If winning, add to balance
       if (ticket.isWinning && ticket.prizeWon > 0) {

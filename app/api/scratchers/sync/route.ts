@@ -67,10 +67,19 @@ export async function POST(req: NextRequest) {
     // Arsitektur Redis-first: semua transaksi sesi (beli + menang) diakumulasi di Redis,
     // lalu diterapkan ke MongoDB dalam satu batch write di sini.
     if (netProfit !== 0) {
-      await db.collection("currencies").updateOne(
-        { userId: discordId, guildId: GUILD_ID },
-        { $inc: { totalNC: netProfit } }
-      );
+      if (netProfit > 0) {
+        await db.collection("currencies").updateOne(
+          { userId: discordId, guildId: GUILD_ID },
+          { $inc: { totalNC: netProfit } },
+          { upsert: true }
+        );
+      } else {
+        // Clamping agar saldo tidak minus jika ada concurrent spending
+        await db.collection("currencies").updateOne(
+          { userId: discordId, guildId: GUILD_ID },
+          [{ $set: { totalNC: { $max: [0, { $add: [{ $ifNull: ["$totalNC", 0] }, netProfit] }] } } }]
+        );
+      }
     }
 
     // Catat histori pengeluaran (batch untuk seluruh sesi)

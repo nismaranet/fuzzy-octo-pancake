@@ -72,10 +72,13 @@ export async function GET(request: Request) {
         continue;
       }
 
-      // Check user currency
-      const userCurrency = await db.collection("currencies").findOne({ userId: garage.discordId, guildId: GUILD_ID });
+      // 🛡️ ATOMIC DEDUCTION: Coba potong saldo secara atomik
+      const deductRes = await db.collection("currencies").updateOne(
+        { userId: garage.discordId, guildId: GUILD_ID, totalNC: { $gte: garage.operational_cost } },
+        { $inc: { totalNC: -garage.operational_cost } }
+      );
       
-      if (!userCurrency || userCurrency.totalNC < garage.operational_cost) {
+      if (deductRes.modifiedCount === 0) {
         // Gagal bayar karena saldo kurang
         failedCount++;
         
@@ -91,11 +94,6 @@ export async function GET(request: Request) {
         
       } else {
         // Berhasil bayar
-        await db.collection("currencies").updateOne(
-          { userId: garage.discordId, guildId: GUILD_ID },
-          { $inc: { totalNC: -garage.operational_cost } }
-        );
-
         await db.collection("currencyhistories").insertOne({
           userId: garage.discordId,
           guildId: GUILD_ID,

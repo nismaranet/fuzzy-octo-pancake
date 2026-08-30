@@ -75,16 +75,14 @@ export async function GET(request: Request) {
       for (const specialty of specialties) {
         const mechanic = garage.mechanics[specialty];
         if (mechanic && mechanic.extendAt && new Date(mechanic.extendAt) <= now) {
-          // Time to pay salary
-          const currencyData = await db.collection("currencies").findOne({ userId: garage.discordId, guildId: GUILD_ID });
+          // 🛡️ ATOMIC DEDUCTION: Coba potong gaji secara atomik
+          const deductRes = await db.collection("currencies").updateOne(
+            { userId: garage.discordId, guildId: GUILD_ID, totalNC: { $gte: mechanic.salary } },
+            { $inc: { totalNC: -mechanic.salary } }
+          );
           
-          if (currencyData && currencyData.totalNC >= mechanic.salary) {
-            // Can pay: Deduct and extend
-            await db.collection("currencies").updateOne(
-              { userId: garage.discordId, guildId: GUILD_ID },
-              { $inc: { totalNC: -mechanic.salary } }
-            );
-
+          if (deductRes.modifiedCount > 0) {
+            // Can pay: Extend and record history
             await db.collection("currencyhistories").insertOne({
               userId: garage.discordId,
               guildId: GUILD_ID,

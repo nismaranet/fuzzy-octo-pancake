@@ -55,45 +55,43 @@ export async function POST(
       );
     }
 
-    const existingPurchase = await MarketPurchase.findOne({
-      buyerId,
-      marketItemId: item._id, // Gunakan _id asli dari document
-    });
-    if (existingPurchase) {
-      return NextResponse.json(
-        { error: "Anda sudah memiliki barang ini" },
-        { status: 400 },
-      );
+    const price = Number(item.price);
+
+    // 🛡️ ATOMIC GATE: Buat riwayat pembelian terlebih dahulu untuk mengunci kepemilikan (mencegah double spend)
+    let purchase;
+    try {
+      purchase = await MarketPurchase.create({
+        buyerId,
+        marketItemId: item._id,
+        pricePaid: price,
+      });
+    } catch (err: any) {
+      if (err.code === 11000) {
+        return NextResponse.json(
+          { error: "Anda sudah memiliki barang ini" },
+          { status: 400 }
+        );
+      }
+      throw err;
     }
 
     const client = await clientPromise;
     const db = client.db();
-    const price = Number(item.price);
 
     // Proses pembayaran jika harganya lebih dari 0
     if (price > 0) {
-      const buyerCurrency = await db.collection("currencies").findOne({
-        userId: buyerId,
-        guildId: GUILD_ID,
-      });
-
-      if (!buyerCurrency || buyerCurrency.totalNC < price) {
-        return NextResponse.json(
-          { error: "Saldo Nismara Coin tidak mencukupi" },
-          { status: 400 },
-        );
-      }
-
-      // Potong NC pembeli
+      // Potong NC pembeli secara atomik
       const deductRes = await db.collection("currencies").updateOne(
         { userId: buyerId, guildId: GUILD_ID, totalNC: { $gte: price } },
         { $inc: { totalNC: -price } },
       );
 
       if (deductRes.modifiedCount === 0) {
+        // Rollback purchase record jika saldo tidak cukup
+        await MarketPurchase.deleteOne({ _id: purchase._id });
         return NextResponse.json(
-          { error: "Gagal memproses pembayaran (potong saldo)" },
-          { status: 500 },
+          { error: "Saldo Nismara Coin tidak mencukupi atau telah terpakai" },
+          { status: 400 },
         );
       }
 
@@ -106,6 +104,7 @@ export async function POST(
       await db.collection("currencies").updateOne(
         { userId: item.sellerId, guildId: GUILD_ID },
         { $inc: { totalNC: sellerReceives } },
+        { upsert: true }
       );
 
       // Catat history pembeli (pengeluaran)
@@ -149,13 +148,6 @@ export async function POST(
       await logExtremeActivity(buyerId, "MARKET_BUY", price, `Membeli mod market: ${item.title}`);
       await logExtremeActivity(item.sellerId, "MARKET_SELL", sellerReceives, `Menjual mod market: ${item.title}`);
     }
-
-    // Buat riwayat pembelian
-    const purchase = await MarketPurchase.create({
-      buyerId,
-      marketItemId: item._id,
-      pricePaid: price,
-    });
 
     try {
       revalidatePath("/dashboard/library");

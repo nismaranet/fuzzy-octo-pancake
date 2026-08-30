@@ -103,11 +103,17 @@ export async function POST(
       );
     }
 
-    // 1. Check buyer's balance
-    const buyerCurrency = await db
+    // 1 & 2. 🛡️ ATOMIC DEDUCTION: Potong saldo pembeli secara atomik
+    const deductRes = await db
       .collection("currencies")
-      .findOne({ userId: buyer.discordId, guildId: GUILD_ID });
-    if (!buyerCurrency || buyerCurrency.totalNC < order.totalPrice) {
+      .updateOne(
+        { userId: buyer.discordId, guildId: GUILD_ID, totalNC: { $gte: order.totalPrice } },
+        { $inc: { totalNC: -order.totalPrice } },
+      );
+
+    if (deductRes.modifiedCount === 0) {
+      order.status = "claimed";
+      await order.save();
       return NextResponse.json(
         {
           error: "Saldo NC pembeli tidak mencukupi saat ini. Beritahu pembeli.",
@@ -115,14 +121,6 @@ export async function POST(
         { status: 400 },
       );
     }
-
-    // 2. Deduct from buyer
-    await db
-      .collection("currencies")
-      .updateOne(
-        { userId: buyer.discordId, guildId: GUILD_ID },
-        { $inc: { totalNC: -order.totalPrice } },
-      );
     await db.collection("currencyhistories").insertOne({
       userId: buyer.discordId,
       guildId: GUILD_ID,

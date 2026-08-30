@@ -80,27 +80,28 @@ export async function submitSurveyAction(data: SubmitSurveyInput) {
       }
     }
 
-    // 4. PENCEGAHAN GANDA: Cek apakah driver ini sudah pernah mengisi survey ini
-    const existingResponse = await db.collection("survey_responses").findOne({
-      surveyUri: data.surveyUri,
-      discordId: discordId,
-    });
+    // 4 & 5. 🛡️ ATOMIC INSERTION & GATE: Simpan jawaban dengan upsert unik untuk mencegah race condition
+    const upsertRes = await db.collection("survey_responses").updateOne(
+      { surveyUri: data.surveyUri, discordId: discordId },
+      {
+        $setOnInsert: {
+          surveyUri: data.surveyUri,
+          discordId: discordId,
+          answers: data.answers,
+          submittedAt: new Date(),
+        }
+      },
+      { upsert: true }
+    );
 
-    if (existingResponse) {
+    // Jika upsertedCount === 0, berarti dokumen sudah pernah ada sebelumnya (sudah pernah mengisi)
+    if (!upsertRes.upsertedCount) {
       return {
         success: false,
         error:
           "Kamu sudah pernah mengisi survey ini! Pengisian hanya diperbolehkan 1 kali.",
       };
     }
-
-    // 5. Simpan Jawaban Driver ke Koleksi 'survey_responses'
-    await db.collection("survey_responses").insertOne({
-      surveyUri: data.surveyUri,
-      discordId: discordId,
-      answers: data.answers,
-      submittedAt: new Date(),
-    });
 
     // 6. BERIKAN REWARD JIKA ADA
     const rewardType = survey.rewardType || "NC"; // Fallback untuk survey lama

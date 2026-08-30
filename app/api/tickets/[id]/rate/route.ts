@@ -42,8 +42,23 @@ export async function POST(
       return NextResponse.json({ error: "Tiket belum selesai" }, { status: 400 });
     }
 
-    if (ticket.hasTipped) {
-      return NextResponse.json({ error: "Anda sudah memberikan rating/tip" }, { status: 400 });
+    // 🛡️ ATOMIC GATE: Kunci rating tiket terlebih dahulu untuk mencegah race condition
+    const updateTicketRes = await Ticket.updateOne(
+      {
+        _id: ticket._id,
+        hasTipped: { $ne: true },
+      },
+      {
+        $set: {
+          rating,
+          tipAmount: tipAmount || 0,
+          hasTipped: true,
+        },
+      }
+    );
+
+    if (updateTicketRes.modifiedCount === 0) {
+      return NextResponse.json({ error: "Anda sudah memberikan rating/tip untuk tiket ini" }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -51,29 +66,26 @@ export async function POST(
     
     // Process tip if tipAmount > 0
     if (tipAmount && tipAmount > 0) {
-      const userCurrency = await db.collection("currencies").findOne({
-        userId: session.user.discordId,
-        guildId: GUILD_ID,
-      });
-
-      if (!userCurrency || userCurrency.totalNC < tipAmount) {
-        return NextResponse.json({ error: "Saldo NC tidak mencukupi untuk tip" }, { status: 400 });
-      }
-
       if (!ticket.managerId) {
-        return NextResponse.json({ error: "Manager tidak ditemukan untuk tiket ini" }, { status: 400 });
+        return NextResponse.json({ success: true, message: "Rating tersimpan (Manager tidak ditemukan untuk menerima tip)" });
       }
 
-      // Deduct from user
-      await db.collection("currencies").updateOne(
-        { userId: session.user.discordId, guildId: GUILD_ID },
+      // Deduct from user atomically
+      const deductRes = await db.collection("currencies").updateOne(
+        { userId: session.user.discordId, guildId: GUILD_ID, totalNC: { $gte: tipAmount } },
         { $inc: { totalNC: -tipAmount } }
       );
+
+      if (deductRes.modifiedCount === 0) {
+        await Ticket.updateOne({ _id: ticket._id }, { $set: { tipAmount: 0 } });
+        return NextResponse.json({ success: true, message: "Rating tersimpan, namun saldo NC tidak mencukupi untuk memberi tip." });
+      }
 
       // Add to manager
       await db.collection("currencies").updateOne(
         { userId: ticket.managerId, guildId: GUILD_ID },
-        { $inc: { totalNC: tipAmount } }
+        { $inc: { totalNC: tipAmount } },
+        { upsert: true }
       );
 
       // User log
@@ -97,12 +109,7 @@ export async function POST(
       });
     }
 
-    ticket.rating = rating;
-    ticket.tipAmount = tipAmount || 0;
-    ticket.hasTipped = true;
-    await ticket.save();
-
-    return NextResponse.json({ success: true, message: "Berhasil menyimpan rating" });
+    return NextResponse.json({ success: true, message: "Berhasil menyimpan rating dan tip!" });
 
   } catch (error) {
     console.error("Ticket Rate Error:", error);

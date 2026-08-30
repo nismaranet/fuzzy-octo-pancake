@@ -33,17 +33,27 @@ export async function POST(
     const query = mongoose.isValidObjectId(ticketId) 
       ? { $or: [{ _id: ticketId }, { ticketId }] }
       : { ticketId };
-    const ticket = await Ticket.findOne(query);
+    // 🛡️ ATOMIC GATE: Kunci status tiket dari "claimed" menjadi status baru
+    const ticket = await Ticket.findOneAndUpdate(
+      {
+        ...query,
+        status: "claimed",
+        managerId: session.user.discordId,
+      },
+      {
+        $set: {
+          status,
+          closingReason,
+        },
+      },
+      { new: true }
+    );
+
     if (!ticket) {
-      return NextResponse.json({ error: "Tiket tidak ditemukan" }, { status: 404 });
-    }
-
-    if (ticket.status !== "claimed") {
-      return NextResponse.json({ error: "Tiket belum diklaim atau sudah ditutup" }, { status: 400 });
-    }
-
-    if (ticket.managerId !== session.user.discordId) {
-      return NextResponse.json({ error: "Anda bukan pengurus tiket ini" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Tiket tidak ditemukan, belum diklaim, sudah ditutup, atau Anda bukan pengurus tiket ini" },
+        { status: 400 }
+      );
     }
 
     const client = await clientPromise;
@@ -53,7 +63,8 @@ export async function POST(
     const REWARD_AMOUNT = 500;
     await db.collection("currencies").updateOne(
       { userId: session.user.discordId, guildId: GUILD_ID },
-      { $inc: { totalNC: REWARD_AMOUNT } }
+      { $inc: { totalNC: REWARD_AMOUNT } },
+      { upsert: true }
     );
     await db.collection("currencyhistories").insertOne({
       userId: session.user.discordId,
@@ -74,10 +85,6 @@ export async function POST(
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-
-    ticket.status = status;
-    ticket.closingReason = closingReason;
-    await ticket.save();
 
     // Notify user in Discord Channel before deleting
     if (DISCORD_BOT_TOKEN && ticket.discordChannelId) {

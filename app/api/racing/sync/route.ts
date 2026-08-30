@@ -63,10 +63,18 @@ export async function POST(req: NextRequest) {
 
     // 3. Batch write balance changes
     if (netProfit !== 0) {
-      await db.collection("currencies").updateOne(
-        { userId: discordId, guildId: GUILD_ID },
-        { $inc: { totalNC: netProfit } }
-      );
+      if (netProfit > 0) {
+        await db.collection("currencies").updateOne(
+          { userId: discordId, guildId: GUILD_ID },
+          { $inc: { totalNC: netProfit } },
+          { upsert: true }
+        );
+      } else {
+        await db.collection("currencies").updateOne(
+          { userId: discordId, guildId: GUILD_ID },
+          [{ $set: { totalNC: { $max: [0, { $add: [{ $ifNull: ["$totalNC", 0] }, netProfit] }] } } }]
+        );
+      }
     }
 
     // 4. Record histories

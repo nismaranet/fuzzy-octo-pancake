@@ -137,9 +137,11 @@ export async function POST(req: NextRequest) {
     });
     await newTicket.save();
 
-    // 80% (400 NC) to prize pool, 20% (100 NC) burned
-    activePeriod.accumulatedPrize += ticketPrice * 0.8;
-    await activePeriod.save();
+    // 80% (400 NC) to prize pool, 20% (100 NC) burned (🛡️ Atomic increment)
+    await LottoPeriod.updateOne(
+      { _id: activePeriod._id },
+      { $inc: { accumulatedPrize: ticketPrice * 0.8 } }
+    );
 
     return NextResponse.json({
       message: "Ticket purchased successfully",

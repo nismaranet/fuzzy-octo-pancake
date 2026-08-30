@@ -463,6 +463,19 @@ export async function claimConvoyRewardAction(convoyId: string) {
     totalReward += convoy.rewards?.sweeper || 1500;
   }
 
+  // 🛡️ ATOMIC GATE: Kunci status klaim terlebih dahulu untuk mencegah race condition
+  const claimRes = await db.collection("convoylobby").updateOne(
+    { 
+      _id: new ObjectId(convoyId), 
+      partisipan: { $elemMatch: { discordId, claimedReward: { $ne: true } } } 
+    },
+    { $set: { "partisipan.$.claimedReward": true } }
+  );
+
+  if (claimRes.modifiedCount === 0) {
+    throw new Error("Hadiah sudah diklaim sebelumnya atau sedang diproses.");
+  }
+
   // Update Saldo NC Pemain
   const guildId = "863959415702028318";
   await db
@@ -470,6 +483,7 @@ export async function claimConvoyRewardAction(convoyId: string) {
     .updateOne(
       { userId: discordId, guildId: guildId },
       { $inc: { totalNC: totalReward } },
+      { upsert: true }
     );
 
   // Catat riwayat transaksi
@@ -522,14 +536,6 @@ export async function claimConvoyRewardAction(convoyId: string) {
     ticketNumber: ticketNumber,
     createdAt: new Date(),
   });
-
-  // Tandai sebagai sudah diklaim
-  await db
-    .collection("convoylobby")
-    .updateOne(
-      { _id: new ObjectId(convoyId), "partisipan.discordId": discordId },
-      { $set: { "partisipan.$.claimedReward": true } },
-    );
 
   return {
     success: true,

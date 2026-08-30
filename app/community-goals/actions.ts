@@ -25,17 +25,15 @@ export async function donateToGoal(goalId: string, amount: number) {
     if (goal.type !== "nc") return { success: false, error: "Goal ini bukan target donasi NC." };
     if (new Date(goal.deadline) < new Date()) return { success: false, error: "Waktu partisipasi telah habis." };
 
-    // Cek Balance
-    const currency = await db.collection("currencies").findOne({ userId: session.user.discordId, guildId });
-    if (!currency || currency.totalNC < amount) {
-      return { success: false, error: "Saldo Nismara Coin Anda tidak mencukupi." };
-    }
-
-    // 1. Kurangi NC user
-    await db.collection("currencies").updateOne(
-      { userId: session.user.discordId, guildId },
+    // 1. 🛡️ ATOMIC DEDUCTION: Kurangi NC user secara atomik
+    const deductRes = await db.collection("currencies").updateOne(
+      { userId: session.user.discordId, guildId, totalNC: { $gte: amount } },
       { $inc: { totalNC: -amount } }
     );
+
+    if (deductRes.modifiedCount === 0) {
+      return { success: false, error: "Saldo Nismara Coin Anda tidak mencukupi atau telah terpakai." };
+    }
 
     // 2. Catat History Currency
     await db.collection("currencyhistories").insertOne({
@@ -57,7 +55,7 @@ export async function donateToGoal(goalId: string, amount: number) {
           $inc: { 
             currentAmount: amount,
             "participants.$.contributed": amount 
-          }
+          } 
         }
       );
     } else {
@@ -187,13 +185,9 @@ export async function optInKmGoal(goalId: string) {
     if (goal.type !== "km") return { success: false, error: "Goal ini bukan target Jarak Tempuh." };
     if (new Date(goal.deadline) < new Date()) return { success: false, error: "Waktu partisipasi telah habis." };
 
-    const isParticipant = goal.participants?.some((p: any) => p.discordId === session.user.discordId);
-    if (isParticipant) {
-      return { success: false, error: "Anda sudah berpartisipasi dalam Goal ini." };
-    }
-
-    await db.collection("communitygoals").updateOne(
-      { _id: new ObjectId(goalId) },
+    // 🛡️ ATOMIC GATE: Hanya masukkan jika belum terdaftar di array participants
+    const updateRes = await db.collection("communitygoals").updateOne(
+      { _id: new ObjectId(goalId), "participants.discordId": { $ne: session.user.discordId } },
       { 
         $push: { 
           participants: { 
@@ -204,6 +198,10 @@ export async function optInKmGoal(goalId: string) {
         } as any
       }
     );
+
+    if (updateRes.modifiedCount === 0) {
+      return { success: false, error: "Anda sudah berpartisipasi dalam Goal ini." };
+    }
 
     revalidatePath(`/community-goals/${goal.slug || goalId}`);
     return { success: true };

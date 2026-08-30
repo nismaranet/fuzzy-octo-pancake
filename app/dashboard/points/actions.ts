@@ -133,13 +133,17 @@ export async function payPenaltyPoints(pointsToPay: number) {
     if (currentNC < totalCost)
       throw new Error("Nismara Coin (NC) Anda tidak mencukupi.");
 
+    // 🛡️ ATOMIC DEDUCTION: Pastikan saldo mencukupi saat pemotongan
+    const deductRes = await db.collection("currencies").updateOne(
+      { userId, guildId: GUILD_ID, totalNC: { $gte: totalCost } },
+      { $inc: { totalNC: -totalCost } }
+    );
+
+    if (deductRes.modifiedCount === 0) {
+      throw new Error("Saldo Nismara Coin (NC) Anda tidak mencukupi atau telah terpakai.");
+    }
+
     await Promise.all([
-      db
-        .collection("currencies")
-        .updateOne(
-          { userId, guildId: GUILD_ID },
-          { $inc: { totalNC: -totalCost } },
-        ),
       db
         .collection("points")
         .updateOne(
@@ -159,7 +163,7 @@ export async function payPenaltyPoints(pointsToPay: number) {
         userId,
         guildId: GUILD_ID,
         managerId: userId,
-        amount: `-${totalCost}`,
+        amount: totalCost,
         type: "spend",
         reason: `Tebus ${pointsToPay} penalty point`,
         createdAt: new Date(),
@@ -313,28 +317,37 @@ export async function validateJobPoints(jobId: string) {
     // Mencegah poin menjadi minus
     const actualReduction = Math.min(reduction, currentPoints);
 
-    // 4. Jalankan operasi atomik
+    // 4. 🛡️ ATOMIC GATE: Kunci validasi job di validatedjobs untuk mencegah race condition
+    const validateRes = await db.collection("validatedjobs").updateOne(
+      { jobId: job.jobId },
+      {
+        $setOnInsert: {
+          guildId: GUILD_ID,
+          userId: userId,
+          jobId: job.jobId,
+          distance: distance,
+          deducted: actualReduction,
+          type: "point_reduction",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          __v: 0,
+        }
+      },
+      { upsert: true }
+    );
+
+    if (!validateRes.upsertedCount) {
+      throw new Error("Job ini sudah pernah divalidasi atau ditukar tiket sebelumnya.");
+    }
+
+    // 5. Kurangi poin penalti dan catat histori
     await Promise.all([
-      // Insert ke koleksi validatedjobs (sebagai tracker utama)
-      db.collection("validatedjobs").insertOne({
-        guildId: GUILD_ID,
-        userId: userId,
-        jobId: job.jobId,
-        distance: distance,
-        deducted: actualReduction,
-        type: "point_reduction",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        __v: 0,
-      }),
-      // Kurangi poin penalti
       db
         .collection("points")
         .updateOne(
           { userId, guildId: GUILD_ID },
           [{ $set: { totalPoints: { $max: [0, { $subtract: [{ $ifNull: ["$totalPoints", 0] }, actualReduction] }] } } }]
         ),
-      // Catat sejarah poin
       db.collection("pointhistories").insertOne({
         userId,
         guildId: GUILD_ID,
@@ -515,25 +528,35 @@ export async function exchangeJobForTickets(jobId: string) {
       throw new Error(`Kapasitas Safebox Anda tidak mencukupi (Max: ${maxCapacity}). Harap upgrade Safebox di menu Garage terlebih dahulu.`);
     }
 
-    // 4. Jalankan operasi atomik
-    await Promise.all([
-      db.collection("garages").updateOne(
-        { discordId: userId },
-        { $inc: { safeboxStock: ticketAmount } },
-        { upsert: true }
-      ),
-      db.collection("validatedjobs").insertOne({
-        guildId: GUILD_ID,
-        userId: userId,
-        jobId: job.jobId,
-        distance: distance,
-        ticketAmount: ticketAmount,
-        type: "ticket_exchange",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        __v: 0,
-      }),
-    ]);
+    // 4. 🛡️ ATOMIC GATE: Kunci penukaran tiket di validatedjobs untuk mencegah race condition
+    const exchangeRes = await db.collection("validatedjobs").updateOne(
+      { jobId: job.jobId },
+      {
+        $setOnInsert: {
+          guildId: GUILD_ID,
+          userId: userId,
+          jobId: job.jobId,
+          distance: distance,
+          ticketAmount: ticketAmount,
+          type: "ticket_exchange",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          __v: 0,
+        }
+      },
+      { upsert: true }
+    );
+
+    if (!exchangeRes.upsertedCount) {
+      throw new Error("Job ini sudah pernah divalidasi atau ditukar tiket sebelumnya.");
+    }
+
+    // 5. Tambahkan tiket ke Safebox
+    await db.collection("garages").updateOne(
+      { discordId: userId },
+      { $inc: { safeboxStock: ticketAmount } },
+      { upsert: true }
+    );
 
     await sendDiscordLog({
       title: `🎟️ Tukar Job ke Tiket Penalti`,

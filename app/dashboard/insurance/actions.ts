@@ -40,26 +40,22 @@ export async function buyInsurance() {
       finalPrice = Math.floor(finalPrice * (1 - totalDiscountPercent / 100));
     }
 
-    // 3. Cek saldo NC
-    const userCurrency = await db
-      .collection("currencies")
-      .findOne({ userId: discordId, guildId });
-    if (!userCurrency || userCurrency.totalNC < finalPrice) {
-      return {
-        success: false,
-        message: `Saldo NC Anda tidak cukup. Harga asuransi Anda saat ini: ${finalPrice.toLocaleString("id-ID")} NC (Rating: ${currentRating}/100).`,
-      };
-    }
-
-    // 4. Potong saldo NC
-    await db
+    // 3. 🛡️ ATOMIC DEDUCTION: Potong saldo NC secara atomik
+    const deductRes = await db
       .collection("currencies")
       .updateOne(
-        { userId: discordId, guildId },
+        { userId: discordId, guildId, totalNC: { $gte: finalPrice } },
         { $inc: { totalNC: -finalPrice } },
       );
 
-    // 5. Atur Masa Berlaku (Tambah 30 Hari)
+    if (deductRes.modifiedCount === 0) {
+      return {
+        success: false,
+        message: `Saldo NC Anda tidak cukup atau telah terpakai. Harga asuransi Anda saat ini: ${finalPrice.toLocaleString("id-ID")} NC (Rating: ${currentRating}/100).`,
+      };
+    }
+
+    // 4. Atur Masa Berlaku (Tambah 30 Hari)
     const now = new Date();
     let newExpiredAt = new Date();
 
@@ -76,7 +72,7 @@ export async function buyInsurance() {
       newExpiredAt.setDate(now.getDate() + 30);
     }
 
-    // 6. Update Database User
+    // 5. Update Database User
     await db.collection("users").updateOne(
       { discordId },
       {
@@ -88,11 +84,11 @@ export async function buyInsurance() {
       },
     );
 
-    // 7. Catat ke point history (opsional tapi disarankan)
+    // 6. Catat ke currencyhistories
     await db.collection("currencyhistories").insertOne({
       guildId,
       userId: discordId,
-      type: "remove",
+      type: "spend",
       amount: finalPrice,
       reason: "Pembelian Asuransi Transport (30 Hari)",
       createdAt: now,

@@ -33,34 +33,36 @@ export async function POST(
     const client = await clientPromise;
     const db = client.db();
 
-    const order = await FleetMaintenanceOrder.findById(params.id);
+    // 🛡️ ATOMIC GATE: Kunci status order menjadi "processing" agar tidak dikonfirmasi ganda oleh manager lain
+    const order = await FleetMaintenanceOrder.findOneAndUpdate(
+      { _id: params.id, status: "pending" },
+      { $set: { status: "processing" } },
+      { new: true }
+    );
+
     if (!order) {
-      return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Order tidak ditemukan, bukan dalam status pending, atau sedang diproses oleh manager lain" },
+        { status: 400 }
+      );
     }
 
-    if (order.status !== "pending") {
-      return NextResponse.json({ error: "Order tidak dalam status pending" }, { status: 400 });
-    }
-
-    // 1. Check buyer's balance
-    const driverCurrency = await db
+    // 2. 🛡️ ATOMIC DEDUCTION: Potong saldo dari driver secara atomik
+    const deductRes = await db
       .collection("currencies")
-      .findOne({ userId: order.discordId, guildId: GUILD_ID });
+      .updateOne(
+        { userId: order.discordId, guildId: GUILD_ID, totalNC: { $gte: order.totalPrice } },
+        { $inc: { totalNC: -order.totalPrice } },
+      );
       
-    if (!driverCurrency || driverCurrency.totalNC < order.totalPrice) {
+    if (deductRes.modifiedCount === 0) {
+      // Revert status order back to pending jika saldo tidak cukup
+      await FleetMaintenanceOrder.updateOne({ _id: order._id }, { $set: { status: "pending" } });
       return NextResponse.json(
         { error: "Saldo NC user tidak mencukupi saat ini." },
         { status: 400 },
       );
     }
-
-    // 2. Deduct from buyer
-    await db
-      .collection("currencies")
-      .updateOne(
-        { userId: order.discordId, guildId: GUILD_ID },
-        { $inc: { totalNC: -order.totalPrice } },
-      );
       
     await db.collection("currencyhistories").insertOne({
       userId: order.discordId,
