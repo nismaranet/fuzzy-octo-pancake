@@ -45,6 +45,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Garage not found" }, { status: 404 });
     }
 
+    if (garage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
     // Check if the user already has a mechanic of this specialty
     if (garage.mechanics && garage.mechanics[specialty as MechanicSpecialty]?.name) {
       return NextResponse.json({ error: `Anda sudah memiliki mekanik untuk tipe ${specialty}` }, { status: 400 });

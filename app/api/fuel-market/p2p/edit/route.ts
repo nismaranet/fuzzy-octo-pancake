@@ -37,6 +37,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Listing ini sudah tidak aktif (mungkin sudah terjual)" }, { status: 400 });
     }
 
+    const { default: clientPromise } = await import("@/lib/mongodb");
+    const client = await clientPromise;
+    const db = client.db();
+    const userGarage = await db.collection("garages").findOne({ discordId });
+    if (userGarage?.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
     // Ubah harga (updatedAt akan ter-update otomatis oleh Mongoose karena timestamps: true)
     listing.pricePerLiter = Number(newPrice);
     await listing.save();

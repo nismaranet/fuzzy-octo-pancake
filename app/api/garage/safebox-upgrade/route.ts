@@ -25,6 +25,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Garasi tidak ditemukan" }, { status: 404 });
     }
 
+    if (userGarage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
     const currentLevel = userGarage.safeboxLevel || 1;
     const newLevel = currentLevel + multiplier;
 
@@ -63,17 +67,14 @@ export async function POST(request: Request) {
     const currentTotalOpCost = userGarage.operational_cost || 0;
     const newTotalOpCost = currentTotalOpCost + deltaOpCost;
 
-    // Cek saldo user
-    const userCurrency = await db.collection("currencies").findOne({ userId: discordId, guildId: GUILD_ID });
-    if (!userCurrency || userCurrency.totalNC < totalCost) {
-      return NextResponse.json({ error: `Saldo NC tidak mencukupi. Butuh ${totalCost} NC.` }, { status: 400 });
-    }
-
-    // Transaksi pemotongan NC
-    await db.collection("currencies").updateOne(
-      { userId: discordId, guildId: GUILD_ID },
+    // Transaksi pemotongan NC secara atomik
+    const currencyUpdate = await db.collection("currencies").updateOne(
+      { userId: discordId, guildId: GUILD_ID, totalNC: { $gte: totalCost } },
       { $inc: { totalNC: -totalCost } }
     );
+    if (currencyUpdate.modifiedCount === 0) {
+      return NextResponse.json({ error: `Saldo NC tidak mencukupi. Butuh ${totalCost} NC.` }, { status: 400 });
+    }
 
     // Catat riwayat NC
     await db.collection("currencyhistories").insertOne({

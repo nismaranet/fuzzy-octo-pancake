@@ -31,6 +31,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Garasi tidak ditemukan" }, { status: 404 });
     }
 
+    if (userGarage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
     const currentCapacity = userGarage.fuelCapacity || MIN_CAPACITY;
     const currentLevel = userGarage.fuelTankLevel || MIN_LEVEL;
     const currentStock = userGarage.fuelStock || 0;

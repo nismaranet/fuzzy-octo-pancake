@@ -60,6 +60,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check garage status
+    const userGarage = await Garage.findOne({ discordId: session.user.discordId });
+    if (userGarage?.status === "suspended") {
+      return NextResponse.json(
+        { error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional. Selesaikan tunggakan terlebih dahulu." },
+        { status: 403 }
+      );
+    }
+
     // Prevent spam: Check if user already has a pending/waiting maintenance order for this fleet
     const existingOrder = await FleetMaintenanceOrder.findOne({
       fleetId: fleet._id,

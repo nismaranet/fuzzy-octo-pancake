@@ -23,6 +23,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Garage not found" }, { status: 404 });
     }
 
+    if (garage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
     if (garage.fleetSlot <= 1) {
       return NextResponse.json({ error: "Tidak bisa downgrade. Kapasitas minimal adalah 1 Slot." }, { status: 400 });
     }
@@ -34,17 +38,15 @@ export async function POST(request: Request) {
     const client = await clientPromise;
     const db = client.db();
 
-    // Cek saldo
-    const currencyData = await db.collection("currencies").findOne({ userId: session.user.discordId, guildId: GUILD_ID });
-    if (!currencyData || currencyData.totalNC < DOWNGRADE_COST) {
-      return NextResponse.json({ error: `Saldo NC tidak mencukupi untuk downgrade (Butuh ${DOWNGRADE_COST} NC)` }, { status: 400 });
-    }
-
-    // Deduct NC
-    await db.collection("currencies").updateOne(
-      { userId: session.user.discordId, guildId: GUILD_ID },
+    // Deduct NC atomically
+    const deductRes = await db.collection("currencies").updateOne(
+      { userId: session.user.discordId, guildId: GUILD_ID, totalNC: { $gte: DOWNGRADE_COST } },
       { $inc: { totalNC: -DOWNGRADE_COST } }
     );
+
+    if (deductRes.modifiedCount === 0) {
+      return NextResponse.json({ error: `Saldo NC tidak mencukupi untuk downgrade (Butuh ${DOWNGRADE_COST} NC)` }, { status: 400 });
+    }
 
     // Record history
     await db.collection("currencyhistories").insertOne({

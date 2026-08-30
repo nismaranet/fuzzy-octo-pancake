@@ -404,6 +404,9 @@ export async function usePenaltyTicket(amountToUse: number) {
     try {
       // Cek Safebox
       const garageData = await db.collection("garages").findOne({ discordId: userId });
+      if (garageData?.status === "suspended") {
+        throw new Error("Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional.");
+      }
       const safeboxStock = garageData?.safeboxStock || 0;
       
       if (safeboxStock < amountToUse) {

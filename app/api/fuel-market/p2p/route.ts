@@ -46,10 +46,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { amount, pricePerLiter } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const amount = Math.floor(Number(body.amount));
+    const pricePerLiter = Number(body.pricePerLiter);
 
-    if (!amount || amount <= 0 || !pricePerLiter || pricePerLiter <= 0) {
-      return NextResponse.json({ error: "Amount dan price harus lebih besar dari 0" }, { status: 400 });
+    if (!amount || amount <= 0 || !Number.isFinite(amount) || !pricePerLiter || pricePerLiter <= 0 || !Number.isFinite(pricePerLiter)) {
+      return NextResponse.json({ error: "Jumlah BBM (Liter) harus berupa bilangan bulat dan harga harus lebih besar dari 0" }, { status: 400 });
     }
 
     if (pricePerLiter > 1.5) {
@@ -71,6 +73,10 @@ export async function POST(request: Request) {
     const userGarage = await db.collection("garages").findOne({ discordId });
     if (!userGarage) {
       return NextResponse.json({ error: "Garasi tidak ditemukan" }, { status: 404 });
+    }
+
+    if (userGarage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
     }
 
     const currentFuelStock = userGarage.fuelStock || 0;

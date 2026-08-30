@@ -13,9 +13,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { amount } = await request.json();
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: "Amount diperlukan dan harus lebih dari 0" }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    const amount = Math.floor(Number(body.amount));
+    if (!amount || amount <= 0 || !Number.isFinite(amount)) {
+      return NextResponse.json({ error: "Jumlah BBM (Liter) tidak valid dan harus berupa bilangan bulat lebih dari 0" }, { status: 400 });
     }
 
     const buyerDiscordId = session.user.discordId;
@@ -49,6 +50,10 @@ export async function POST(request: Request) {
     const buyerGarage = await db.collection("garages").findOne({ discordId: buyerDiscordId });
     if (!buyerGarage) {
       return NextResponse.json({ error: "Anda harus memiliki Garasi terlebih dahulu" }, { status: 404 });
+    }
+
+    if (buyerGarage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
     }
 
     const buyerCapacity = buyerGarage.fuelCapacity || 2000;

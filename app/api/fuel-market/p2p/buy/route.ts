@@ -61,6 +61,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Anda harus memiliki Garasi terlebih dahulu" }, { status: 404 });
     }
 
+    if (buyerGarage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
+    const sellerGarage = await db.collection("garages").findOne({ discordId: listing.sellerDiscordId });
+    if (sellerGarage?.status === "suspended") {
+      return NextResponse.json({ error: "Transaksi gagal. Garasi penjual sedang dibekukan karena tunggakan biaya operasional." }, { status: 400 });
+    }
+
     const buyerCapacity = buyerGarage.fuelCapacity || 2000;
     const buyerPhysicalFuel = (buyerGarage.fuelStock || 0) + (buyerGarage.fuelListed || 0);
     

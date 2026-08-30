@@ -25,23 +25,24 @@ export async function POST(request: Request) {
 
     const GUILD_ID = process.env.GUILD_ID || "863959415702028318";
 
-    // Dapatkan data mata uang user
-    const userCurrency = await db.collection("currencies").findOne({ userId: discordId, guildId: GUILD_ID });
-    if (!userCurrency || userCurrency.totalNC < totalCost) {
-      return NextResponse.json({ error: `Saldo NC tidak mencukupi. Butuh ${totalCost} NC.` }, { status: 400 });
-    }
-
     // Cek apakah user punya Garasi
     const userGarage = await db.collection("garages").findOne({ discordId });
     if (!userGarage) {
       return NextResponse.json({ error: "Garasi tidak ditemukan" }, { status: 404 });
     }
 
-    // Transaksi potongan NC
-    await db.collection("currencies").updateOne(
-      { userId: discordId, guildId: GUILD_ID },
+    if (userGarage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
+    // Transaksi potongan NC secara atomik
+    const currencyUpdate = await db.collection("currencies").updateOne(
+      { userId: discordId, guildId: GUILD_ID, totalNC: { $gte: totalCost } },
       { $inc: { totalNC: -totalCost } }
     );
+    if (currencyUpdate.modifiedCount === 0) {
+      return NextResponse.json({ error: `Saldo NC tidak mencukupi. Butuh ${totalCost} NC.` }, { status: 400 });
+    }
 
     const currentCapacity = userGarage.fuelCapacity || 2000;
     const currentLevel = userGarage.fuelTankLevel || 1;

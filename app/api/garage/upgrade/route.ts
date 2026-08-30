@@ -34,6 +34,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Garage not found" }, { status: 404 });
     }
 
+    if (garage.status === "suspended") {
+      return NextResponse.json({ error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional." }, { status: 403 });
+    }
+
     const deficit = Math.max(0, (garage.fleetSlotUsed || 0) - garage.fleetSlot);
     const slotsToAdd = deficit > 0 ? deficit + 1 : 1;
     

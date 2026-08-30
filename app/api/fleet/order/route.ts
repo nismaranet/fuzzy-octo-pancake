@@ -61,6 +61,12 @@ export async function POST(request: Request) {
     let upgradeFee = 0;
     let upgradeSlotCount = 0;
     const garage = await db.collection("garages").findOne({ discordId: session.user.discordId });
+    if (garage?.status === "suspended") {
+      return NextResponse.json(
+        { error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional. Selesaikan tunggakan terlebih dahulu." },
+        { status: 403 }
+      );
+    }
     if (requiresGarageUpgrade && garage) {
       const deficit = Math.max(0, (garage.fleetSlotUsed || 0) - garage.fleetSlot);
       upgradeSlotCount = deficit + 1;
