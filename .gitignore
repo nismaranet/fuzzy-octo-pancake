@@ -51,3 +51,23 @@ AGENTS.md
 CLAUDE.md
 /.agents
 /walktrough
+
+# Temporary / Scratchpad (Script testing lokal & ad-hoc)
+/scratch/
+/tmp/
+*.tmp
+
+# OS Metadata files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor / IDE directories (selain .vscode yang sudah ada)
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+
+# Log tambahan
+*.log
