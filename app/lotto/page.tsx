@@ -74,7 +74,7 @@ export default async function LottoPage() {
   const participantsData = await User.find({
     discordId: { $in: participantIds },
   })
-    .select("name image discordId isBooster nismaraplus.status discordRole")
+    .select("name image discordId isBooster nismaraplus discordRole truckyRank")
     .lean();
 
   const totalPrizePool =

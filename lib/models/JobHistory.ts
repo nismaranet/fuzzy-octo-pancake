@@ -93,6 +93,7 @@ const jobHistorySchema = new mongoose.Schema(
       hardcore: Number,
       event: Number,
       booster: Number,
+      voucher_boost: { type: Number, default: 0 },
       truckersmp: Number,
       total: Number,
     },

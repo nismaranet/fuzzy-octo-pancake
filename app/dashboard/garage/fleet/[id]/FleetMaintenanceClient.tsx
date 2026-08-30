@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { AlertCircle, Wrench, Calendar, Receipt, Info } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { AlertCircle, Wrench, Calendar, Receipt, Info, Ticket, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface FleetMaintenanceClientProps {
@@ -34,9 +34,48 @@ export default function FleetMaintenanceClient({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vouchers, setVouchers] = useState<any[]>([]);
+  const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
   const router = useRouter();
 
-  const totalPrice = totalComponentCost + adminFee;
+  // Fetch available maintenance vouchers when modal opens
+  useEffect(() => {
+    if (isModalOpen) {
+      setIsLoadingVouchers(true);
+      fetch("/api/vouchers/my?category=FLEET_MAINTENANCE&status=ACTIVE")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.vouchers)) {
+            setVouchers(data.vouchers);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setIsLoadingVouchers(false));
+    } else {
+      setSelectedVoucherId(null);
+      setError(null);
+    }
+  }, [isModalOpen]);
+
+  const selectedVoucher = vouchers.find((v) => v._id === selectedVoucherId);
+
+  // Calculate discount (applies strictly to totalComponentCost, Admin Fee remains intact)
+  let voucherDiscount = 0;
+  if (selectedVoucher) {
+    if (selectedVoucher.discountType === "percentage") {
+      voucherDiscount = Math.round(totalComponentCost * (selectedVoucher.discountValue / 100));
+      if (selectedVoucher.maxDiscount > 0) {
+        voucherDiscount = Math.min(voucherDiscount, selectedVoucher.maxDiscount);
+      }
+    } else if (selectedVoucher.discountType === "fixed") {
+      voucherDiscount = Math.min(totalComponentCost, selectedVoucher.discountValue);
+    }
+    voucherDiscount = Math.max(0, Math.min(totalComponentCost, voucherDiscount));
+  }
+
+  const finalComponentCost = Math.max(0, totalComponentCost - voucherDiscount);
+  const totalPrice = finalComponentCost + adminFee;
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -49,6 +88,7 @@ export default function FleetMaintenanceClient({
         body: JSON.stringify({
           fleetId,
           type: orderType,
+          voucherId: selectedVoucherId || undefined,
           needsEngine,
           needsTires,
           needsTransmission,
@@ -155,6 +195,82 @@ export default function FleetMaintenanceClient({
                 </div>
               </div>
 
+              {/* Voucher Selector Section */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Ticket size={14} className="text-emerald-400" /> Kupon / Voucher Servis
+                  </span>
+                  {vouchers.length > 0 && (
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      {vouchers.length} Tersedia
+                    </span>
+                  )}
+                </h3>
+
+                {isLoadingVouchers ? (
+                  <div className="p-3 text-xs text-muted-foreground bg-background/50 border border-border/50 rounded-xl animate-pulse">
+                    Memuat voucher Anda...
+                  </div>
+                ) : vouchers.length === 0 ? (
+                  <div className="p-3 text-xs text-muted-foreground bg-background/50 border border-border/50 rounded-xl flex items-center gap-2">
+                    <Info size={14} className="text-muted-foreground shrink-0" />
+                    <span>Tidak ada voucher servis aktif di akun Anda.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div
+                      onClick={() => setSelectedVoucherId(null)}
+                      className={`p-3 rounded-xl border text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${
+                        selectedVoucherId === null
+                          ? "bg-primary/10 border-primary text-foreground"
+                          : "bg-background/50 border-border/50 text-muted-foreground hover:border-border"
+                      }`}
+                    >
+                      <span>Tanpa Voucher (Bayar Normal)</span>
+                      {selectedVoucherId === null && <CheckCircle2 size={16} className="text-primary" />}
+                    </div>
+
+                    {vouchers.map((v) => {
+                      const isSelected = selectedVoucherId === v._id;
+                      const discLabel =
+                        v.discountType === "percentage"
+                          ? v.discountValue === 100
+                            ? "Free Service (100%)"
+                            : `Diskon ${v.discountValue}%`
+                          : `Potongan ${v.discountValue.toLocaleString("id-ID")} NC`;
+
+                      return (
+                        <div
+                          key={v._id}
+                          onClick={() => setSelectedVoucherId(v._id)}
+                          className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
+                            isSelected
+                              ? "bg-emerald-500/15 border-emerald-500/60 text-emerald-400 ring-1 ring-emerald-500/30"
+                              : "bg-background/50 border-border/50 hover:border-emerald-500/40 text-foreground"
+                          }`}
+                        >
+                          <div className="space-y-0.5">
+                            <div className="font-bold flex items-center gap-1.5">
+                              <Ticket size={13} className="text-emerald-400 shrink-0" />
+                              <span>{v.title}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground font-mono">
+                              Kode: {v.code}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0 ml-2">
+                            <span className="inline-block px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-md font-black text-[11px] border border-emerald-500/30">
+                              {discLabel}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                   <Receipt size={14} /> Rincian Biaya
@@ -168,8 +284,20 @@ export default function FleetMaintenanceClient({
                       {totalComponentCost.toLocaleString("id-ID")} NC
                     </span>
                   </div>
+
+                  {voucherDiscount > 0 && selectedVoucher && (
+                    <div className="flex justify-between text-sm text-emerald-400 font-medium">
+                      <span className="flex items-center gap-1">
+                        <Ticket size={13} /> Diskon Voucher ({selectedVoucher.discountType === "percentage" ? `${selectedVoucher.discountValue}%` : "Fixed"})
+                      </span>
+                      <span>
+                        -{voucherDiscount.toLocaleString("id-ID")} NC
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Biaya Admin</span>
+                    <span className="text-muted-foreground">Biaya Admin (Manager)</span>
                     <span className="font-medium">
                       {adminFee.toLocaleString("id-ID")} NC
                     </span>

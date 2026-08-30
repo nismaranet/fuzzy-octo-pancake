@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import FleetMaintenanceOrder from "@/lib/models/FleetMaintenanceOrder";
 import Transaction from "@/lib/models/Transaction";
 import { sendPersonalNotification } from "@/lib/services/NotificationService";
+import { restoreVoucher } from "@/lib/voucher";
 
 import dbConnect from "@/lib/mongoose";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -46,6 +47,11 @@ export async function POST(
         { error: "Order tidak ditemukan atau sudah diproses" },
         { status: 400 },
       );
+    }
+
+    // Restore voucher if one was used
+    if (order.voucherId) {
+      await restoreVoucher(order.voucherId);
     }
 
     // Update pending transaction to failed

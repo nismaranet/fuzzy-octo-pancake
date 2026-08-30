@@ -30,6 +30,15 @@ const userSchema = new mongoose.Schema(
       expiredAt: { type: Date, default: null },
     },
 
+    ncBoost: {
+      active: { type: Boolean, default: false },
+      multiplier: { type: Number, default: 0 },
+      startedAt: { type: Date, default: null },
+      expiredAt: { type: Date, default: null },
+      voucherTitle: { type: String, default: null },
+      voucherCode: { type: String, default: null },
+    },
+
     galleryBan: {
       status: { type: Boolean, default: false },
       expiredAt: { type: Date, default: null },

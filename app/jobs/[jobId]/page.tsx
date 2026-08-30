@@ -410,6 +410,13 @@ export default async function JobDetailPage(props: {
                         value={localJob?.nc?.booster}
                         color="text-blue-600 dark:text-blue-400"
                       />
+                      {localJob?.nc?.voucher_boost > 0 && (
+                        <BreakdownRow
+                          label="⚡ NC Voucher Booster"
+                          value={localJob?.nc?.voucher_boost}
+                          color="text-amber-500 dark:text-amber-400"
+                        />
+                      )}
 
                       {/* Pengeluaran */}
                       <BreakdownRow

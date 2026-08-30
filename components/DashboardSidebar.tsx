@@ -17,6 +17,7 @@ import {
   FileText,
   ShieldCheck,
   MoreHorizontal,
+  Ticket,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,6 +35,7 @@ const menuItems = [
   { name: "Garage", href: "/dashboard/garage", icon: Truck },
   { name: "Job History", href: "/dashboard/jobs", icon: Briefcase },
   { name: "Wallet", href: "/dashboard/currency", icon: Coins },
+  { name: "My Vouchers", href: "/dashboard/vouchers", icon: Ticket },
   { name: "Penalty Points", href: "/dashboard/points", icon: TriangleAlert },
   { name: "Tickets", href: "/dashboard/ticket", icon: FileText },
   { name: "Insurance", href: "/dashboard/insurance", icon: Shield },

@@ -6,7 +6,9 @@ import mongoose from "mongoose";
 import FleetOrder from "@/lib/models/FleetOrder";
 import FleetStore from "@/lib/models/FleetStore";
 import Transaction from "@/lib/models/Transaction";
+import "@/lib/models/UserVoucher";
 import { getCurrencyDataLogic } from "@/lib/currency";
+import { validateVoucher, calculateVoucherDiscount, consumeVoucher } from "@/lib/voucher";
 import crypto from "crypto";
 
 import dbConnect from "@/lib/mongoose";
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { fleetStoreId, requiresGarageUpgrade = false } =
+    const { fleetStoreId, requiresGarageUpgrade = false, voucherId } =
       await request.json();
     if (!fleetStoreId) {
       return NextResponse.json(
@@ -57,6 +59,8 @@ export async function POST(request: Request) {
 
     let nismaraPlusDiscount = 0;
     let boosterDiscount = 0;
+    let appliedVoucher: any = null;
+    let voucherDiscount = 0;
 
     let upgradeFee = 0;
     let upgradeSlotCount = 0;
@@ -87,8 +91,27 @@ export async function POST(request: Request) {
       nismaraPlusDiscount = basePrice * 0.2;
     if (user.isBooster === true) boosterDiscount = basePrice * 0.2;
 
-    const totalPrice =
-      basePrice + taxFee - nismaraPlusDiscount - boosterDiscount + adminFee + upgradeFee;
+    // Voucher handling (Applies to basePrice of the fleet)
+    if (voucherId) {
+      const vRes = await validateVoucher(
+        voucherId,
+        session.user.discordId,
+        "FLEET_BUY",
+        basePrice
+      );
+
+      if (!vRes.valid) {
+        return NextResponse.json({ error: vRes.error }, { status: 400 });
+      }
+
+      appliedVoucher = vRes.voucher;
+      voucherDiscount = calculateVoucherDiscount(basePrice, appliedVoucher);
+    }
+
+    const totalPrice = Math.max(
+      adminFee,
+      basePrice + taxFee - nismaraPlusDiscount - boosterDiscount - voucherDiscount + adminFee + upgradeFee
+    );
 
     // Check balance
     const currencyData = await getCurrencyDataLogic();
@@ -191,6 +214,15 @@ export async function POST(request: Request) {
                   value: `${basePrice.toLocaleString("id-ID")} NC`,
                   inline: false,
                 },
+                ...(voucherDiscount > 0 && appliedVoucher
+                  ? [
+                      {
+                        name: "🎟️ Diskon Voucher",
+                        value: `-${voucherDiscount.toLocaleString("id-ID")} NC (${appliedVoucher.title})`,
+                        inline: false,
+                      },
+                    ]
+                  : []),
                 {
                   name: "Pajak (11%)",
                   value: `${taxFee.toLocaleString("id-ID")} NC`,
@@ -235,12 +267,19 @@ export async function POST(request: Request) {
       adminFee,
       nismaraPlusDiscount,
       boosterDiscount,
+      voucherId: appliedVoucher?._id || null,
+      voucherDiscount,
       totalPrice,
       requiresGarageUpgrade,
       upgradeSlotCount,
     });
 
-    // 4. Create Pending Transaction
+    // 4. Consume voucher if applied
+    if (appliedVoucher) {
+      await consumeVoucher(appliedVoucher._id, newOrder._id, user.discordId);
+    }
+
+    // 5. Create Pending Transaction
     await Transaction.create({
       trxId: `TRX-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
       discordId: user.discordId,
@@ -252,7 +291,9 @@ export async function POST(request: Request) {
       status: "pending",
       metadata: {
         orderId: newOrder._id,
-        fleetStoreId: storeItem._id
+        fleetStoreId: storeItem._id,
+        voucherId: appliedVoucher?._id || null,
+        voucherDiscount,
       }
     });
 
