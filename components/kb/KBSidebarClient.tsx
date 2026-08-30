@@ -93,22 +93,26 @@ export default function KBSidebarClient({ currentSlug, categorySlug }: { current
               
               {isExpanded && (
                 <div className="flex flex-col mt-1 space-y-1 border-l border-border/50 ml-2 pl-3">
-                  {articles.map(article => {
-                    const isActive = currentSlug === article.slug;
-                    return (
-                      <Link
-                        key={article._id}
-                        href={`/kb/${article.categorySlug}/${article.slug}`}
-                        className={`text-sm py-1.5 px-3 rounded-md transition-colors ${
-                          isActive 
-                            ? "bg-primary/10 text-primary font-semibold" 
-                            : "text-muted-foreground hover:text-foreground hover:bg-card/50"
-                        }`}
-                      >
-                        {article.title}
-                      </Link>
-                    );
-                  })}
+                  {(articles || []).length > 0 ? (
+                    articles.map(article => {
+                      const isActive = currentSlug === article.slug;
+                      return (
+                        <Link
+                          key={article._id}
+                          href={`/kb/${article.categorySlug}/${article.slug}`}
+                          className={`text-sm py-1.5 px-3 rounded-md transition-colors ${
+                            isActive 
+                              ? "bg-primary/10 text-primary font-semibold" 
+                              : "text-muted-foreground hover:text-foreground hover:bg-card/50"
+                          }`}
+                        >
+                          {article.title}
+                        </Link>
+                      );
+                    })
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic py-1 px-3">Belum ada artikel</span>
+                  )}
                 </div>
               )}
             </div>

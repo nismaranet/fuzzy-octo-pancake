@@ -38,8 +38,15 @@ export async function GET(req: NextRequest) {
       .project({ content: 0 }) // Do not fetch full markdown content for the list
       .toArray();
 
+    const categoryFilter: any = {
+      $or: [
+        { accessLevel: { $in: allowedAccess } },
+        { accessLevel: { $exists: false } }
+      ]
+    };
+
     const categories = await db.collection("kb_categories")
-      .find()
+      .find(categoryFilter)
       .sort({ order: 1, createdAt: 1 })
       .toArray();
 

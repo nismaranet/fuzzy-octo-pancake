@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { BookOpen, Search, Folder } from "lucide-react";
+import { BookOpen, Search, Folder, ShieldCheck, Lock } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 
 export default function KBPortalClient({ session }: { session: any }) {
@@ -26,6 +26,24 @@ export default function KBPortalClient({ session }: { session: any }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getAccessBadge = (level: string) => {
+    if (level === "manager") {
+      return (
+        <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+          <ShieldCheck className="w-3 h-3" /> Manager
+        </span>
+      );
+    }
+    if (level === "driver") {
+      return (
+        <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-500 border border-blue-500/30">
+          <Lock className="w-3 h-3" /> Driver
+        </span>
+      );
+    }
+    return null;
   };
 
   return (
@@ -61,7 +79,8 @@ export default function KBPortalClient({ session }: { session: any }) {
             {categories.map((cat, idx) => (
               <ScrollReveal key={cat._id} delay={idx * 0.1}>
                 <Link href={`/kb/${cat.slug}`} className="group block h-full">
-                  <div className="bg-card/50 border border-border/50 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 rounded-2xl p-6 transition-all duration-300 h-full flex flex-col justify-center items-center text-center">
+                  <div className="bg-card/50 border border-border/50 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 rounded-2xl p-6 transition-all duration-300 h-full flex flex-col justify-center items-center text-center relative overflow-hidden">
+                    {getAccessBadge(cat.accessLevel)}
                     <Folder className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors mb-4" />
                     <h3 className="text-xl font-bold group-hover:text-primary transition-colors">
                       {cat.name}

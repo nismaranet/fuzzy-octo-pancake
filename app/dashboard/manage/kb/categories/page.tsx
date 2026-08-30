@@ -10,7 +10,7 @@ export default function ManageKBCategories() {
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", order: 0 });
+  const [formData, setFormData] = useState({ name: "", order: 0, accessLevel: "public" });
   
   const router = useRouter();
 
@@ -53,7 +53,7 @@ export default function ManageKBCategories() {
       if (data.success) {
         showAlert(editingId ? "Kategori diperbarui!" : "Kategori dibuat!");
         setEditingId(null);
-        setFormData({ name: "", order: 0 });
+        setFormData({ name: "", order: 0, accessLevel: "public" });
         fetchCategories();
       } else {
         showAlert(`Gagal: ${data.error}`, "error");
@@ -65,12 +65,12 @@ export default function ManageKBCategories() {
 
   const handleEdit = (cat: any) => {
     setEditingId(cat._id);
-    setFormData({ name: cat.name, order: cat.order });
+    setFormData({ name: cat.name, order: cat.order || 0, accessLevel: cat.accessLevel || "public" });
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setFormData({ name: "", order: 0 });
+    setFormData({ name: "", order: 0, accessLevel: "public" });
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -90,6 +90,28 @@ export default function ManageKBCategories() {
     }
   };
 
+  const getAccessBadge = (level: string) => {
+    if (level === "manager") {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+          Manager
+        </span>
+      );
+    }
+    if (level === "driver") {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+          Driver
+        </span>
+      );
+    }
+    return (
+      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30">
+        Public
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
@@ -103,14 +125,14 @@ export default function ManageKBCategories() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             Kelola Kategori KB
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Atur nama dan urutan kategori Knowledge Base.</p>
+          <p className="text-sm text-muted-foreground mt-1">Atur nama, level akses (RAC), dan urutan kategori Knowledge Base.</p>
         </div>
       </div>
 
       <div className="bg-card/50 border border-border/50 rounded-2xl p-6 shadow-sm">
         <h2 className="text-lg font-bold mb-4">{editingId ? "Edit Kategori" : "Tambah Kategori Baru"}</h2>
-        <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-end">
-          <div className="flex-1 space-y-2 w-full">
+        <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-end flex-wrap">
+          <div className="flex-1 min-w-[200px] space-y-2 w-full">
             <label className="text-sm font-bold text-muted-foreground">Nama Kategori</label>
             <input 
               type="text" 
@@ -121,8 +143,20 @@ export default function ManageKBCategories() {
               onChange={(e) => setFormData({...formData, name: e.target.value})}
             />
           </div>
-          <div className="w-full sm:w-32 space-y-2">
-            <label className="text-sm font-bold text-muted-foreground">Order (0-9)</label>
+          <div className="w-full sm:w-44 space-y-2">
+            <label className="text-sm font-bold text-muted-foreground">Level Akses (RAC)</label>
+            <select
+              value={formData.accessLevel}
+              onChange={(e) => setFormData({...formData, accessLevel: e.target.value})}
+              className="w-full bg-background border border-input rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="public">🌐 Public (Semua)</option>
+              <option value="driver">🚗 Driver Only</option>
+              <option value="manager">🛡️ Manager Only</option>
+            </select>
+          </div>
+          <div className="w-full sm:w-28 space-y-2">
+            <label className="text-sm font-bold text-muted-foreground">Order</label>
             <input 
               type="number" 
               required
@@ -156,21 +190,22 @@ export default function ManageKBCategories() {
         <table className="w-full text-sm text-left">
           <thead className="bg-muted/50 text-muted-foreground uppercase text-xs">
             <tr>
-              <th className="px-6 py-4 font-bold w-20 text-center">Order</th>
+              <th className="px-6 py-4 font-bold w-16 text-center">Order</th>
               <th className="px-6 py-4 font-bold">Nama Kategori</th>
+              <th className="px-6 py-4 font-bold">Akses (RAC)</th>
               <th className="px-6 py-4 font-bold text-right">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">
+                <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
                   Memuat data...
                 </td>
               </tr>
             ) : categories.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">
+                <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
                   Belum ada kategori.
                 </td>
               </tr>
@@ -179,6 +214,7 @@ export default function ManageKBCategories() {
                 <tr key={cat._id} className="border-b border-border/50 last:border-0 hover:bg-muted/20">
                   <td className="px-6 py-4 font-black text-center text-primary">{cat.order}</td>
                   <td className="px-6 py-4 font-semibold">{cat.name}</td>
+                  <td className="px-6 py-4">{getAccessBadge(cat.accessLevel || "public")}</td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <button 
                       onClick={() => handleEdit(cat)}

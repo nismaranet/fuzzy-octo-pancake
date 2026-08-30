@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, order } = body;
+    const { name, order, accessLevel } = body;
 
     if (!name) {
       return NextResponse.json({ success: false, error: "Nama kategori wajib diisi" }, { status: 400 });
@@ -64,10 +64,14 @@ export async function POST(req: NextRequest) {
       counter++;
     }
 
+    const validAccessLevels = ["public", "driver", "manager"];
+    const level = validAccessLevels.includes(accessLevel) ? accessLevel : "public";
+
     const newCategory = {
       name: name.trim(),
       slug,
       order: order !== undefined ? Number(order) : 0,
+      accessLevel: level,
       createdAt: new Date(),
     };
 

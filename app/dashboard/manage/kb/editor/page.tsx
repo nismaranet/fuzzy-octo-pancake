@@ -37,13 +37,23 @@ export default function KBEditorPage() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch("/api/kb/categories");
+      const res = await fetch("/api/manager/kb/categories");
       const data = await res.json();
       if (data.success && data.categories) {
         setCategories(data.categories);
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleCategoryChange = (catName: string) => {
+    setCategory(catName);
+    if (!editId) {
+      const selectedCat = categories.find((c: any) => c.name === catName);
+      if (selectedCat?.accessLevel) {
+        setAccessLevel(selectedCat.accessLevel);
+      }
     }
   };
 
@@ -219,10 +229,14 @@ export default function KBEditorPage() {
                 required
                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
               >
                 <option value="" disabled>Pilih Kategori...</option>
-                {categories.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
+                {categories.map(c => (
+                  <option key={c._id} value={c.name}>
+                    {c.name} {c.accessLevel && c.accessLevel !== "public" ? `[${c.accessLevel.toUpperCase()}]` : ""}
+                  </option>
+                ))}
               </select>
             </div>
 

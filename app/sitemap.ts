@@ -79,7 +79,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .toArray(),
     db
       .collection("kb_categories")
-      .find({}, { projection: { slug: 1, updatedAt: 1, createdAt: 1 } })
+      .find(
+        { $or: [{ accessLevel: "public" }, { accessLevel: { $exists: false } }] },
+        { projection: { slug: 1, updatedAt: 1, createdAt: 1 } }
+      )
       .toArray(),
     db
       .collection("kb_articles")

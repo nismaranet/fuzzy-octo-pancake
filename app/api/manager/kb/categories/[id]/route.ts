@@ -14,7 +14,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { id } = await params;
     const body = await req.json();
-    const { name, order } = body;
+    const { name, order, accessLevel } = body;
 
     if (!name) {
       return NextResponse.json({ success: false, error: "Nama kategori wajib diisi" }, { status: 400 });
@@ -37,11 +37,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ success: false, error: "Kategori tidak ditemukan" }, { status: 404 });
     }
 
+    const validAccessLevels = ["public", "driver", "manager"];
+    const level = validAccessLevels.includes(accessLevel) ? accessLevel : oldCategory.accessLevel || "public";
+
     await db.collection("kb_categories").updateOne(
       { _id: new ObjectId(id) },
       { $set: { 
         name: name.trim(),
-        order: order !== undefined ? Number(order) : oldCategory.order
+        order: order !== undefined ? Number(order) : oldCategory.order,
+        accessLevel: level,
       }}
     );
 
