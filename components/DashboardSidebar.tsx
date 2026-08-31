@@ -18,6 +18,8 @@ import {
   ShieldCheck,
   MoreHorizontal,
   Ticket,
+  Trophy,
+  Crown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,6 +33,7 @@ import {
 
 const menuItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Nismara Pass", href: "/dashboard/season-pass", icon: Trophy },
   { name: "Driver Guide", href: "/dashboard/driver-guide", icon: BookOpen },
   { name: "Garage", href: "/dashboard/garage", icon: Truck },
   { name: "Job History", href: "/dashboard/jobs", icon: Briefcase },
@@ -47,6 +50,8 @@ const menuItems = [
 
 const managementItems = [
   { name: "Manager Overview", href: "/dashboard/manage", icon: ShieldCheck },
+  { name: "Manage Season Pass", href: "/dashboard/manage/season-pass", icon: Trophy },
+  { name: "Manage N+ Quests", href: "/dashboard/manage/nismaraplus/quests", icon: Crown },
   { name: "Manage Data", href: "/dashboard/manage/data", icon: User2 },
   { name: "Manage Events", href: "/dashboard/manage/events", icon: Sparkles },
   { name: "Manage Fleets", href: "/dashboard/manage/fleet", icon: Truck },

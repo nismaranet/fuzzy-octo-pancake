@@ -16,12 +16,15 @@ import {
   Truck,
   ScrollText,
   AlertTriangle,
+  Trophy,
 } from "lucide-react";
 import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import NismaraPlusClient from "./NismaraPlusClient";
 import NismaraPlusClaimClient from "./NismaraPlusClaimClient";
+import NplusWeeklyQuestsClient from "./NplusWeeklyQuestsClient";
 import NismaraPlusOrder from "@/lib/models/NismaraPlusOrder";
 import dbConnect from "@/lib/mongoose";
+import { getUserWeeklyQuestProgress } from "@/lib/nplusWeeklyQuest";
 
 export const metadata = {
   title: "Nismaraplus",
@@ -37,6 +40,15 @@ const PREMIUM_FEATURES = [
     description:
       "Mendapatkan bonus tambahan Nismara Coin (NC) dari setiap lembar pekerjaan logistik yang Anda selesaikan.",
     icon: Coins,
+    iconColor: "text-amber-400",
+    bgColor: "bg-amber-400/10",
+  },
+  {
+    id: "weekly-quests",
+    title: "Weekly Quests & Hadiah",
+    description:
+      "Tantangan mingguan eksklusif dengan rotasi hadiah: voucher diskon servis 50%, bonus NC, tiket Safebox penalti, dan fuel.",
+    icon: Trophy,
     iconColor: "text-amber-400",
     bgColor: "bg-amber-400/10",
   },
@@ -131,7 +143,11 @@ export default async function NismaraPlusPage() {
   const isActive = nismaraplus.status && !isExpired;
 
   await dbConnect();
-  const pendingOrder = await NismaraPlusOrder.findOne({ discordId, status: "pending" });
+  const [pendingOrder, questDataRaw] = await Promise.all([
+    NismaraPlusOrder.findOne({ discordId, status: "pending" }).lean(),
+    getUserWeeklyQuestProgress(String(discordId)),
+  ]);
+  const questData = JSON.parse(JSON.stringify(questDataRaw));
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8">
@@ -157,6 +173,10 @@ export default async function NismaraPlusPage() {
       {/* KONDISI 1: JIKA USER SUDAH AKTIF PREMIUM-NYA */}
       {isActive ? (
         <div className="space-y-8 animate-in fade-in duration-500">
+          {/* Section 1: Weekly Quests */}
+          <NplusWeeklyQuestsClient initialData={questData} />
+
+          {/* Section 2: Daily/Monthly Claim */}
           <NismaraPlusClaimClient
             lastClaimAt={
               nismaraplus.lastClaimAt
@@ -364,6 +384,11 @@ export default async function NismaraPlusPage() {
               {/* Komponen interaktif yang menampilkan paket dan tombol */}
               <NismaraPlusClient initialPendingOrder={pendingOrder ? JSON.parse(JSON.stringify(pendingOrder)) : null} />
             </div>
+          </div>
+
+          {/* PREVIEW WEEKLY QUESTS UNTUK USER NON-PLUS */}
+          <div className="lg:col-span-12 pt-6 border-t border-border">
+            <NplusWeeklyQuestsClient initialData={questData} />
           </div>
         </div>
       )}

@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { ObjectId } from "mongodb";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { deleteFileFromR2 } from "@/lib/r2";
+import { addSeasonXp } from "@/lib/seasonPass";
 
 export async function createConvoy(formData: FormData) {
   const client = await clientPromise;
@@ -495,6 +496,11 @@ export async function claimConvoyRewardAction(convoyId: string) {
     reason: `Reward Sesi Convoy: ${convoy.convoyName}`,
     createdAt: new Date(),
   });
+
+  // Award Seasonal XP for Convoy participation (1.500 XP)
+  await addSeasonXp(discordId, 1500, `Reward Sesi Convoy: ${convoy.convoyName}`).catch((err) =>
+    console.error("Season XP Convoy Error:", err)
+  );
 
   // Generate Collectible Ticket
   let ticketNumber = convoy.ticketNumber;
