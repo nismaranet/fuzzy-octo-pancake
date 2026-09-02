@@ -146,7 +146,7 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     ],
     premiumRewards: [
       { type: "NC", title: "12.000 Nismara Coin", amount: 12000 },
-      { type: "FUEL", title: "5.000 Liter Fuel Garasi", amount: 5000 },
+      { type: "FUEL", title: "4.000 Liter Fuel Garasi", amount: 4000 },
       {
         type: "VOUCHER",
         title: "Kupon Diskon Servis 50%",
@@ -173,7 +173,7 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     freeRewards: [{ type: "NC", title: "3.500 Nismara Coin", amount: 3500 }],
     premiumRewards: [
       { type: "NC", title: "8.000 Nismara Coin", amount: 8000 },
-      { type: "FUEL", title: "2.500 Liter Fuel Garasi", amount: 2500 },
+      { type: "FUEL", title: "3.000 Liter Fuel Garasi", amount: 3000 },
     ],
   },
   {
@@ -293,7 +293,7 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
       },
     ],
     premiumRewards: [
-      { type: "FUEL", title: "7.500 Liter Fuel Garasi", amount: 7500 },
+      { type: "FUEL", title: "7.000 Liter Fuel Garasi", amount: 7000 },
       {
         type: "VOUCHER",
         title: "Kupon Diskon Beli Fleet 20%",
@@ -326,13 +326,13 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     cumulativeXp: 113000,
     freeRewards: [
       { type: "NC", title: "10.000 Nismara Coin", amount: 10000 },
-      { type: "FUEL", title: "4.000 Liter Fuel Garasi", amount: 4000 },
+      { type: "FUEL", title: "3.500 Liter Fuel Garasi", amount: 3500 },
       { type: "SAFEBOX_TICKET", title: "1x Tiket Hapus Penalti (Safebox)", amount: 1 },
       { type: "BADGE", title: "S1 Silver Pro", badgeId: "s1_silver" },
     ],
     premiumRewards: [
       { type: "NC", title: "25.000 Nismara Coin", amount: 25000 },
-      { type: "FUEL", title: "10.000 Liter Fuel Garasi", amount: 10000 },
+      { type: "FUEL", title: "7.500 Liter Fuel Garasi", amount: 7500 },
       {
         type: "VOUCHER",
         title: "Voucher Bebas Servis Armada (100% Free)",
@@ -370,7 +370,7 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
       },
     ],
     premiumRewards: [
-      { type: "FUEL", title: "10.000 Liter Fuel Garasi", amount: 10000 },
+      { type: "FUEL", title: "7.000 Liter Fuel Garasi", amount: 7000 },
       {
         type: "VOUCHER",
         title: "Kupon Diskon Servis 50%",
@@ -394,9 +394,9 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     level: 24,
     xpRequired: 12000,
     cumulativeXp: 158000,
-    freeRewards: [{ type: "FUEL", title: "5.000 Liter Fuel Garasi", amount: 5000 }],
+    freeRewards: [{ type: "FUEL", title: "4.000 Liter Fuel Garasi", amount: 4000 }],
     premiumRewards: [
-      { type: "FUEL", title: "12.000 Liter Fuel Garasi", amount: 12000 },
+      { type: "FUEL", title: "7.500 Liter Fuel Garasi", amount: 7500 },
       {
         type: "VOUCHER",
         title: "Kupon Diskon Beli Fleet 25%",
@@ -436,9 +436,9 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     level: 26,
     xpRequired: 13000,
     cumulativeXp: 183500,
-    freeRewards: [{ type: "FUEL", title: "6.000 Liter Fuel Garasi", amount: 6000 }],
+    freeRewards: [{ type: "FUEL", title: "4.500 Liter Fuel Garasi", amount: 4500 }],
     premiumRewards: [
-      { type: "FUEL", title: "15.000 Liter Fuel Garasi", amount: 15000 },
+      { type: "FUEL", title: "8.000 Liter Fuel Garasi", amount: 8000 },
       { type: "SAFEBOX_TICKET", title: "3x Tiket Hapus Penalti (Safebox)", amount: 3 },
     ],
   },
@@ -456,7 +456,7 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
       },
     ],
     premiumRewards: [
-      { type: "FUEL", title: "35.000 Liter Fuel Garasi", amount: 35000 },
+      { type: "FUEL", title: "8.500 Liter Fuel Garasi", amount: 8500 },
       {
         type: "VOUCHER",
         title: "Kupon Diskon Beli Fleet 30%",
@@ -471,11 +471,11 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     xpRequired: 14000,
     cumulativeXp: 211000,
     freeRewards: [
-      { type: "FUEL", title: "8.000 Liter Fuel Garasi", amount: 8000 },
+      { type: "FUEL", title: "5.000 Liter Fuel Garasi", amount: 5000 },
       { type: "SAFEBOX_TICKET", title: "1x Tiket Hapus Penalti (Safebox)", amount: 1 },
     ],
     premiumRewards: [
-      { type: "FUEL", title: "18.000 Liter Fuel Garasi", amount: 18000 },
+      { type: "FUEL", title: "9.000 Liter Fuel Garasi", amount: 9000 },
       {
         type: "VOUCHER",
         title: "Mega Booster +100% NC (6 Jam)",
@@ -492,11 +492,11 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     cumulativeXp: 225000,
     freeRewards: [
       { type: "NC", title: "20.000 Nismara Coin", amount: 20000 },
-      { type: "FUEL", title: "10.000 Liter Fuel Garasi", amount: 10000 },
+      { type: "FUEL", title: "5.500 Liter Fuel Garasi", amount: 5500 },
     ],
     premiumRewards: [
       { type: "NC", title: "50.000 Nismara Coin", amount: 50000 },
-      { type: "FUEL", title: "20.000 Liter Fuel Garasi", amount: 20000 },
+      { type: "FUEL", title: "9.500 Liter Fuel Garasi", amount: 9500 },
       {
         type: "VOUCHER",
         title: "Voucher Bebas Servis Armada (100% Free)",
@@ -513,7 +513,7 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     cumulativeXp: 225000,
     freeRewards: [
       { type: "NC", title: "35.000 Nismara Coin", amount: 35000 },
-      { type: "FUEL", title: "15.000 Liter Fuel Garasi", amount: 15000 },
+      { type: "FUEL", title: "6.000 Liter Fuel Garasi", amount: 6000 },
       {
         type: "VOUCHER",
         title: "Voucher Booster +50% NC (12 Jam)",
@@ -526,7 +526,7 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
     ],
     premiumRewards: [
       { type: "NC", title: "75.000 Nismara Coin", amount: 75000 },
-      { type: "FUEL", title: "30.000 Liter Fuel Garasi", amount: 30000 },
+      { type: "FUEL", title: "10.000 Liter Fuel Garasi", amount: 10000 },
       {
         type: "BADGE",
         title: "S1 Champion Legend",
@@ -785,28 +785,59 @@ export async function claimLevelReward(
   const season = await SeasonPass.findOne({ seasonNumber });
   if (!season) return { success: false, error: "Musim tidak ditemukan" };
 
-  const progress = await getUserSeasonProgress(discordId, seasonNumber);
-  if (!progress) return { success: false, error: "Progress user tidak ditemukan" };
-
-  const levelConfig = season.levels.find((l: any) => l.level === levelNum);
+  const levelConfig = season.levels.find((l: any) => l.level === Number(levelNum));
   if (!levelConfig) return { success: false, error: `Level ${levelNum} tidak ditemukan` };
 
-  // Validasi apakah level sudah terbuka
-  if (progress.currentLevel < levelNum) {
-    return { success: false, error: `Level ${levelNum} belum terbuka (Level Anda: ${progress.currentLevel})` };
-  }
+  const updateField = track === "free" ? "claimedFreeLevels" : "claimedPremiumLevels";
 
-  // Validasi track
-  if (track === "premium" && !progress.isPremium) {
-    return { success: false, error: "Anda belum mengupgrade ke Nismara Pass Premium" };
-  }
+  // ATOMIC GUARD: Hanya update & klaim jika level terbuka, track valid, dan BELUM PERNAH diklaim
+  // Mencegah eksploitasi spam klik / race condition secara 100% atomik di level MongoDB engine
+  const progress = await UserSeasonProgress.findOneAndUpdate(
+    {
+      discordId: String(discordId),
+      seasonNumber: Number(seasonNumber),
+      currentLevel: { $gte: Number(levelNum) },
+      ...(track === "premium" ? { isPremium: true } : {}),
+      [updateField]: { $ne: Number(levelNum) },
+    },
+    {
+      $addToSet: { [updateField]: Number(levelNum) },
+    },
+    { returnDocument: "after" }
+  );
 
-  // Validasi apakah sudah diklaim
-  if (track === "free" && progress.claimedFreeLevels.includes(levelNum)) {
-    return { success: false, error: `Hadiah gratis level ${levelNum} sudah diklaim` };
-  }
-  if (track === "premium" && progress.claimedPremiumLevels.includes(levelNum)) {
-    return { success: false, error: `Hadiah premium level ${levelNum} sudah diklaim` };
+  if (!progress) {
+    // Jika atomik gagal, cari penyebab spesifik untuk error message yang jelas
+    const existing = await UserSeasonProgress.findOne({
+      discordId: String(discordId),
+      seasonNumber: Number(seasonNumber),
+    });
+
+    if (!existing) return { success: false, error: "Progress user tidak ditemukan" };
+    if (existing.currentLevel < Number(levelNum)) {
+      return {
+        success: false,
+        error: `Level ${levelNum} belum terbuka (Level Anda: ${existing.currentLevel})`,
+      };
+    }
+    if (track === "premium" && !existing.isPremium) {
+      return {
+        success: false,
+        error: "Anda belum mengupgrade ke Nismara Pass Premium",
+      };
+    }
+    const alreadyClaimed =
+      track === "free"
+        ? existing.claimedFreeLevels.includes(Number(levelNum))
+        : existing.claimedPremiumLevels.includes(Number(levelNum));
+    if (alreadyClaimed) {
+      return {
+        success: false,
+        error: `Hadiah ${track === "free" ? "gratis" : "premium"} level ${levelNum} sudah diklaim`,
+      };
+    }
+
+    return { success: false, error: "Gagal mengklaim hadiah" };
   }
 
   const rewardsToGrant: RewardItem[] = track === "free" ? levelConfig.freeRewards : levelConfig.premiumRewards;
@@ -868,19 +899,63 @@ export async function claimLevelReward(
       });
       results.push(`Kupon: ${r.title}`);
     } else if (r.type === "NPLUS_TRIAL" && r.amount && r.amount > 0) {
-      // 5. Perpanjang Trial Nismara+
+      // 5. Perpanjang / Aktifkan Nismara+ VIP
       const now = new Date();
-      const currentExpiry = user.nismaraplus?.expiredAt && new Date(user.nismaraplus.expiredAt) > now
-        ? new Date(user.nismaraplus.expiredAt)
-        : now;
-      const newExpiry = new Date(currentExpiry.getTime() + r.amount * 24 * 60 * 60 * 1000);
+      const currentNPlus = user.nismaraplus || {};
+      const durationMs = r.amount * 24 * 60 * 60 * 1000;
 
-      user.nismaraplus = {
-        status: true,
-        startedAt: user.nismaraplus?.startedAt || now,
-        expiredAt: newExpiry,
-        lastClaimAt: user.nismaraplus?.lastClaimAt || null,
-      };
+      let newStartedAt = now;
+      let newExpiredAt = new Date(now.getTime() + durationMs);
+
+      // Jika user sudah aktif dan belum expired, perpanjang masa aktif dari expiredAt yang sudah ada!
+      if (
+        currentNPlus.status &&
+        currentNPlus.expiredAt &&
+        new Date(currentNPlus.expiredAt) > now
+      ) {
+        newStartedAt = currentNPlus.startedAt ? new Date(currentNPlus.startedAt) : now;
+        newExpiredAt = new Date(new Date(currentNPlus.expiredAt).getTime() + durationMs);
+      }
+
+      await User.updateOne(
+        { discordId: String(discordId) },
+        {
+          $set: {
+            "nismaraplus.status": true,
+            "nismaraplus.startedAt": newStartedAt,
+            "nismaraplus.expiredAt": newExpiredAt,
+          },
+        }
+      );
+
+      // Berikan Role Discord Nismara+ jika bot token dan role ID tersedia
+      const botToken = process.env.DISCORD_BOT_TOKEN;
+      const guildId = process.env.DISCORD_GUILD_ID;
+      const plusRoleId = process.env.DISCORD_NISMARAPLUS_ROLE_ID;
+      if (botToken && guildId && plusRoleId) {
+        await fetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${plusRoleId}`,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: `Bot ${botToken}`,
+              "X-Audit-Log-Reason": `Nismara+ Trial ${r.amount} Hari (Season Pass S${seasonNumber})`,
+            },
+          }
+        ).catch((e) => console.error("Discord Role Error:", e));
+      }
+
+      // Hapus cache session Redis agar profil driver langsung update
+      try {
+        const { redis } = await import("@/lib/redis");
+        if (redis) {
+          await redis.del(`session:profile:${user._id}`);
+        }
+      } catch (redisErr) {
+        // ignore redis error
+      }
+
+      results.push(`+${r.amount} Hari VIP Nismara+ (Aktif s.d. ${newExpiredAt.toLocaleDateString("id-ID")})`);
     } else if (r.type === "BADGE" && r.badgeId) {
       // 6. Masukkan ke Koleksi Achievement & UserAchievement agar tampil di Profil Driver
       try {
@@ -918,18 +993,15 @@ export async function claimLevelReward(
         console.error("Badge Grant Error:", badgeErr);
         results.push(r.title);
       }
-    } else if (r.type === "MOD_LIVERY" || r.type === "DISCORD_ROLE") {
+    } else if (
+      r.type === "MOD_LIVERY" ||
+      r.type === "PHYSICAL_MERCH" ||
+      r.type === "DOWNLOADABLE" ||
+      r.type === "DISCORD_ROLE"
+    ) {
       results.push(r.title);
     }
   }
-
-  // Tandai level telah diklaim
-  if (track === "free") {
-    progress.claimedFreeLevels.push(levelNum);
-  } else {
-    progress.claimedPremiumLevels.push(levelNum);
-  }
-  await progress.save();
 
   return {
     success: true,
@@ -989,19 +1061,32 @@ export async function upgradeToPremiumPass(
 ) {
   await dbConnect();
 
-  const progress = await getUserSeasonProgress(discordId, seasonNumber);
-  if (!progress) return { success: false, error: "Progress user tidak ditemukan" };
+  // ATOMIC GUARD: Hanya update jika isPremium belum bernilai true
+  const progress = await UserSeasonProgress.findOneAndUpdate(
+    {
+      discordId: String(discordId),
+      seasonNumber: Number(seasonNumber),
+      isPremium: { $ne: true },
+    },
+    {
+      $set: { isPremium: true, purchasedAt: new Date() },
+    },
+    { returnDocument: "after" }
+  );
 
-  if (progress.isPremium) {
-    return { success: false, error: "Anda sudah memiliki Nismara Pass Premium musim ini!" };
+  if (!progress) {
+    const existing = await UserSeasonProgress.findOne({
+      discordId: String(discordId),
+      seasonNumber: Number(seasonNumber),
+    });
+    if (existing?.isPremium) {
+      return { success: false, error: "Anda sudah memiliki Nismara Pass Premium musim ini!" };
+    }
+    return { success: false, error: "Progress user tidak ditemukan" };
   }
-
-  progress.isPremium = true;
-  progress.purchasedAt = new Date();
-  await progress.save();
 
   return {
     success: true,
-    message: "Selamat! Nismara Pass Premium Season 1 Anda telah aktif.",
+    message: `Selamat! Nismara Pass Premium Season ${seasonNumber} Anda telah aktif.`,
   };
 }

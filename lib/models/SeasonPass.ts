@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 export interface RewardItem {
-  type: "NC" | "FUEL" | "SAFEBOX_TICKET" | "VOUCHER" | "NPLUS_TRIAL" | "BADGE" | "DISCORD_ROLE" | "MOD_LIVERY" | "CUSTOM";
+  type: "NC" | "FUEL" | "SAFEBOX_TICKET" | "VOUCHER" | "NPLUS_TRIAL" | "BADGE" | "DISCORD_ROLE" | "MOD_LIVERY" | "DOWNLOADABLE" | "PHYSICAL_MERCH" | "PHYSICAL" | "CUSTOM";
   title: string;
   description?: string;
   amount?: number; // For NC, Fuel, Safebox Ticket, or NPlus Trial Days
@@ -36,6 +36,9 @@ const rewardItemSchema = new mongoose.Schema(
         "BADGE",
         "DISCORD_ROLE",
         "MOD_LIVERY",
+        "DOWNLOADABLE",
+        "PHYSICAL_MERCH",
+        "PHYSICAL",
         "CUSTOM",
       ],
       required: true,
@@ -87,7 +90,11 @@ const seasonPassSchema = new mongoose.Schema(
     grandPrize: {
       title: { type: String, default: "Mod Livery Truk Eksklusif Season 1" },
       description: { type: String, default: "Livery resmi edisi terbatas Season 1 untuk truk Scania & Volvo" },
-      type: { type: String, default: "MOD_LIVERY" },
+      type: {
+        type: String,
+        enum: ["MOD_LIVERY", "DOWNLOADABLE", "PHYSICAL_MERCH", "PHYSICAL"],
+        default: "MOD_LIVERY",
+      },
       downloadUrl: { type: String, default: "" },
       imageUrl: { type: String, default: "" },
     },

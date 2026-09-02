@@ -494,8 +494,34 @@ export async function claimWeeklyQuestReward(discordId: string, questId: string)
     };
   }
 
-  // 5. Eksekusi Distribusi Hadiah
+  // 5. ATOMIC CLAIM GUARD: Kunci klaim secara atomik SEBELUM mendistribusikan hadiah!
+  // Berkat unique index { discordId: 1, weekKey: 1, questId: 1 }, hanya tepat 1 request yang dapat lolos.
   const reward = targetQuest.reward;
+  let claimDoc: any;
+
+  try {
+    claimDoc = await NplusWeeklyQuestClaim.create({
+      discordId: String(discordId),
+      userId: user._id,
+      guildId,
+      weekKey: weekInfo.weekKey,
+      questId: String(questId),
+      claimedAt: new Date(),
+      rewardSnapshot: {
+        type: reward.type,
+        title: reward.title,
+        amount: reward.amount || 0,
+        details: "Pending grant...",
+      },
+    });
+  } catch (err: any) {
+    if (err.code === 11000) {
+      return { success: false, error: "Hadiah untuk quest ini sudah pernah Anda klaim minggu ini." };
+    }
+    throw err;
+  }
+
+  // 6. Eksekusi Distribusi Hadiah (Hanya request yang memenangkan kunci atomik yang mengeksekusi ini)
   let rewardMessage = "";
   let grantedVoucherId = null;
 
@@ -556,30 +582,16 @@ export async function claimWeeklyQuestReward(discordId: string, questId: string)
     rewardMessage = `Voucher: ${reward.title}`;
   }
 
-  // 6. Simpan Bukti Klaim (Mencegah Double Claim)
-  try {
-    await NplusWeeklyQuestClaim.create({
-      discordId: String(discordId),
-      userId: user._id,
-      guildId,
-      weekKey: weekInfo.weekKey,
-      questId: String(questId),
-      claimedAt: new Date(),
-      rewardSnapshot: {
-        type: reward.type,
-        title: reward.title,
-        amount: reward.amount || 0,
-        voucherId: grantedVoucherId,
-        details: rewardMessage,
+  // Perbarui snapshot rincian hadiah pada dokumen klaim
+  await NplusWeeklyQuestClaim.updateOne(
+    { _id: claimDoc._id },
+    {
+      $set: {
+        "rewardSnapshot.voucherId": grantedVoucherId,
+        "rewardSnapshot.details": rewardMessage,
       },
-    });
-  } catch (err: any) {
-    // Jika race condition duplicate key
-    if (err.code === 11000) {
-      return { success: false, error: "Hadiah untuk quest ini sudah diklaim." };
     }
-    throw err;
-  }
+  );
 
   // 7. Invalidate Redis Cache
   try {

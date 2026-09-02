@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import dbConnect from "@/lib/mongoose";
 import SeasonPassOrder from "@/lib/models/SeasonPassOrder";
+import SeasonPassMerchClaim from "@/lib/models/SeasonPassMerchClaim";
 import {
   getActiveSeason,
   getUserSeasonProgress,
@@ -42,10 +43,16 @@ export default async function SeasonPassPage() {
     status: "pending",
   }).lean();
 
+  const merchClaimDoc = await SeasonPassMerchClaim.findOne({
+    discordId,
+    seasonNumber,
+  }).lean();
+
   const season = seasonDoc ? JSON.parse(JSON.stringify(seasonDoc)) : null;
   const progress = progressDoc ? JSON.parse(JSON.stringify(progressDoc)) : null;
   const weekInfo = seasonDoc ? JSON.parse(JSON.stringify(getSeasonWeekInfo(seasonDoc, progressDoc?.isPremium || false))) : null;
   const pendingOrder = pendingOrderDoc ? JSON.parse(JSON.stringify(pendingOrderDoc)) : null;
+  const merchClaim = merchClaimDoc ? JSON.parse(JSON.stringify(merchClaimDoc)) : null;
   const guildId = process.env.DISCORD_GUILD_ID || "863959415702028318";
 
   return (
@@ -55,6 +62,7 @@ export default async function SeasonPassPage() {
         initialProgress={progress}
         initialWeekInfo={weekInfo}
         initialPendingOrder={pendingOrder}
+        initialMerchClaim={merchClaim}
         guildId={guildId}
       />
     </div>

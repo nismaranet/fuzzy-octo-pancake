@@ -22,6 +22,9 @@ import {
   Check,
   XCircle,
   MessageSquare,
+  Package,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { showAlert, showConfirm } from "@/lib/dialog";
 import { useRouter } from "next/navigation";
@@ -351,11 +354,33 @@ export default function ManageSeasonPassClient({
                   </div>
 
                   {/* Grand Prize */}
-                  <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                      <Gift size={12} /> Hadiah Puncak Level 30
-                    </span>
+                  <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                        <Gift size={12} /> Hadiah Puncak Level 30
+                      </span>
+                      {s.grandPrize?.type === "PHYSICAL_MERCH" || s.grandPrize?.type === "PHYSICAL" ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[9px] font-bold uppercase tracking-wider border border-purple-500/30">
+                          <Package size={10} /> Merchandise Fisik
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] font-bold uppercase tracking-wider border border-amber-500/30">
+                          <Download size={10} /> Digital Mod
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs font-bold text-foreground truncate">{s.grandPrize?.title || "Hadiah Puncak"}</p>
+                    {s.grandPrize?.downloadUrl && (
+                      <a
+                        href={s.grandPrize.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-amber-400 transition underline underline-offset-2 truncate max-w-full"
+                      >
+                        <ExternalLink size={10} className="shrink-0" />
+                        <span className="truncate">{s.grandPrize.downloadUrl}</span>
+                      </a>
+                    )}
                   </div>
                 </div>
 

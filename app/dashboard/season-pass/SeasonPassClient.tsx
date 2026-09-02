@@ -26,6 +26,7 @@ import {
   Send,
   ExternalLink,
   MessageSquare,
+  Package,
 } from "lucide-react";
 import { showAlert } from "@/lib/dialog";
 import { useRouter } from "next/navigation";
@@ -55,12 +56,14 @@ export default function SeasonPassClient({
   initialProgress,
   initialWeekInfo,
   initialPendingOrder = null,
+  initialMerchClaim = null,
   guildId = "863959415702028318",
 }: {
   initialSeason: any;
   initialProgress: any;
   initialWeekInfo: any;
   initialPendingOrder?: any;
+  initialMerchClaim?: any;
   guildId?: string;
 }) {
   const router = useRouter();
@@ -68,6 +71,9 @@ export default function SeasonPassClient({
   const [progress, setProgress] = useState<any>(initialProgress);
   const [weekInfo] = useState<any>(initialWeekInfo);
   const [pendingOrder, setPendingOrder] = useState<any>(initialPendingOrder);
+  const [merchClaim, setMerchClaim] = useState<any>(
+    initialMerchClaim || initialProgress?.merchClaim || null
+  );
 
   const [activeTierFilter, setActiveTierFilter] = useState<"ALL" | "T1" | "T2" | "T3">("ALL");
   const [isClaiming, setIsClaiming] = useState<string | null>(null);
@@ -76,9 +82,60 @@ export default function SeasonPassClient({
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
+  // In-app Merchandise Claim Form State
+  const [showMerchClaimModal, setShowMerchClaimModal] = useState(false);
+  const [isSubmittingMerchClaim, setIsSubmittingMerchClaim] = useState(false);
+  const [merchFormData, setMerchFormData] = useState({
+    recipientName: "",
+    recipientPhone: "",
+    recipientAddress: "",
+    shippingNotes: "",
+  });
+
   const userLevel = progress?.currentLevel || 1;
   const userXp = progress?.currentXp || 0;
   const isPremium = progress?.isPremium || false;
+
+  const handleSubmitMerchClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !merchFormData.recipientName.trim() ||
+      !merchFormData.recipientPhone.trim() ||
+      !merchFormData.recipientAddress.trim()
+    ) {
+      await showAlert("Mohon lengkapi semua kolom bertanda bintang (*).");
+      return;
+    }
+
+    setIsSubmittingMerchClaim(true);
+    try {
+      const res = await fetch("/api/season-pass/claim-merch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          seasonNumber: season?.seasonNumber || 1,
+          ...merchFormData,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengirimkan formulir klaim merchandise");
+      }
+
+      setMerchClaim(data.merchClaim);
+      setShowMerchClaimModal(false);
+      await showAlert(
+        data.message ||
+          "Data pengiriman berhasil dikirim! Channel Discord tiket telah dibuat untuk konfirmasi ongkir & resi bersama Owner & Developer."
+      );
+      router.refresh();
+    } catch (err: any) {
+      await showAlert(`Gagal: ${err.message}`);
+    } finally {
+      setIsSubmittingMerchClaim(false);
+    }
+  };
 
   // Levels for current tier filter
   const displayedLevels = useMemo(() => {
@@ -206,7 +263,11 @@ export default function SeasonPassClient({
       case "BADGE":
         return <Trophy className={`text-amber-400 ${size}`} />;
       case "MOD_LIVERY":
+      case "DOWNLOADABLE":
         return <Download className={`text-yellow-400 ${size}`} />;
+      case "PHYSICAL_MERCH":
+      case "PHYSICAL":
+        return <Package className={`text-purple-400 ${size}`} />;
       case "DISCORD_ROLE":
         return <Star className={`text-indigo-400 ${size}`} />;
       default:
@@ -615,44 +676,154 @@ export default function SeasonPassClient({
       </div>
 
       {/* 4. Grand Prize Level 30 Showcase */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-950/40 via-card to-purple-950/40 border border-amber-500/40 p-6 md:p-8 backdrop-blur-xl shadow-xl">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-black shadow-lg shadow-amber-500/30 shrink-0">
-              <Trophy size={32} className="fill-black" />
-            </div>
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-400">
-                <Star size={13} className="fill-amber-400" /> Hadiah Puncak Level 30 (Grand Finale)
-              </div>
-              <h3 className="text-xl md:text-2xl font-black text-foreground tracking-tight">
-                {season?.grandPrize?.title || "Mod Livery Truk Eksklusif Season 1"}
-              </h3>
-              <p className="text-xs text-muted-foreground max-w-xl">
-                {season?.grandPrize?.description || "Livery resmi edisi terbatas Season 1 untuk truk Scania & Volvo"} + S1 Champion Legend + Role Discord Juara!
-              </p>
-            </div>
-          </div>
+      {(() => {
+        const isPhysicalGrandPrize =
+          season?.grandPrize?.type === "PHYSICAL_MERCH" || season?.grandPrize?.type === "PHYSICAL";
 
-          <div className="shrink-0">
-            {userLevel >= 30 ? (
-              <div className="px-6 py-3 bg-emerald-500 text-black font-black text-xs uppercase tracking-wider rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/20">
-                <CheckCircle2 size={18} />
-                Tamat Level 30
+        return (
+          <div
+            className={`relative overflow-hidden rounded-3xl border p-6 md:p-8 backdrop-blur-xl shadow-xl transition ${
+              isPhysicalGrandPrize
+                ? "bg-gradient-to-r from-purple-950/40 via-card to-pink-950/40 border-purple-500/40"
+                : "bg-gradient-to-r from-amber-950/40 via-card to-orange-950/40 border-amber-500/40"
+            }`}
+          >
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+              <div className="flex items-start md:items-center gap-4">
+                <div
+                  className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0 ${
+                    isPhysicalGrandPrize
+                      ? "bg-gradient-to-br from-purple-500 to-pink-600 shadow-purple-500/30"
+                      : "bg-gradient-to-br from-amber-400 to-orange-500 text-black shadow-amber-500/30"
+                  }`}
+                >
+                  {isPhysicalGrandPrize ? (
+                    <Package size={32} className="text-white" />
+                  ) : (
+                    <Trophy size={32} className="fill-black text-black" />
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider border ${
+                        isPhysicalGrandPrize
+                          ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                          : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                      }`}
+                    >
+                      <Star size={12} className={isPhysicalGrandPrize ? "fill-purple-300" : "fill-amber-300"} />
+                      Hadiah Puncak Level 30
+                    </span>
+                    {isPhysicalGrandPrize ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px] font-bold uppercase tracking-wider">
+                        <Package size={11} /> Merchandise Fisik (Dikirim ke Rumah)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold uppercase tracking-wider">
+                        <Download size={11} /> Downloadable Content (Mod File)
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="text-xl md:text-2xl font-black text-foreground tracking-tight">
+                    {season?.grandPrize?.title || (isPhysicalGrandPrize ? "Merchandise Eksklusif Season 1" : "Mod Livery Truk Eksklusif Season 1")}
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-2xl leading-relaxed">
+                    {season?.grandPrize?.description || (isPhysicalGrandPrize ? "Merchandise resmi edisi terbatas Nismara Transport dikirim via ekspedisi" : "Livery resmi edisi terbatas Season 1 untuk truk Scania & Volvo")} + S1 Champion Legend + Role Discord Juara!
+                  </p>
+
+                  {userLevel >= 30 && isPremium && (
+                    <p className="text-[11px] font-medium text-foreground/80 flex items-center gap-1.5 pt-1">
+                      {isPhysicalGrandPrize ? (
+                        merchClaim?.channelId ? (
+                          <>
+                            <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                            <span>Data pengiriman Anda telah diterima. Pantau konfirmasi resi & ongkir di channel Discord Anda.</span>
+                          </>
+                        ) : (
+                          <>
+                            <Package size={13} className="text-purple-400 shrink-0" />
+                            <span>Silakan klik tombol klaim di samping untuk mengisi formulir alamat pengiriman penerima.</span>
+                          </>
+                        )
+                      ) : season?.grandPrize?.downloadUrl ? (
+                        <>
+                          <Download size={13} className="text-amber-400 shrink-0" />
+                          <span>File mod eksklusif sudah siap untuk diunduh dan dipasang di game simulator.</span>
+                        </>
+                      ) : null}
+                    </p>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="px-5 py-2.5 bg-card/80 border border-border/60 rounded-xl text-center">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider">
-                  Target Level
-                </span>
-                <span className="text-sm font-black text-amber-400 font-mono">
-                  {userLevel} / 30 Level
-                </span>
+
+              {/* Action / Progress Box */}
+              <div className="shrink-0 w-full lg:w-auto flex flex-col sm:flex-row items-center gap-3">
+                {userLevel >= 30 ? (
+                  isPremium ? (
+                    isPhysicalGrandPrize ? (
+                      merchClaim?.channelId ? (
+                        <a
+                          href={`https://discord.com/channels/${guildId}/${merchClaim.channelId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 hover:from-purple-600 hover:to-pink-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl shadow-purple-500/25 flex items-center justify-center gap-2.5"
+                        >
+                          <Package size={17} />
+                          <span>Buka Channel Klaim Discord</span>
+                          <ExternalLink size={14} />
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => setShowMerchClaimModal(true)}
+                          className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 hover:from-purple-600 hover:to-pink-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl shadow-purple-500/25 flex items-center justify-center gap-2.5 animate-pulse"
+                        >
+                          <Package size={17} />
+                          <span>Klaim Merchandise (Isi Alamat)</span>
+                        </button>
+                      )
+                    ) : season?.grandPrize?.downloadUrl ? (
+                      <a
+                        href={season.grandPrize.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2.5"
+                      >
+                        <Download size={17} />
+                        <span>Unduh Mod / Konten</span>
+                        <ExternalLink size={14} />
+                      </a>
+                    ) : (
+                      <div className="w-full sm:w-auto px-6 py-3.5 bg-emerald-500 text-black font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
+                        <CheckCircle2 size={18} />
+                        Tamat Level 30
+                      </div>
+                    )
+                  ) : (
+                    <button
+                      onClick={() => setShowBuyModal(true)}
+                      className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2"
+                    >
+                      <Crown size={16} className="fill-black" />
+                      <span>Upgrade Pass Untuk Buka Hadiah</span>
+                    </button>
+                  )
+                ) : (
+                  <div className="w-full sm:w-auto px-5 py-3 bg-card/80 border border-border/60 rounded-2xl text-center">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider">
+                      Target Puncak
+                    </span>
+                    <span className="text-sm font-black text-amber-400 font-mono">
+                      {userLevel} / 30 Level
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* 5. Detail Modal Popup for Any Level */}
       {selectedLevelModal && (
@@ -754,17 +925,83 @@ export default function SeasonPassClient({
                 </div>
 
                 <div className="space-y-2">
-                  {selectedLevelModal.premiumRewards.map((r, idx) => (
-                    <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-card border border-amber-500/30 shadow-sm">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                        {getRewardIcon(r, "w-4 h-4")}
+                  {selectedLevelModal.premiumRewards.map((r, idx) => {
+                    const isGrandPrizeItem =
+                      r.type === "MOD_LIVERY" ||
+                      r.type === "PHYSICAL_MERCH" ||
+                      r.type === "DOWNLOADABLE" ||
+                      r.type === "PHYSICAL";
+                    const isPhysical =
+                      r.type === "PHYSICAL_MERCH" ||
+                      r.type === "PHYSICAL" ||
+                      season?.grandPrize?.type === "PHYSICAL_MERCH" ||
+                      season?.grandPrize?.type === "PHYSICAL";
+
+                    return (
+                      <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-card border border-amber-500/30 shadow-sm">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                            isGrandPrizeItem && isPhysical
+                              ? "bg-purple-500/20 text-purple-400"
+                              : "bg-amber-500/10 text-amber-400"
+                          }`}
+                        >
+                          {getRewardIcon(r, "w-4 h-4")}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-foreground truncate">{r.title}</p>
+                            {isGrandPrizeItem && isPhysical && (
+                              <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                                Fisik
+                              </span>
+                            )}
+                          </div>
+                          {r.description && <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{r.description}</p>}
+
+                          {/* Quick Link Button for Grand Prize if unlocked */}
+                          {isGrandPrizeItem && isPremium && userLevel >= selectedLevelModal.level && (
+                            isPhysical ? (
+                              merchClaim?.channelId ? (
+                                <a
+                                  href={`https://discord.com/channels/${guildId}/${merchClaim.channelId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase tracking-wider transition bg-purple-500 text-white hover:bg-purple-600 shadow-sm"
+                                >
+                                  <Package size={12} />
+                                  <span>Buka Channel Discord</span>
+                                  <ExternalLink size={10} />
+                                </a>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setSelectedLevelModal(null);
+                                    setShowMerchClaimModal(true);
+                                  }}
+                                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase tracking-wider transition bg-purple-500 text-white hover:bg-purple-600 shadow-sm"
+                                >
+                                  <Package size={12} />
+                                  <span>Isi Formulir Alamat</span>
+                                </button>
+                              )
+                            ) : season?.grandPrize?.downloadUrl ? (
+                              <a
+                                href={season.grandPrize.downloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase tracking-wider transition bg-amber-500 text-black hover:bg-amber-600 shadow-sm"
+                              >
+                                <Download size={12} />
+                                <span>Unduh Mod</span>
+                                <ExternalLink size={10} />
+                              </a>
+                            ) : null
+                          )}
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-foreground">{r.title}</p>
-                        {r.description && <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{r.description}</p>}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {userLevel >= selectedLevelModal.level && isPremium && !progress?.claimedPremiumLevels?.includes(selectedLevelModal.level) && (
@@ -937,6 +1174,127 @@ export default function SeasonPassClient({
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. In-App Merchandise Claim Modal */}
+      {showMerchClaimModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-xl bg-card border border-purple-500/40 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border/60 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 shadow-sm">
+                  <Package size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg md:text-xl font-black text-foreground">
+                    Formulir Pengiriman Merchandise
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {season?.grandPrize?.title || "Hadiah Puncak Merchandise Season Pass"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowMerchClaimModal(false)}
+                className="p-2 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Explanatory Banner */}
+            <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200/90 leading-relaxed space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-purple-300">
+                <Sparkles size={14} /> Konfirmasi Alamat Langsung ke Owner & Developer
+              </p>
+              <p>
+                Setelah Anda mengirim data di bawah, sistem akan otomatis membuat channel tiket privat di Discord bersama Owner & Developer untuk konfirmasi ongkos kirim dan nomor resi pengiriman.
+              </p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmitMerchClaim} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <span>Nama Lengkap Penerima</span>
+                  <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={merchFormData.recipientName}
+                  onChange={(e) => setMerchFormData({ ...merchFormData, recipientName: e.target.value })}
+                  placeholder="Contoh: Budi Santoso"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-purple-500 focus:outline-none text-sm font-medium"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <span>Nomor WhatsApp Penerima</span>
+                  <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={merchFormData.recipientPhone}
+                  onChange={(e) => setMerchFormData({ ...merchFormData, recipientPhone: e.target.value })}
+                  placeholder="Contoh: 081234567890"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-purple-500 focus:outline-none text-sm font-medium font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <span>Alamat Lengkap Pengiriman</span>
+                  <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={merchFormData.recipientAddress}
+                  onChange={(e) => setMerchFormData({ ...merchFormData, recipientAddress: e.target.value })}
+                  placeholder="Nama Jalan, No. Rumah, RT/RW, Kelurahan, Kecamatan, Kota/Kabupaten, Provinsi, Kode Pos..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-purple-500 focus:outline-none text-sm font-medium resize-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Catatan Tambahan (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={merchFormData.shippingNotes}
+                  onChange={(e) => setMerchFormData({ ...merchFormData, shippingNotes: e.target.value })}
+                  placeholder="Contoh: Ukuran Kaos XL / Patokan samping minimarket..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-purple-500 focus:outline-none text-sm font-medium"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border/60">
+                <button
+                  type="button"
+                  onClick={() => setShowMerchClaimModal(false)}
+                  className="px-5 py-2.5 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold uppercase tracking-wider transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingMerchClaim}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/25 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Send size={14} />
+                  <span>{isSubmittingMerchClaim ? "Mengirim Data..." : "Kirim Data Pengiriman"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -13,6 +13,20 @@ const userSeasonProgressSchema = new mongoose.Schema(
     claimedFreeLevels: { type: [Number], default: [] }, // Array of level numbers claimed in Free Track
     claimedPremiumLevels: { type: [Number], default: [] }, // Array of level numbers claimed in Premium Track
     levelSkipsPurchased: { type: Number, default: 0 },
+    merchClaim: {
+      claimedAt: { type: Date, default: null },
+      recipientName: { type: String, default: null },
+      recipientPhone: { type: String, default: null },
+      recipientAddress: { type: String, default: null },
+      shippingNotes: { type: String, default: null },
+      channelId: { type: String, default: null },
+      status: {
+        type: String,
+        enum: ["pending", "confirmed", "shipped", "completed", "cancelled"],
+        default: "pending",
+      },
+      resiNumber: { type: String, default: null },
+    },
     // Weekly XP Tracking for audits
     weeklyXpLogs: [
       {

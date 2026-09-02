@@ -103,6 +103,7 @@ export async function POST(request: Request) {
         grandPrizeTitle,
         grandPrizeDesc,
         grandPrizeUrl,
+        grandPrizeType = "MOD_LIVERY",
         premiumPriceIdr = 35000,
         premiumPriceNc = 75000,
         copyRewardsFromSeason = 1,
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
         grandPrize: {
           title: grandPrizeTitle || `Hadiah Puncak Season ${seasonNumber}`,
           description: grandPrizeDesc || `Hadiah eksklusif edisi terbatas untuk Season ${seasonNumber}`,
-          type: "MOD_LIVERY",
+          type: grandPrizeType || "MOD_LIVERY",
           downloadUrl: grandPrizeUrl || "",
           imageUrl: "",
         },
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if (action === "UPDATE") {
+    if (action === "UPDATE" || action === "EDIT") {
       const {
         seasonNumber,
         title,
@@ -169,6 +170,7 @@ export async function POST(request: Request) {
         grandPrizeTitle,
         grandPrizeDesc,
         grandPrizeUrl,
+        grandPrizeType,
         premiumPriceIdr,
         premiumPriceNc,
         status,
@@ -191,11 +193,12 @@ export async function POST(request: Request) {
       if (premiumPriceNc) season.premiumPriceNc = Number(premiumPriceNc);
       if (status) season.status = status;
 
-      if (grandPrizeTitle || grandPrizeDesc || grandPrizeUrl !== undefined) {
+      if (grandPrizeTitle || grandPrizeDesc || grandPrizeUrl !== undefined || grandPrizeType) {
         season.grandPrize = {
           ...season.grandPrize,
           title: grandPrizeTitle || season.grandPrize?.title,
           description: grandPrizeDesc || season.grandPrize?.description,
+          type: grandPrizeType || season.grandPrize?.type || "MOD_LIVERY",
           downloadUrl: grandPrizeUrl !== undefined ? grandPrizeUrl : season.grandPrize?.downloadUrl,
         };
       }
