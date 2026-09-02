@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: any): Promise<Metadata> {
 
   const metadata: Metadata = {
     title: `${event.nameEvent} - Nismara Transport`,
-    description: `Ikuti event ${event.nameEvent} dan dapatkan bonus multiplier sebesar ${event.multiplier}x!`,
+    description: `Ikuti event ${event.nameEvent} dan dapatkan bonus multiplier sebesar +${Math.round(Number(event.multiplier || 0) * 100)}% NC!`,
   };
 
   if (event.imageUrl) {

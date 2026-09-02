@@ -86,7 +86,7 @@ export default function VouchersClient({
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
         setTimeLeftStr(
-          `${hours > 0 ? `${hours} Jam ` : ""}${minutes} Menit ${seconds} Detik`
+          `${hours > 0 ? `${hours} Jam ` : ""}${minutes} Menit ${seconds} Detik`,
         );
       }
     };
@@ -103,11 +103,21 @@ export default function VouchersClient({
   };
 
   const handleActivateBooster = async (voucher: VoucherItem) => {
+    const isCurrentlyActive =
+      ncBoost && ncBoost.active && new Date(ncBoost.expiredAt) > new Date();
+
+    if (isCurrentlyActive) {
+      await showAlert(
+        "Anda masih memiliki NC Booster aktif. Tunggu hingga durasi booster saat ini selesai sebelum mengaktifkan booster baru.",
+      );
+      return;
+    }
+
     const boostPercent = voucher.discountValue || 50;
     const hours = voucher.durationHours || 2;
 
     const confirmed = await showConfirm(
-      `Aktifkan voucher ini sekarang? Bonus +${boostPercent}% NC akan aktif untuk setiap pengiriman job selama ${hours} jam ke depan.`
+      `Aktifkan voucher ini sekarang? Bonus +${boostPercent}% NC akan aktif untuk setiap pengiriman job selama ${hours} jam ke depan.`,
     );
 
     if (!confirmed) return;
@@ -131,8 +141,8 @@ export default function VouchersClient({
         prev.map((v) =>
           v._id === voucher._id
             ? { ...v, status: "USED", usedAt: new Date().toISOString() }
-            : v
-        )
+            : v,
+        ),
       );
 
       setNcBoost({
@@ -236,19 +246,26 @@ export default function VouchersClient({
               </div>
               <div>
                 <div className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-400">
-                  <Zap size={13} className="fill-amber-400" /> NC Booster Sedang Aktif!
+                  <Zap size={13} className="fill-amber-400" /> NC Booster Sedang
+                  Aktif!
                 </div>
                 <h3 className="text-base font-black text-foreground tracking-tight">
-                  Bonus +{Math.round((ncBoost.multiplier || 0.5) * 100)}% NC Tiap Job
+                  Bonus +{Math.round((ncBoost.multiplier || 0.5) * 100)}% NC
+                  Tiap Job
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Setiap pengiriman job yang selesai akan otomatis mendapatkan bonus ekstra.
+                  Setiap pengiriman job yang selesai akan otomatis mendapatkan
+                  bonus ekstra.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 self-start sm:self-center px-4 py-2 bg-card/80 border border-amber-500/30 rounded-xl">
-              <Timer size={16} className="text-amber-400 animate-spin" style={{ animationDuration: "6s" }} />
+              <Timer
+                size={16}
+                className="text-amber-400 animate-spin"
+                style={{ animationDuration: "6s" }}
+              />
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider">
                   Sisa Waktu
@@ -285,8 +302,7 @@ export default function VouchersClient({
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Riwayat (
-            {vouchers.filter((v) => v.status !== "ACTIVE").length})
+            Riwayat ({vouchers.filter((v) => v.status !== "ACTIVE").length})
           </button>
         </div>
 
@@ -353,10 +369,10 @@ export default function VouchersClient({
             const discBadgeText = isBooster
               ? `BOOSTER +${v.discountValue}% (${v.durationHours || 2} JAM)`
               : isFreeService
-              ? "FREE SERVICE (100%)"
-              : v.discountType === "percentage"
-              ? `DISKON ${v.discountValue}%`
-              : `POTONGAN ${v.discountValue.toLocaleString("id-ID")} NC`;
+                ? "FREE SERVICE (100%)"
+                : v.discountType === "percentage"
+                  ? `DISKON ${v.discountValue}%`
+                  : `POTONGAN ${v.discountValue.toLocaleString("id-ID")} NC`;
 
             return (
               <div
@@ -366,8 +382,8 @@ export default function VouchersClient({
                     ? isBooster
                       ? "bg-gradient-to-b from-card via-card to-amber-950/20 border-amber-500/40 hover:border-amber-400/70 shadow-lg hover:shadow-amber-500/10 hover:-translate-y-1"
                       : isFreeService
-                      ? "bg-gradient-to-b from-card via-card to-emerald-950/20 border-emerald-500/40 hover:border-emerald-400/70 shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1"
-                      : "bg-card/70 border-border/70 hover:border-primary/50 shadow-md hover:-translate-y-1"
+                        ? "bg-gradient-to-b from-card via-card to-emerald-950/20 border-emerald-500/40 hover:border-emerald-400/70 shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1"
+                        : "bg-card/70 border-border/70 hover:border-primary/50 shadow-md hover:-translate-y-1"
                     : "bg-card/30 border-border/30 opacity-60 grayscale-[40%]"
                 }`}
               >
@@ -387,10 +403,10 @@ export default function VouchersClient({
                           isBooster
                             ? "bg-amber-500 text-black border-amber-400 font-extrabold"
                             : isFreeService
-                            ? "bg-emerald-500 text-black border-emerald-400 font-extrabold"
-                            : v.discountType === "percentage"
-                            ? "bg-teal-500/20 text-teal-300 border-teal-500/40"
-                            : "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                              ? "bg-emerald-500 text-black border-emerald-400 font-extrabold"
+                              : v.discountType === "percentage"
+                                ? "bg-teal-500/20 text-teal-300 border-teal-500/40"
+                                : "bg-purple-500/20 text-purple-300 border-purple-500/40"
                         }`}
                       >
                         {discBadgeText}
@@ -462,7 +478,7 @@ export default function VouchersClient({
                               day: "2-digit",
                               month: "short",
                               year: "numeric",
-                            }
+                            },
                           )}
                         </span>
                       ) : v.expiresAt ? (
@@ -492,14 +508,27 @@ export default function VouchersClient({
                       {isBooster ? (
                         <button
                           onClick={() => handleActivateBooster(v)}
-                          disabled={isActivating === v._id}
-                          className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50"
+                          disabled={isActivating === v._id || isBoostActive}
+                          className={`w-full py-2.5 px-4 font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                            isBoostActive
+                              ? "bg-muted text-muted-foreground border border-border/80 cursor-not-allowed opacity-60"
+                              : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black shadow-md shadow-amber-500/20 disabled:opacity-50"
+                          }`}
                         >
-                          <Zap size={14} className="fill-black" />
+                          <Zap
+                            size={14}
+                            className={
+                              isBoostActive
+                                ? "text-muted-foreground"
+                                : "fill-black"
+                            }
+                          />
                           <span>
                             {isActivating === v._id
                               ? "Mengaktifkan..."
-                              : "Aktifkan Booster"}
+                              : isBoostActive
+                                ? "Booster Lain Aktif"
+                                : "Aktifkan Booster"}
                           </span>
                         </button>
                       ) : (

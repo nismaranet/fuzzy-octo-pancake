@@ -434,7 +434,7 @@ export default async function JobDetailPage(props: {
                         isPenalty
                       />
                       <BreakdownRow
-                        label={`Pajak (${localJob?.tax?.rate * 100}%)`}
+                        label={`Pajak (${Number(((localJob?.tax?.rate || 0) * 100).toFixed(2))}%)`}
                         value={localJob?.tax?.amount}
                         isPenalty
                       />

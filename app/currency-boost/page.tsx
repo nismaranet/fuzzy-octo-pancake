@@ -95,8 +95,8 @@ export default async function EventsPage() {
                       alt={event.nameEvent}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
-                    <div className="absolute top-4 right-4 z-20 px-4 py-2 rounded-xl bg-primary text-(-foreground) font-bold shadow-lg flex items-center gap-2">
-                      <Zap className="w-4 h-4" /> {event.multiplier}x Bonus
+                    <div className="absolute top-4 right-4 z-20 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-black shadow-lg flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 fill-current" /> +{Math.round(Number(event.multiplier || 0) * 100)}% Bonus NC
                     </div>
                   </div>
 
@@ -222,8 +222,8 @@ export default async function EventsPage() {
                       <Calendar className="w-3 h-3" />{" "}
                       {formatDate(event.realEndAt || event.endAt)}
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">
-                      {event.multiplier}x Multiplier
+                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 font-bold text-amber-400">
+                      +{Math.round(Number(event.multiplier || 0) * 100)}% NC
                     </span>
                   </div>
                 </div>

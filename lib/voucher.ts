@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 import UserVoucher from "@/lib/models/UserVoucher";
+import User from "@/lib/models/User";
 import dbConnect from "@/lib/mongoose";
 
 export interface GrantVoucherParams {
@@ -218,33 +219,53 @@ export async function activateBoosterVoucher(
   const multiplier = (voucher.discountValue || 50) / 100; // e.g. 50 -> 0.5 (+50%)
 
   const now = new Date();
-  const User = mongoose.model("User");
   const user = await User.findOne({ discordId: String(discordId) });
   if (!user) {
     return { success: false, error: "User tidak ditemukan" };
   }
 
-  // Hitung expiredAt baru (jika user sudah punya booster aktif yang sama/lebih tinggi, extend durasinya)
-  let newExpiredAt = new Date(now.getTime() + durationHours * 3600 * 1000);
-  if (user.ncBoost && user.ncBoost.active && user.ncBoost.expiredAt && new Date(user.ncBoost.expiredAt) > now) {
-    newExpiredAt = new Date(new Date(user.ncBoost.expiredAt).getTime() + durationHours * 3600 * 1000);
+  // Strict Check: User tidak boleh mengaktifkan booster baru jika masih ada booster yang sedang aktif
+  if (
+    user.ncBoost &&
+    user.ncBoost.active &&
+    user.ncBoost.expiredAt &&
+    new Date(user.ncBoost.expiredAt) > now
+  ) {
+    const remainingMinutes = Math.ceil(
+      (new Date(user.ncBoost.expiredAt).getTime() - now.getTime()) / 60000
+    );
+    const timeLeftStr =
+      remainingMinutes >= 60
+        ? `${Math.floor(remainingMinutes / 60)} jam ${remainingMinutes % 60} menit`
+        : `${remainingMinutes} menit`;
+
+    return {
+      success: false,
+      error: `Anda masih memiliki booster aktif (+${Math.round((user.ncBoost.multiplier || 0) * 100)}% NC) yang tersisa ${timeLeftStr}. Tunggu hingga durasi booster saat ini habis sebelum mengaktifkan voucher baru.`,
+    };
   }
 
-  // Update status voucher menjadi USED
-  voucher.status = "USED";
-  voucher.usedAt = now;
-  await voucher.save();
+  const newExpiredAt = new Date(now.getTime() + durationHours * 3600 * 1000);
 
-  // Update profil user
-  user.ncBoost = {
+  const newBoostData = {
     active: true,
-    multiplier: Math.max(multiplier, user.ncBoost?.multiplier || 0),
-    startedAt: user.ncBoost?.active && user.ncBoost?.startedAt ? user.ncBoost.startedAt : now,
+    multiplier,
+    startedAt: now,
     expiredAt: newExpiredAt,
     voucherTitle: voucher.title,
     voucherCode: voucher.code,
   };
-  await user.save();
+
+  // 1. Update profil user terlebih dahulu secara atomic
+  await User.updateOne(
+    { discordId: String(discordId) },
+    { $set: { ncBoost: newBoostData } }
+  );
+
+  // 2. Jika user update berhasil, update status voucher menjadi USED
+  voucher.status = "USED";
+  voucher.usedAt = now;
+  await voucher.save();
 
   return {
     success: true,

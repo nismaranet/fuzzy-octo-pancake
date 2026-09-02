@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true },
+    id: { type: String, required: false },
     name: { type: String, required: true },
     discordId: { type: String, required: true }, // Discord ID
     isDriver: { type: Boolean, default: false },

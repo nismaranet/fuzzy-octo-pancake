@@ -17,6 +17,11 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "media.discordapp.net",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "avatars.steamstatic.com",
         pathname: "/**",
       },
@@ -28,6 +33,36 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "transport.nismara.my.id",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "i.imgur.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "imgur.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "i.vgy.me",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "vgy.me",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "ui-avatars.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "**.truckyapp.com",
         pathname: "/**",
       },
     ],
