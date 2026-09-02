@@ -63,7 +63,7 @@ export default async function VouchersPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-xs font-bold uppercase tracking-widest">
               <Sparkles size={14} /> Driver Voucher Inventory
             </div>
-            <h1 className="text-3xl md:text-4xl font-black italic tracking-tight text-foreground flex items-center gap-3">
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-foreground flex items-center gap-3">
               <Ticket className="text-teal-400 w-8 h-8 md:w-9 md:h-9" />
               Kupon & Voucher Saya
             </h1>

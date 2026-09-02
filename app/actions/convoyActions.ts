@@ -578,9 +578,60 @@ export async function endConvoyAction(convoyId: string) {
     .collection("convoylobby")
     .updateOne(
       { _id: new ObjectId(convoyId) },
-      { $set: { isEnded: true, isActive: false, updatedAt: new Date() } },
+      { $set: { isEnded: true, isActive: false, active: false, updatedAt: new Date() } },
     );
 
   revalidatePath(`/convoy/${convoy.convoyUri}`);
+  revalidatePath(`/dashboard/manage/events/convoy`);
   return { success: true, message: "Convoy berhasil diakhiri secara manual." };
+}
+
+export async function deleteConvoyAction(convoyId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.role || session.user.role === "user") {
+    throw new Error("Unauthorized");
+  }
+
+  const client = await clientPromise;
+  const db = client.db();
+
+  const convoy = await db
+    .collection("convoylobby")
+    .findOne({ _id: new ObjectId(convoyId) });
+  if (!convoy) {
+    throw new Error("Convoy tidak ditemukan");
+  }
+
+  if (convoy.imageUrl) {
+    await deleteFileFromR2(convoy.imageUrl);
+  }
+
+  await db
+    .collection("convoylobby")
+    .deleteOne({ _id: new ObjectId(convoyId) });
+
+  revalidatePath("/dashboard/manage/events/convoy");
+  revalidatePath("/convoy");
+  return { success: true };
+}
+
+export async function closeConvoyAction(convoyId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.role || session.user.role === "user") {
+    throw new Error("Unauthorized");
+  }
+
+  const client = await clientPromise;
+  const db = client.db();
+
+  await db
+    .collection("convoylobby")
+    .updateOne(
+      { _id: new ObjectId(convoyId) },
+      { $set: { active: false, isEnded: true, updatedAt: new Date() } }
+    );
+
+  revalidatePath("/dashboard/manage/events/convoy");
+  revalidatePath("/convoy");
+  return { success: true };
 }

@@ -58,6 +58,7 @@ export default function SeasonPassClient({
   initialPendingOrder = null,
   initialMerchClaim = null,
   guildId = "863959415702028318",
+  isSeasonActive = true,
 }: {
   initialSeason: any;
   initialProgress: any;
@@ -65,6 +66,7 @@ export default function SeasonPassClient({
   initialPendingOrder?: any;
   initialMerchClaim?: any;
   guildId?: string;
+  isSeasonActive?: boolean;
 }) {
   const router = useRouter();
   const [season] = useState<any>(initialSeason);
@@ -81,6 +83,7 @@ export default function SeasonPassClient({
   const [selectedLevelModal, setSelectedLevelModal] = useState<SeasonLevel | null>(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [showArchiveTrack, setShowArchiveTrack] = useState(false);
 
   // In-app Merchandise Claim Form State
   const [showMerchClaimModal, setShowMerchClaimModal] = useState(false);
@@ -164,6 +167,9 @@ export default function SeasonPassClient({
     return count;
   }, [season, progress, userLevel, isPremium]);
 
+  const isGracePeriod = !isSeasonActive && unclaimedCount > 0;
+  const isOffSeason = !isSeasonActive && unclaimedCount === 0;
+
   const handleClaim = async (level: number, track: "free" | "premium") => {
     setIsClaiming(`${level}-${track}`);
     try {
@@ -217,6 +223,10 @@ export default function SeasonPassClient({
   };
 
   const handleCreateOrder = async () => {
+    if (!isSeasonActive) {
+      await showAlert("Musim telah berakhir. Pembelian Nismara Pass untuk season ini telah ditutup.");
+      return;
+    }
     setIsCreatingOrder(true);
     try {
       const res = await fetch("/api/season-pass/order", {
@@ -279,8 +289,119 @@ export default function SeasonPassClient({
     ? `https://discord.com/channels/${guildId}/${pendingOrder.channelId}`
     : null;
 
+  // OFF-SEASON HIBERNATION VIEW
+  if (isOffSeason && !showArchiveTrack) {
+    return (
+      <div className="space-y-8 pb-16 animate-in fade-in duration-500">
+        {/* Off-Season Hero Banner */}
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-card via-card/95 to-amber-500/10 border border-border p-8 md:p-14 shadow-2xl backdrop-blur-xl text-center space-y-6">
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-black uppercase tracking-widest">
+            <Clock size={14} /> Off-Season • Jeda Antara Musim
+          </div>
+
+          <div className="max-w-2xl mx-auto space-y-3">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-foreground uppercase">
+              Nismara Pass <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300">Off-Season</span>
+            </h1>
+            <p className="text-muted-foreground text-sm md:text-base leading-relaxed">
+              Musim kompetisi Nismara Pass saat ini telah resmi berakhir. Manajemen dan Developer Nismara sedang mempersiapkan Season baru dengan tema baru, quest logistik spesial, serta hadiah eksklusif yang lebih spektakuler!
+            </p>
+          </div>
+
+          {/* Previous Season Personal Hall of Fame */}
+          <div className="pt-4 max-w-3xl mx-auto">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-3">
+              Pencapaian Pribadi Anda Pada Musim Terakhir (Season {season?.seasonNumber || 1})
+            </span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-left">
+              <div className="p-4 rounded-2xl bg-black/30 border border-border">
+                <span className="text-[9px] font-black text-muted-foreground uppercase">Level Puncak</span>
+                <p className="text-xl font-black text-foreground tabular-nums mt-0.5">Level {userLevel} / 30</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-black/30 border border-border">
+                <span className="text-[9px] font-black text-muted-foreground uppercase">Total XP Musim</span>
+                <p className="text-xl font-black text-amber-400 tabular-nums mt-0.5">{userXp.toLocaleString("id-ID")} XP</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-black/30 border border-border">
+                <span className="text-[9px] font-black text-muted-foreground uppercase">Status Pass</span>
+                <p className="text-base font-black text-purple-400 mt-0.5">{isPremium ? "Nismara Pass Premium" : "Free Track"}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-black/30 border border-border">
+                <span className="text-[9px] font-black text-emerald-400 uppercase">Status Hadiah</span>
+                <p className="text-sm font-black text-emerald-400 mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 size={16} /> Tuntas Diklaim
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Discord Announcement CTA & Links */}
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href={`https://discord.com/channels/${guildId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full sm:w-auto px-6 py-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+            >
+              <MessageSquare size={16} /> Pantau Pengumuman di Discord
+            </a>
+            <button
+              onClick={() => setShowArchiveTrack(true)}
+              className="w-full sm:w-auto px-6 py-3.5 bg-card border border-border hover:border-primary/40 text-foreground font-bold text-xs uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2"
+            >
+              <Trophy size={16} /> Lihat Arsip Hadiah Musim Lalu
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-16">
+      {/* Return to Off-Season Banner Button if viewing archive */}
+      {showArchiveTrack && (
+        <div className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-border">
+          <span className="text-xs font-bold text-muted-foreground">
+            Anda sedang melihat <strong className="text-foreground">Arsip Hadiah Season {season?.seasonNumber || 1}</strong>
+          </span>
+          <button
+            onClick={() => setShowArchiveTrack(false)}
+            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-foreground text-xs font-bold uppercase tracking-wider transition-colors"
+          >
+            ⬅ Kembali ke Off-Season
+          </button>
+        </div>
+      )}
+
+      {/* Grace Period Vault Claim Alert */}
+      {isGracePeriod && (
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500/20 via-card to-emerald-500/10 border-2 border-amber-500/60 p-6 md:p-8 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
+              <Sparkles size={13} /> Masa Tenggang Klaim • Season {season?.seasonNumber || 1} Telah Selesai
+            </div>
+            <h3 className="text-xl md:text-2xl font-black text-foreground uppercase tracking-tight">
+              Klaim Sisa Hadiah Season Anda ({unclaimedCount} Hadiah Tersedia)
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Musim kompetisi telah resmi ditutup, namun Anda masih berhak mengambil seluruh reward dari level yang telah Anda capai. Segera klaim seluruh hadiah sebelum database diarsipkan!
+            </p>
+          </div>
+
+          <button
+            disabled={isClaimingAll}
+            onClick={handleClaimAll}
+            className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 hover:scale-105"
+          >
+            <Zap size={16} className="fill-black" /> {isClaimingAll ? "Mengklaim Semua..." : `Klaim Semua (${unclaimedCount} Hadiah)`}
+          </button>
+        </div>
+      )}
+
       {/* 1. Header Banner & Status */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-950/40 via-card/90 to-amber-950/30 border border-amber-500/30 p-6 md:p-10 shadow-2xl backdrop-blur-xl">
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
@@ -294,9 +415,9 @@ export default function SeasonPassClient({
                 <Trophy size={14} /> {season?.title || "Season 1: Pioneer of Asphalt"}
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-card/80 border border-border text-muted-foreground text-xs font-semibold">
-                <Clock size={13} /> Sisa {weekInfo?.daysRemaining || 90} Hari
+                <Clock size={13} /> {isSeasonActive ? `Sisa ${weekInfo?.daysRemaining || 90} Hari` : "Musim Selesai (Off-Season)"}
               </span>
-              {weekInfo?.isFinalRush && (
+              {isSeasonActive && weekInfo?.isFinalRush && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-black uppercase tracking-wider animate-pulse">
                   <Flame size={13} /> Final Rush: 2x Pass XP!
                 </span>
@@ -304,8 +425,8 @@ export default function SeasonPassClient({
             </div>
 
             <div>
-              <h1 className="text-3xl md:text-5xl font-black italic tracking-tight text-foreground flex items-center gap-3">
-                Nismara Pass <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300">Season 1</span>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight text-foreground flex items-center gap-3">
+                Nismara Pass <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300">Season {season?.seasonNumber || 1}</span>
               </h1>
               <p className="text-muted-foreground text-sm md:text-base mt-2 leading-relaxed">
                 Narik job di game untuk mengumpulkan Seasonal XP, menaikkan level, dan membuka 30 level hadiah eksklusif NC, Fuel, Kupon Servis, NC Booster, dan Mod Livery!
@@ -365,7 +486,11 @@ export default function SeasonPassClient({
               </div>
 
               {!isPremium && (
-                discordChannelUrl ? (
+                !isSeasonActive ? (
+                  <span className="px-3 py-1.5 rounded-xl bg-white/5 border border-border text-muted-foreground text-[10px] font-bold uppercase">
+                    Musim Selesai
+                  </span>
+                ) : discordChannelUrl ? (
                   <a
                     href={discordChannelUrl}
                     target="_blank"

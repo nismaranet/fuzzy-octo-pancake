@@ -306,7 +306,7 @@ export default function FleetStoreManager() {
               <tbody className="divide-y divide-border">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-8 py-20 text-center text-foreground/20 font-black uppercase tracking-[0.2em] italic">
+                    <td colSpan={5} className="px-8 py-20 text-center text-foreground/20 font-black uppercase tracking-[0.2em]">
                       <div className="flex justify-center items-center gap-3">
                         <Truck className="animate-pulse" size={24} />
                         Loading fleet store data...

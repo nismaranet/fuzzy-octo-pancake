@@ -233,7 +233,7 @@ export default function FleetBrandManager() {
               <tbody className="divide-y divide-border">
                 {loading ? (
                   <tr>
-                    <td colSpan={2} className="px-8 py-20 text-center text-foreground/20 font-black uppercase tracking-[0.2em] italic">
+                    <td colSpan={2} className="px-8 py-20 text-center text-foreground/20 font-black uppercase tracking-[0.2em]">
                       Loading fleet brands...
                     </td>
                   </tr>
@@ -281,7 +281,7 @@ export default function FleetBrandManager() {
                   <tr>
                     <td
                       colSpan={2}
-                      className="px-8 py-20 text-center text-foreground/20 font-black uppercase tracking-[0.2em] italic"
+                      className="px-8 py-20 text-center text-foreground/20 font-black uppercase tracking-[0.2em]"
                     >
                       No brands found
                     </td>

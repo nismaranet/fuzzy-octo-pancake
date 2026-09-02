@@ -226,3 +226,55 @@ export async function updateContractAction(
   revalidatePath("/dashboard/manage/events/contracts");
   redirect("/dashboard/manage/events/contracts");
 }
+
+export async function closeContractAction(contractId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+
+  try {
+    await db.collection("contracts").updateOne(
+      { _id: new ObjectId(contractId) },
+      {
+        $set: {
+          isActive: false,
+          isScheduled: false,
+          endAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    revalidatePath("/dashboard/manage/events/contracts");
+    revalidatePath("/special-contracts");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Gagal menutup kontrak:", error);
+    return { success: false, error: error.message || "Gagal menutup kontrak" };
+  }
+}
+
+export async function deleteContractAction(contractId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+
+  try {
+    const existing = await db
+      .collection("contracts")
+      .findOne({ _id: new ObjectId(contractId) });
+
+    if (existing?.imageUrl) {
+      await deleteFileFromR2(existing.imageUrl);
+    }
+
+    await db
+      .collection("contracts")
+      .deleteOne({ _id: new ObjectId(contractId) });
+
+    revalidatePath("/dashboard/manage/events/contracts");
+    revalidatePath("/special-contracts");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Gagal menghapus kontrak:", error);
+    return { success: false, error: error.message || "Gagal menghapus kontrak" };
+  }
+}

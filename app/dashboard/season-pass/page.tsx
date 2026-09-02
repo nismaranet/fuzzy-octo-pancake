@@ -7,6 +7,7 @@ import SeasonPassOrder from "@/lib/models/SeasonPassOrder";
 import SeasonPassMerchClaim from "@/lib/models/SeasonPassMerchClaim";
 import {
   getActiveSeason,
+  getLatestSeason,
   getUserSeasonProgress,
   getSeasonWeekInfo,
 } from "@/lib/seasonPass";
@@ -17,6 +18,9 @@ export const metadata = {
   description:
     "Progresi musim Nismara Pass 30 Level dengan hadiah Nismara Coin, Fuel, Voucher Servis, NC Booster, dan Mod Livery Eksklusif.",
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function SeasonPassPage() {
   const session = await getServerSession(authOptions);
@@ -31,8 +35,10 @@ export default async function SeasonPassPage() {
 
   await dbConnect();
 
-  const seasonDoc = await getActiveSeason();
-  const seasonNumber = seasonDoc?.seasonNumber || 1;
+  const activeSeasonDoc = await getActiveSeason();
+  const latestSeasonDoc = activeSeasonDoc || (await getLatestSeason());
+
+  const seasonNumber = latestSeasonDoc?.seasonNumber || 1;
   const discordId = String(session.user.discordId);
 
   const progressDoc = await getUserSeasonProgress(discordId, seasonNumber);
@@ -48,12 +54,24 @@ export default async function SeasonPassPage() {
     seasonNumber,
   }).lean();
 
-  const season = seasonDoc ? JSON.parse(JSON.stringify(seasonDoc)) : null;
+  const season = latestSeasonDoc ? JSON.parse(JSON.stringify(latestSeasonDoc)) : null;
   const progress = progressDoc ? JSON.parse(JSON.stringify(progressDoc)) : null;
-  const weekInfo = seasonDoc ? JSON.parse(JSON.stringify(getSeasonWeekInfo(seasonDoc, progressDoc?.isPremium || false))) : null;
-  const pendingOrder = pendingOrderDoc ? JSON.parse(JSON.stringify(pendingOrderDoc)) : null;
-  const merchClaim = merchClaimDoc ? JSON.parse(JSON.stringify(merchClaimDoc)) : null;
+  const weekInfo = latestSeasonDoc
+    ? JSON.parse(
+        JSON.stringify(
+          getSeasonWeekInfo(latestSeasonDoc, progressDoc?.isPremium || false)
+        )
+      )
+    : null;
+  const pendingOrder = pendingOrderDoc
+    ? JSON.parse(JSON.stringify(pendingOrderDoc))
+    : null;
+  const merchClaim = merchClaimDoc
+    ? JSON.parse(JSON.stringify(merchClaimDoc))
+    : null;
   const guildId = process.env.DISCORD_GUILD_ID || "863959415702028318";
+
+  const isSeasonActive = !!activeSeasonDoc;
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 max-w-7xl mx-auto">
@@ -64,6 +82,7 @@ export default async function SeasonPassPage() {
         initialPendingOrder={pendingOrder}
         initialMerchClaim={merchClaim}
         guildId={guildId}
+        isSeasonActive={isSeasonActive}
       />
     </div>
   );

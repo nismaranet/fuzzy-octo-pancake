@@ -607,10 +607,20 @@ export async function ensureSeasonInitialized() {
 
 export async function getActiveSeason() {
   await dbConnect();
-  let season = await SeasonPass.findOne({ status: "ACTIVE" }).lean();
+  const now = new Date();
+  const season = await SeasonPass.findOne({
+    status: "ACTIVE",
+    startAt: { $lte: now },
+    endAt: { $gte: now },
+  }).lean();
+  return season;
+}
+
+export async function getLatestSeason() {
+  await dbConnect();
+  let season = await getActiveSeason();
   if (!season) {
-    season = await ensureSeasonInitialized();
-    season = JSON.parse(JSON.stringify(season));
+    season = await SeasonPass.findOne({}).sort({ seasonNumber: -1 }).lean();
   }
   return season;
 }
