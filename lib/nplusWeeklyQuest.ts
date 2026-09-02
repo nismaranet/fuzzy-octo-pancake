@@ -174,6 +174,21 @@ export const STARTER_QUEST_TEMPLATES = [
     isActive: true,
     order: 6,
   },
+  {
+    title: "TruckersMP Multiplayer Convoy",
+    description: "Selesaikan 3 pekerjaan dalam mode multiplayer TruckersMP bersama komunitas.",
+    type: "TRUCKERSMP_JOB",
+    target: 3,
+    difficulty: "EASY",
+    reward: {
+      type: "NC",
+      title: "15.000 Nismara Coin",
+      amount: 15000,
+      description: "Bonus 15.000 NC langsung ditambahkan ke saldo akun Anda.",
+    },
+    isActive: true,
+    order: 7,
+  },
 ];
 
 /**
@@ -185,6 +200,93 @@ export async function ensureStarterTemplates() {
   if (count === 0) {
     await NplusQuestTemplate.insertMany(STARTER_QUEST_TEMPLATES);
   }
+}
+
+/**
+ * Definisi kelompok tipe quest yang saling tumpang tindih (Overlapping / Free Reward)
+ * Pasangan di bawah ini TIDAK BOLEH muncul bersamaan dalam 1 minggu yang sama
+ * agar tidak terjadi dobel klaim / free reward tanpa usaha ekstra.
+ */
+const INCOMPATIBLE_TYPE_PAIRS: [string, string][] = [
+  // TOTAL_JOBS dan TRUCKERSMP_JOB sama-sama menghitung kuantitas job murni (job TMP otomatis mengisi Total Job)
+  ["TOTAL_JOBS", "TRUCKERSMP_JOB"],
+];
+
+function isTypeCompatibleWithSelected(type: string, usedTypes: Set<string>): boolean {
+  for (const [typeA, typeB] of INCOMPATIBLE_TYPE_PAIRS) {
+    if (type === typeA && usedTypes.has(typeB)) return false;
+    if (type === typeB && usedTypes.has(typeA)) return false;
+  }
+  return true;
+}
+
+/**
+ * Algoritma pemilihan quest mingguan yang menjamin variasi tipe unik (Quest Type Diversity)
+ * Mencegah munculnya 2 quest bertipe sama atau bertipe tumpang tindih (seperti TOTAL_JOBS + TRUCKERSMP_JOB) dalam 1 minggu,
+ * dan merotasi variasi target/reward di minggu-minggu berikutnya secara adil dan otomatis.
+ */
+export function pickDiverseWeeklyQuests(
+  templates: any[],
+  weekNumber: number,
+  countToPick: number = 3
+): any[] {
+  if (!templates || templates.length === 0) return [];
+  const targetCount = Math.min(countToPick, templates.length);
+
+  // 1. Kelompokkan template berdasarkan tipe quest
+  const typeGroups = new Map<string, any[]>();
+  for (const t of templates) {
+    if (!typeGroups.has(t.type)) typeGroups.set(t.type, []);
+    typeGroups.get(t.type)!.push(t);
+  }
+
+  // 2. Daftar tipe unik
+  const uniqueTypes = Array.from(typeGroups.keys());
+
+  // 3. Rotasikan pemilihan tipe quest berdasarkan weekNumber
+  const selected: any[] = [];
+  const usedTypes = new Set<string>();
+
+  const typeOffset = (weekNumber * 2) % uniqueTypes.length;
+  for (let i = 0; i < uniqueTypes.length && selected.length < targetCount; i++) {
+    const type = uniqueTypes[(typeOffset + i) % uniqueTypes.length];
+    
+    // Pastikan tipe belum pernah dipakai DAN kompatibel (tidak tumpang tindih dengan tipe yang sudah dipilih)
+    if (!usedTypes.has(type) && isTypeCompatibleWithSelected(type, usedTypes)) {
+      const group = typeGroups.get(type)!;
+      // Di dalam tipe yang sama, pilih variasi template berdasarkan weekNumber
+      const templateOffset = weekNumber % group.length;
+      selected.push(group[templateOffset]);
+      usedTypes.add(type);
+    }
+  }
+
+  // 4. Fallback jika slot belum penuh: ambil tipe yang belum terpakai
+  if (selected.length < targetCount) {
+    for (const type of uniqueTypes) {
+      if (selected.length >= targetCount) break;
+      if (!usedTypes.has(type) && isTypeCompatibleWithSelected(type, usedTypes)) {
+        const group = typeGroups.get(type)!;
+        const templateOffset = weekNumber % group.length;
+        selected.push(group[templateOffset]);
+        usedTypes.add(type);
+      }
+    }
+  }
+
+  // 5. Ultimate fallback (jika pool sangat sedikit)
+  if (selected.length < targetCount) {
+    const selectedIds = new Set(selected.map((s) => String(s._id)));
+    for (const t of templates) {
+      if (selected.length >= targetCount) break;
+      if (!selectedIds.has(String(t._id))) {
+        selected.push(t);
+        selectedIds.add(String(t._id));
+      }
+    }
+  }
+
+  return selected;
 }
 
 /**
@@ -204,26 +306,19 @@ export async function ensureWeeklyQuestsInitialized(referenceDate: Date = new Da
       throw new Error("Tidak ada template quest aktif yang tersedia di bank soal");
     }
 
-    // Pilih 2 atau 3 quest berdasarkan rotasi weekNumber
-    const countToPick = Math.min(3, activeTemplates.length);
-    const selectedQuests: IActiveQuestItem[] = [];
-
-    // Gunakan rotasi offset berbasis weekNumber
-    const offset = (weekInfo.weekNumber * 2) % activeTemplates.length;
-    for (let i = 0; i < countToPick; i++) {
-      const template = activeTemplates[(offset + i) % activeTemplates.length];
-      selectedQuests.push({
-        templateId: template._id,
-        title: template.title,
-        description: template.description,
-        type: template.type,
-        target: template.target,
-        minCargoMass: template.minCargoMass,
-        minDistanceKm: template.minDistanceKm,
-        reward: template.reward,
-        difficulty: template.difficulty,
-      });
-    }
+    // Pilih quest mingguan dengan variasi tipe unik (Anti-Duplikasi Tipe)
+    const pickedTemplates = pickDiverseWeeklyQuests(activeTemplates, weekInfo.weekNumber, 3);
+    const selectedQuests: IActiveQuestItem[] = pickedTemplates.map((template) => ({
+      templateId: template._id,
+      title: template.title,
+      description: template.description,
+      type: template.type,
+      target: template.target,
+      minCargoMass: template.minCargoMass,
+      minDistanceKm: template.minDistanceKm,
+      reward: template.reward,
+      difficulty: template.difficulty,
+    }));
 
     activeWeekly = await NplusWeeklyActiveQuest.create({
       weekKey: weekInfo.weekKey,
@@ -329,6 +424,7 @@ export async function getUserWeeklyQuestProgress(
           damage: 1,
           isHardcore: 1,
           hardcoreRating: 1,
+          gameMode: 1,
           completedAt: 1,
         },
       }
@@ -357,6 +453,12 @@ export async function getUserWeeklyQuestProgress(
     switch (q.type) {
       case "TOTAL_JOBS":
         currentValue = userJobs.length;
+        break;
+      case "TRUCKERSMP_JOB":
+        currentValue = userJobs.filter((j) => {
+          const mode = String(j.gameMode || "").toLowerCase();
+          return mode === "truckersmp" || mode.includes("truckersmp");
+        }).length;
         break;
       case "HEAVY_CARGO":
         const minMass = q.minCargoMass || 20;

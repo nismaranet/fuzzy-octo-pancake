@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Loader2,
   Calendar,
+  Globe,
 } from "lucide-react";
 import { claimWeeklyQuestAction, getWeeklyQuestsAction } from "@/app/actions/nplusQuestActions";
 import { showAlert } from "@/lib/dialog";
@@ -122,6 +123,8 @@ export default function NplusWeeklyQuestsClient({ initialData }: NplusWeeklyQues
         return <ShieldCheck className="w-5 h-5 text-emerald-400" />;
       case "HARDCORE_JOB":
         return <Flame className="w-5 h-5 text-rose-400" />;
+      case "TRUCKERSMP_JOB":
+        return <Globe className="w-5 h-5 text-purple-400" />;
       default:
         return <Truck className="w-5 h-5 text-blue-400" />;
     }
@@ -153,6 +156,8 @@ export default function NplusWeeklyQuestsClient({ initialData }: NplusWeeklyQues
         return `${val} / ${target} Job (0% Damage)`;
       case "HARDCORE_JOB":
         return `${val} / ${target} Job Hardcore`;
+      case "TRUCKERSMP_JOB":
+        return `${val} / ${target} Job (TruckersMP)`;
       default:
         return `${val} / ${target} Job`;
     }

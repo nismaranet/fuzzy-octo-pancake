@@ -10,6 +10,7 @@ import {
   getWIBWeekInfo,
   ensureWeeklyQuestsInitialized,
   ensureStarterTemplates,
+  pickDiverseWeeklyQuests,
 } from "@/lib/nplusWeeklyQuest";
 
 async function verifyManagerAuth() {
@@ -187,15 +188,8 @@ export async function getActiveAndNextWeekPreviewAction() {
     // Ambil templates aktif
     const activeTemplates = await NplusQuestTemplate.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).lean();
 
-    // Simulasi pemilihan minggu depan
-    const countToPick = Math.min(3, activeTemplates.length);
-    const nextWeekQuests: any[] = [];
-    if (activeTemplates.length > 0) {
-      const offset = (nextWeekInfo.weekNumber * 2) % activeTemplates.length;
-      for (let i = 0; i < countToPick; i++) {
-        nextWeekQuests.push(activeTemplates[(offset + i) % activeTemplates.length]);
-      }
-    }
+    // Simulasi pemilihan minggu depan dengan algoritma variasi tipe unik
+    const nextWeekQuests = pickDiverseWeeklyQuests(activeTemplates, nextWeekInfo.weekNumber, 3);
 
     return {
       success: true,
