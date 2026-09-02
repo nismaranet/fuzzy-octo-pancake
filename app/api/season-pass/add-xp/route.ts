@@ -38,7 +38,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data: result,
-      message: `Berhasil menambahkan ${result.xpAdded} Seasonal XP ke driver ${discordId}.`,
+      message: result.capped
+        ? result.message
+        : `Berhasil menambahkan ${result.xpAdded?.toLocaleString("id-ID")} Seasonal XP ke driver ${discordId}.`,
     });
   } catch (error: any) {
     console.error("Add Season XP API Error:", error);

@@ -95,9 +95,25 @@ export default function SeasonPassClient({
     shippingNotes: "",
   });
 
-  const userLevel = progress?.currentLevel || 1;
   const userXp = progress?.currentXp || 0;
   const isPremium = progress?.isPremium || false;
+
+  // Level tertinggi yang telah tuntas & terbuka berdasarkan akumulasi XP
+  const unlockedLevel = useMemo(() => {
+    if (!season?.levels) return 0;
+    let unlocked = 0;
+    for (const lvl of season.levels) {
+      if (userXp >= lvl.cumulativeXp) {
+        unlocked = lvl.level;
+      } else {
+        break;
+      }
+    }
+    return unlocked;
+  }, [season, userXp]);
+
+  // Level yang sedang ditempuh (1-30)
+  const userLevel = Math.min(30, unlockedLevel + (unlockedLevel < 30 ? 1 : 0));
 
   const handleSubmitMerchClaim = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,18 +170,18 @@ export default function SeasonPassClient({
   const prevLevelCumulative = userLevel > 1 ? season?.levels?.find((l: SeasonLevel) => l.level === userLevel - 1)?.cumulativeXp || 0 : 0;
   const xpInCurrentLevel = Math.max(0, userXp - prevLevelCumulative);
   const xpNeededForCurrentLevel = nextLevelConfig?.xpRequired || 1;
-  const levelProgressPercent = userLevel >= 30 ? 100 : Math.min(100, Math.round((xpInCurrentLevel / xpNeededForCurrentLevel) * 100));
+  const levelProgressPercent = unlockedLevel >= 30 ? 100 : Math.min(100, Math.round((xpInCurrentLevel / xpNeededForCurrentLevel) * 100));
 
-  // Count available unclaimed rewards
+  // Count available unclaimed rewards up to unlockedLevel
   const unclaimedCount = useMemo(() => {
-    if (!season?.levels || !progress) return 0;
+    if (!season?.levels || !progress || unlockedLevel === 0) return 0;
     let count = 0;
-    for (let lvl = 1; lvl <= userLevel; lvl++) {
+    for (let lvl = 1; lvl <= unlockedLevel; lvl++) {
       if (!progress.claimedFreeLevels?.includes(lvl)) count++;
       if (isPremium && !progress.claimedPremiumLevels?.includes(lvl)) count++;
     }
     return count;
-  }, [season, progress, userLevel, isPremium]);
+  }, [season, progress, unlockedLevel, isPremium]);
 
   const isGracePeriod = !isSeasonActive && unclaimedCount > 0;
   const isOffSeason = !isSeasonActive && unclaimedCount === 0;
@@ -600,8 +616,8 @@ export default function SeasonPassClient({
       {/* 3. The 30-Level Battle Pass Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {displayedLevels.map((lvlConfig: SeasonLevel) => {
-          const isUnlocked = userLevel >= lvlConfig.level;
-          const isCurrentLevel = userLevel === lvlConfig.level;
+          const isUnlocked = userXp >= lvlConfig.cumulativeXp;
+          const isCurrentLevel = userLevel === lvlConfig.level && !isUnlocked;
           const isClaimedFree = progress?.claimedFreeLevels?.includes(lvlConfig.level);
           const isClaimedPremium = progress?.claimedPremiumLevels?.includes(lvlConfig.level);
           const isMilestone = lvlConfig.level === 10 || lvlConfig.level === 20 || lvlConfig.level === 30;
@@ -990,7 +1006,7 @@ export default function SeasonPassClient({
                     <span className="text-emerald-400 text-xs font-bold flex items-center gap-1">
                       <CheckCircle2 size={12} /> Sudah Diklaim
                     </span>
-                  ) : userLevel >= selectedLevelModal.level ? (
+                  ) : userXp >= selectedLevelModal.cumulativeXp ? (
                     <span className="text-amber-400 text-xs font-bold">Siap Diklaim</span>
                   ) : (
                     <span className="text-muted-foreground text-xs font-semibold">Terkunci</span>
@@ -1011,7 +1027,7 @@ export default function SeasonPassClient({
                   ))}
                 </div>
 
-                {userLevel >= selectedLevelModal.level && !progress?.claimedFreeLevels?.includes(selectedLevelModal.level) && (
+                {userXp >= selectedLevelModal.cumulativeXp && !progress?.claimedFreeLevels?.includes(selectedLevelModal.level) && (
                   <button
                     onClick={() => {
                       handleClaim(selectedLevelModal.level, "free");
@@ -1042,7 +1058,7 @@ export default function SeasonPassClient({
                     <span className="text-muted-foreground text-xs font-semibold flex items-center gap-1">
                       <Lock size={12} /> Terkunci
                     </span>
-                  ) : userLevel >= selectedLevelModal.level ? (
+                  ) : userXp >= selectedLevelModal.cumulativeXp ? (
                     <span className="text-amber-400 text-xs font-bold">Siap Diklaim</span>
                   ) : (
                     <span className="text-muted-foreground text-xs font-semibold">Terkunci</span>

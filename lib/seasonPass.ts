@@ -699,21 +699,29 @@ export function getSeasonWeekInfo(season: any, isPremium: boolean = false) {
 }
 
 /**
- * Menghitung level yang dicapai berdasarkan total akumulasi XP
+ * Menghitung level tertinggi yang telah berhasil diselesaikan & dibuka hadiahnya berdasarkan cumulative XP
  */
-export function calculateLevelFromXp(currentXp: number, levels: SeasonLevelConfig[]): number {
-  if (!levels || levels.length === 0) return 1;
+export function calculateUnlockedLevel(currentXp: number, levels: SeasonLevelConfig[]): number {
+  if (!levels || levels.length === 0) return 0;
 
-  let achievedLevel = 1;
+  let unlocked = 0;
   for (const lvl of levels) {
     if (currentXp >= lvl.cumulativeXp) {
-      achievedLevel = Math.min(30, lvl.level + (lvl.level < 30 ? 1 : 0));
+      unlocked = lvl.level;
     } else {
       break;
     }
   }
 
-  return Math.min(30, Math.max(1, achievedLevel));
+  return unlocked;
+}
+
+/**
+ * Menghitung level yang sedang ditempuh (1-30) berdasarkan total akumulasi XP
+ */
+export function calculateLevelFromXp(currentXp: number, levels: SeasonLevelConfig[]): number {
+  const unlocked = calculateUnlockedLevel(currentXp, levels);
+  return Math.min(30, unlocked + (unlocked < 30 ? 1 : 0));
 }
 
 /**
@@ -737,10 +745,29 @@ export async function addSeasonXp(
   // Jika Final Rush, dapat Double Pass XP (2x)
   let xpToAdd = weekInfo.isFinalRush ? baseXpAmount * 2 : baseXpAmount;
 
-  // Cek batas kuota akumulatif server
-  const maxPossibleXp = weekInfo.serverCumulativeCapXp;
-  if (progress.currentXp + xpToAdd > maxPossibleXp) {
-    xpToAdd = Math.max(0, maxPossibleXp - progress.currentXp);
+  // 1. Dapatkan log perolehan XP untuk minggu berjalan
+  const weekLog = progress.weeklyXpLogs.find(
+    (w: any) => w.weekNumber === weekInfo.currentWeekNumber
+  );
+  const currentWeekGained = weekLog ? Number(weekLog.xpGained || 0) : 0;
+
+  // 2. Proteksi Ganda Batas XP Mingguan:
+  // - Batas Per Minggu Berjalan (20.000 Free / 40.000 Premium)
+  // - Batas Akumulatif Server Sampai Minggu Tersebut
+  if (!weekInfo.isFinalRush) {
+    const weeklyRemaining = Math.max(0, weekInfo.userWeeklyCap - currentWeekGained);
+    const cumulativeRemaining = Math.max(0, weekInfo.serverCumulativeCapXp - progress.currentXp);
+    const maxAllowed = Math.min(weeklyRemaining, cumulativeRemaining);
+
+    if (xpToAdd > maxAllowed) {
+      xpToAdd = Math.max(0, maxAllowed);
+    }
+  } else {
+    // Mode Final Rush: Bebas hingga batas maksimum level 30 (totalXp)
+    const maxPossibleXp = season.totalXp || 225000;
+    if (progress.currentXp + xpToAdd > maxPossibleXp) {
+      xpToAdd = Math.max(0, maxPossibleXp - progress.currentXp);
+    }
   }
 
   if (xpToAdd <= 0) {
@@ -750,7 +777,7 @@ export async function addSeasonXp(
       currentXp: progress.currentXp,
       currentLevel: progress.currentLevel,
       capped: true,
-      message: "XP mingguan sudah mencapai batas maksimal akumulatif",
+      message: `Batas perolehan Seasonal XP mingguan telah tercapai (${weekInfo.userWeeklyCap.toLocaleString("id-ID")} XP/minggu).`,
     };
   }
 
@@ -758,7 +785,6 @@ export async function addSeasonXp(
   progress.currentLevel = calculateLevelFromXp(progress.currentXp, season.levels);
 
   // Update weekly logs
-  const weekLog = progress.weeklyXpLogs.find((w: any) => w.weekNumber === weekInfo.currentWeekNumber);
   if (weekLog) {
     weekLog.xpGained += xpToAdd;
     weekLog.lastUpdated = new Date();
@@ -800,13 +826,13 @@ export async function claimLevelReward(
 
   const updateField = track === "free" ? "claimedFreeLevels" : "claimedPremiumLevels";
 
-  // ATOMIC GUARD: Hanya update & klaim jika level terbuka, track valid, dan BELUM PERNAH diklaim
+  // ATOMIC GUARD: Hanya update & klaim jika total cumulativeXp sudah tercapai, track valid, dan BELUM PERNAH diklaim
   // Mencegah eksploitasi spam klik / race condition secara 100% atomik di level MongoDB engine
   const progress = await UserSeasonProgress.findOneAndUpdate(
     {
       discordId: String(discordId),
       seasonNumber: Number(seasonNumber),
-      currentLevel: { $gte: Number(levelNum) },
+      currentXp: { $gte: Number(levelConfig.cumulativeXp) },
       ...(track === "premium" ? { isPremium: true } : {}),
       [updateField]: { $ne: Number(levelNum) },
     },
@@ -824,10 +850,10 @@ export async function claimLevelReward(
     });
 
     if (!existing) return { success: false, error: "Progress user tidak ditemukan" };
-    if (existing.currentLevel < Number(levelNum)) {
+    if (existing.currentXp < Number(levelConfig.cumulativeXp)) {
       return {
         success: false,
-        error: `Level ${levelNum} belum terbuka (Level Anda: ${existing.currentLevel})`,
+        error: `Level ${levelNum} belum terbuka (Memerlukan ${levelConfig.cumulativeXp.toLocaleString("id-ID")} XP, akumulasi XP Anda saat ini: ${existing.currentXp.toLocaleString("id-ID")} XP)`,
       };
     }
     if (track === "premium" && !existing.isPremium) {
@@ -1036,8 +1062,9 @@ export async function claimAllAvailableRewards(
   if (!progress) return { success: false, error: "Progress user tidak ditemukan" };
 
   const claimedResults: string[] = [];
+  const unlockedLevel = calculateUnlockedLevel(progress.currentXp, season.levels);
 
-  for (let lvl = 1; lvl <= progress.currentLevel; lvl++) {
+  for (let lvl = 1; lvl <= unlockedLevel; lvl++) {
     // Claim Free Track jika belum
     if (!progress.claimedFreeLevels.includes(lvl)) {
       const freeRes = await claimLevelReward(discordId, seasonNumber, lvl, "free");
