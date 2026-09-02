@@ -22,6 +22,7 @@ import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import NismaraPlusClient from "./NismaraPlusClient";
 import NismaraPlusClaimClient from "./NismaraPlusClaimClient";
 import NplusWeeklyQuestsClient from "./NplusWeeklyQuestsClient";
+import NismaraPlusExtendModal from "./NismaraPlusExtendModal";
 import NismaraPlusOrder from "@/lib/models/NismaraPlusOrder";
 import dbConnect from "@/lib/mongoose";
 import { getUserWeeklyQuestProgress } from "@/lib/nplusWeeklyQuest";
@@ -242,35 +243,49 @@ export default async function NismaraPlusPage() {
                     </p>
                   </div>
 
-                  <div className="bg-muted/40 p-4 rounded-xl border border-amber-400/30 bg-amber-400/5">
-                    <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
-                      Sisa Waktu
-                    </p>
-                    <h3 className="text-3xl font-black text-foreground mt-1 tracking-tight">
-                      {Math.ceil(
-                        (new Date(nismaraplus.expiredAt).getTime() -
-                          now.getTime()) /
-                          (1000 * 60 * 60 * 24),
-                      )}
-                      <span className="text-sm font-bold text-muted-foreground ml-1">
-                        Hari Lagi
-                      </span>
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Berlaku hingga{" "}
-                      {new Date(nismaraplus.expiredAt).toLocaleDateString(
-                        "id-ID",
-                        { day: "numeric", month: "short", year: "numeric" },
-                      )}
-                    </p>
+                    <div className="bg-muted/40 p-4 rounded-xl border border-amber-400/30 bg-amber-400/5">
+                      <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
+                        Sisa Waktu
+                      </p>
+                      <h3 className="text-3xl font-black text-foreground mt-1 tracking-tight">
+                        {Math.ceil(
+                          (new Date(nismaraplus.expiredAt).getTime() -
+                            now.getTime()) /
+                            (1000 * 60 * 60 * 24),
+                        )}
+                        <span className="text-sm font-bold text-muted-foreground ml-1">
+                          Hari Lagi
+                        </span>
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Berlaku hingga{" "}
+                        {new Date(nismaraplus.expiredAt).toLocaleDateString(
+                          "id-ID",
+                          { day: "numeric", month: "short", year: "numeric" },
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Perpanjangan Langganan (Extend) Trigger Button & Modal */}
+                    <div className="pt-2">
+                      <NismaraPlusExtendModal
+                        currentExpiredAt={
+                          nismaraplus.expiredAt
+                            ? new Date(nismaraplus.expiredAt).toISOString()
+                            : null
+                        }
+                        guildId={process.env.DISCORD_GUILD_ID || "863959415702028318"}
+                        initialPendingOrder={
+                          pendingOrder ? JSON.parse(JSON.stringify(pendingOrder)) : null
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      ) : (
-        /* KONDISI 2: JIKA USER ADALAH USER BIASA (TAMPILKAN DAFTAR BENEFIT DINAMIS & TERMASUK SYARAT KETENTUAN) */
+        ) : (/* KONDISI 2: JIKA USER ADALAH USER BIASA (TAMPILKAN DAFTAR BENEFIT DINAMIS & TERMASUK SYARAT KETENTUAN) */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* SISI KIRI: DAFTAR BENEFIT PREMIUM (EASY TO EXTEND) */}
           <div className="lg:col-span-7 space-y-6">
