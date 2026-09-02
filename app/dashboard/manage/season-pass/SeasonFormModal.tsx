@@ -21,6 +21,7 @@ export default function SeasonFormModal({
   initialData,
   latestSeasonNumber = 1,
 }: SeasonFormModalProps) {
+  const [templates, setTemplates] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     seasonNumber: latestSeasonNumber + 1,
     title: `Season ${latestSeasonNumber + 1}: Road Conqueror`,
@@ -31,6 +32,7 @@ export default function SeasonFormModal({
     totalXp: 225000,
     weeklyCapXp: 20000,
     finalRushWeeks: 2,
+    templateId: "",
     grandPrizeTitle: "Mod Livery Eksklusif / Merch Mug Season 2",
     grandPrizeDesc: "Hadiah puncak edisi terbatas resmi Nismara Transport",
     grandPrizeType: "MOD_LIVERY",
@@ -40,6 +42,23 @@ export default function SeasonFormModal({
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/manage/season-pass/templates")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.templates) {
+            setTemplates(data.templates);
+            if (mode === "CREATE" && !formData.templateId) {
+              const def = data.templates.find((t: any) => t.isDefault) || data.templates[0];
+              if (def) setFormData((prev) => ({ ...prev, templateId: def._id }));
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, mode]);
 
   useEffect(() => {
     if (mode === "EDIT" && initialData) {
@@ -53,6 +72,7 @@ export default function SeasonFormModal({
         totalXp: initialData.totalXp || 225000,
         weeklyCapXp: initialData.weeklyCapXp || 20000,
         finalRushWeeks: initialData.finalRushWeeks || 2,
+        templateId: "",
         grandPrizeTitle: initialData.grandPrize?.title || "",
         grandPrizeDesc: initialData.grandPrize?.description || "",
         grandPrizeType: initialData.grandPrize?.type || "MOD_LIVERY",
@@ -246,6 +266,34 @@ export default function SeasonFormModal({
                 className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-amber-500 focus:outline-none text-sm font-mono font-bold"
               />
             </div>
+
+            {/* Template Selection for CREATE mode */}
+            {mode === "CREATE" && (
+              <div className="md:col-span-2 pt-2 border-t border-border/40 space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Layers size={14} /> Pilih Template Hadiah (Level 1–30)
+                  </span>
+                  <span className="text-[10px] font-bold text-muted-foreground lowercase">
+                    {templates.length} template tersedia
+                  </span>
+                </label>
+                <select
+                  value={formData.templateId || ""}
+                  onChange={(e) => setFormData({ ...formData, templateId: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-amber-500 focus:outline-none text-xs font-bold text-foreground"
+                >
+                  {templates.map((tpl) => (
+                    <option key={tpl._id} value={tpl._id}>
+                      {tpl.isDefault ? "⭐ [DEFAULT] " : ""}{tpl.name} ({tpl.levels?.length || 30} Level • {tpl.totalXp?.toLocaleString("id-ID")} XP)
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-muted-foreground">
+                  Hadiah Free Track & Premium Track untuk level 1 s/d 30 akan otomatis diterapkan sesuai konfigurasi template yang Anda pilih.
+                </p>
+              </div>
+            )}
 
             {/* Grand Prize Configuration */}
             <div className="md:col-span-2 pt-2 border-t border-border/40 space-y-3">

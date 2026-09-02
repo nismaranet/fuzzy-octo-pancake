@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/mongoose";
 import SeasonPass from "@/lib/models/SeasonPass";
+import SeasonPassTemplate from "@/lib/models/SeasonPassTemplate";
 import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import User from "@/lib/models/User";
 import { SEASON_1_LEVELS, ensureSeasonInitialized } from "@/lib/seasonPass";
@@ -106,7 +107,8 @@ export async function POST(request: Request) {
         grandPrizeType = "MOD_LIVERY",
         premiumPriceIdr = 35000,
         premiumPriceNc = 75000,
-        copyRewardsFromSeason = 1,
+        templateId,
+        copyRewardsFromSeason,
       } = body;
 
       const existing = await SeasonPass.findOne({ seasonNumber: Number(seasonNumber) });
@@ -117,12 +119,22 @@ export async function POST(request: Request) {
         );
       }
 
-      // Ambil template level dari season sebelumnya atau default
+      // Ambil template level dari template terpilih, season sebelumnya, atau default
       let levelsTemplate = SEASON_1_LEVELS;
-      if (copyRewardsFromSeason) {
+      if (templateId) {
+        const chosenTemplate = await SeasonPassTemplate.findById(templateId);
+        if (chosenTemplate?.levels?.length) {
+          levelsTemplate = chosenTemplate.levels;
+        }
+      } else if (copyRewardsFromSeason) {
         const sourceSeason = await SeasonPass.findOne({ seasonNumber: Number(copyRewardsFromSeason) });
         if (sourceSeason?.levels?.length) {
           levelsTemplate = sourceSeason.levels;
+        }
+      } else {
+        const defaultTpl = await SeasonPassTemplate.findOne({ isDefault: true });
+        if (defaultTpl?.levels?.length) {
+          levelsTemplate = defaultTpl.levels;
         }
       }
 
