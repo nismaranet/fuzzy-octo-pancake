@@ -9,6 +9,7 @@ export interface GiveawayRewardItem {
   voucherDiscountType?: "percentage" | "fixed";
   voucherDiscountValue?: number;
   voucherDurationHours?: number;
+  voucherExpireDays?: number;
   imageUrl?: string;
 }
 
@@ -84,6 +85,7 @@ const rewardItemSchema = new mongoose.Schema(
     voucherDiscountType: { type: String, default: null },
     voucherDiscountValue: { type: Number, default: 0 },
     voucherDurationHours: { type: Number, default: 0 },
+    voucherExpireDays: { type: Number, default: 30 },
     imageUrl: { type: String, default: null },
   },
   { _id: false }

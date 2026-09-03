@@ -140,10 +140,24 @@ export default function GiveawayPublicDetailClient({
   const isOngoing = giveaway.status === "ongoing";
   const isCompleted = giveaway.status === "completed";
   const startStr = giveaway.startDate
-    ? new Date(giveaway.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+    ? new Date(giveaway.startDate).toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }) + " WIB"
     : "-";
   const endStr = giveaway.endDate
-    ? new Date(giveaway.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+    ? new Date(giveaway.endDate).toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }) + " WIB"
     : "-";
 
   return (

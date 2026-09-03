@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { compressImageToWebP } from "@/lib/imageUtils";
 import {
   Gift,
   ArrowLeft,
@@ -18,6 +20,9 @@ import {
   CheckCircle2,
   Sparkles,
   HelpCircle,
+  UploadCloud,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import { showAlert } from "@/lib/dialog";
 
@@ -26,24 +31,106 @@ interface GiveawayFormClientProps {
   isEdit?: boolean;
 }
 
+// Helper konversi tanggal ISO/Date ke format input HTML5 datetime-local ("YYYY-MM-DDTHH:mm") dalam WIB (Asia/Jakarta, GMT+7)
+function toWIBDateTimeLocal(dateInput?: string | Date | null): string {
+  if (!dateInput) return "";
+  const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return "";
+
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(d);
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  let hour = parts.find((p) => p.type === "hour")?.value || "00";
+  if (hour === "24") hour = "00";
+  const minute = parts.find((p) => p.type === "minute")?.value || "00";
+
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+// Helper konversi nilai input datetime-local ke ISO UTC dengan offset eksplisit WIB (+07:00)
+function parseWIBToISO(dateTimeLocalStr?: string): string {
+  if (!dateTimeLocalStr) return "";
+  if (dateTimeLocalStr.includes("+") || dateTimeLocalStr.endsWith("Z")) {
+    return new Date(dateTimeLocalStr).toISOString();
+  }
+  const withOffset = dateTimeLocalStr.length === 16 ? `${dateTimeLocalStr}:00+07:00` : `${dateTimeLocalStr}+07:00`;
+  return new Date(withOffset).toISOString();
+}
+
 export default function GiveawayFormClient({ initialData, isEdit }: GiveawayFormClientProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Form State
   const [title, setTitle] = useState(initialData?.title || "");
   const [slug, setSlug] = useState(initialData?.slug || "");
   const [description, setDescription] = useState(initialData?.description || "");
   const [bannerUrl, setBannerUrl] = useState(initialData?.bannerUrl || "");
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>(initialData?.bannerUrl || "");
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [status, setStatus] = useState(initialData?.status || "scheduled");
   const [startDate, setStartDate] = useState(
-    initialData?.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : ""
+    initialData?.startDate
+      ? toWIBDateTimeLocal(initialData.startDate)
+      : toWIBDateTimeLocal(new Date())
   );
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showAlert("Format tidak didukung! Harap unggah file gambar (PNG, JPG, WEBP, atau GIF).");
+      return;
+    }
+
+    const isNismaraPlus = (session?.user as any)?.nismaraplus?.status === true;
+    if (!isNismaraPlus && file.type === "image/gif") {
+      showAlert("Format GIF hanya dapat diunggah oleh pengemudi dengan keanggotaan Nismara+.");
+      return;
+    }
+
+    const maxSizeMB = isNismaraPlus ? 5 : 3;
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      showAlert(`Ukuran gambar melebihi batas maksimal (${maxSizeMB}MB).`);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+    setBannerFile(file);
+  };
+
+  const handleRemoveBanner = () => {
+    setBannerFile(null);
+    setPreviewUrl("");
+    setBannerUrl("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
   const [endDate, setEndDate] = useState(
-    initialData?.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : ""
+    initialData?.endDate
+      ? toWIBDateTimeLocal(initialData.endDate)
+      : toWIBDateTimeLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
   );
   const [drawDate, setDrawDate] = useState(
-    initialData?.drawDate ? new Date(initialData.drawDate).toISOString().slice(0, 16) : ""
+    initialData?.drawDate ? toWIBDateTimeLocal(initialData.drawDate) : ""
   );
 
   // Aturan & Toggle
@@ -199,15 +286,62 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
 
     setLoading(true);
     try {
+      let finalBannerUrl = bannerUrl.trim();
+
+      // Jika ada file gambar baru yang dipilih, kompres ke WebP dan unggah ke Cloudflare R2
+      if (bannerFile) {
+        setIsUploadingImage(true);
+        try {
+          const isNismaraPlus = (session?.user as any)?.nismaraplus?.status === true;
+          const compressedFile = await compressImageToWebP(bannerFile, isNismaraPlus ? 5 : 3, 1920);
+
+          const uploadInitRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: compressedFile.name,
+              fileType: compressedFile.type,
+              fileSize: compressedFile.size,
+              folder: "giveaways",
+            }),
+          });
+
+          const uploadInitData = await uploadInitRes.json();
+          if (!uploadInitRes.ok || !uploadInitData.signedUrl) {
+            throw new Error(uploadInitData.error || "Gagal mendapatkan izin upload ke Cloudflare R2.");
+          }
+
+          const uploadRes = await fetch(uploadInitData.signedUrl, {
+            method: "PUT",
+            headers: { "Content-Type": compressedFile.type },
+            body: compressedFile,
+          });
+
+          if (!uploadRes.ok) {
+            throw new Error("Gagal mengunggah file gambar ke Cloudflare R2.");
+          }
+
+          finalBannerUrl = uploadInitData.publicUrl;
+        } catch (uploadErr: any) {
+          console.error("[Giveaway Form] R2 Upload Error:", uploadErr);
+          await showAlert(uploadErr.message || "Gagal mengunggah gambar banner.");
+          setLoading(false);
+          setIsUploadingImage(false);
+          return;
+        } finally {
+          setIsUploadingImage(false);
+        }
+      }
+
       const payload = {
         title,
         slug: slug.trim() || undefined,
         description,
-        bannerUrl: bannerUrl.trim() || undefined,
+        bannerUrl: finalBannerUrl || undefined,
         status,
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
-        drawDate: drawDate ? new Date(drawDate).toISOString() : new Date(endDate).toISOString(),
+        startDate: parseWIBToISO(startDate),
+        endDate: parseWIBToISO(endDate),
+        drawDate: parseWIBToISO(drawDate || endDate),
         allowMultipleWins,
         enableQuests,
         quests,
@@ -272,7 +406,12 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
           disabled={loading}
           className="px-6 py-3 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-primary/25 disabled:opacity-50"
         >
-          <Save size={16} /> {loading ? "Menyimpan..." : "Simpan Giveaway"}
+          <Save size={16} />{" "}
+          {loading
+            ? isUploadingImage
+              ? "Mengunggah Gambar WebP..."
+              : "Menyimpan..."
+            : "Simpan Giveaway"}
         </button>
       </div>
 
@@ -295,15 +434,114 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-foreground">URL Banner Poster (Opsional)</label>
+          <div className="md:col-span-2 space-y-2">
+            <label className="text-xs font-bold text-foreground flex items-center justify-between">
+              <span>Banner Poster Giveaway (Upload Cloudflare R2 • WebP)</span>
+              {previewUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveBanner}
+                  className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
+                >
+                  <X size={12} /> Hapus Banner
+                </button>
+              )}
+            </label>
+
             <input
-              type="url"
-              value={bannerUrl}
-              onChange={(e) => setBannerUrl(e.target.value)}
-              placeholder="https://images.nismara.web.id/banner.webp"
-              className="w-full px-4 py-3 rounded-2xl bg-black/40 border border-border/80 focus:border-primary text-foreground text-sm font-semibold outline-none transition-all"
+              type="file"
+              ref={fileInputRef}
+              onChange={handleBannerFileChange}
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+              className="hidden"
             />
+
+            {previewUrl ? (
+              <div className="relative rounded-2xl overflow-hidden border border-border/80 bg-black/40 group max-h-64 flex items-center justify-center">
+                <img
+                  src={previewUrl}
+                  alt="Preview Banner"
+                  className="w-full h-56 sm:h-64 object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 transition-all"
+                  >
+                    <UploadCloud size={14} /> Ganti Gambar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveBanner}
+                    className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 transition-all"
+                  >
+                    <Trash2 size={14} /> Hapus
+                  </button>
+                </div>
+                {bannerFile && (
+                  <span className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
+                    ✓ Siap Dikompresi WebP & Diunggah ke R2 saat Disimpan
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="p-6 sm:p-8 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/60 bg-black/30 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-2 group"
+              >
+                <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                  <UploadCloud size={28} />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-foreground">
+                    Klik atau Seret Gambar Banner ke Sini
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Format: PNG, JPG, WEBP (Maks 3MB) / GIF (Maks 5MB khusus Nismara+)
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold text-primary uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+                  ⚡ Otomatis Dikompresi ke Format WebP R2
+                </span>
+              </div>
+            )}
+
+            {/* Opsi URL Gambar Manual */}
+            <div className="pt-1">
+              {!showUrlInput ? (
+                <button
+                  type="button"
+                  onClick={() => setShowUrlInput(true)}
+                  className="text-[11px] text-muted-foreground hover:text-primary transition-colors underline"
+                >
+                  Atau masukkan tautan URL gambar eksternal
+                </button>
+              ) : (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[11px] font-bold text-muted-foreground">URL Gambar Manual:</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={bannerUrl}
+                      onChange={(e) => {
+                        setBannerUrl(e.target.value);
+                        if (!bannerFile) setPreviewUrl(e.target.value);
+                      }}
+                      placeholder="https://images.nismara.web.id/giveaways/banner.webp"
+                      className="flex-1 px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowUrlInput(false)}
+                      className="px-3 py-2 rounded-xl bg-card border border-border text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -645,65 +883,224 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
                 {tier.rewards?.map((r: any, rIdx: number) => (
                   <div
                     key={rIdx}
-                    className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-card/60 border border-border/50 items-center"
+                    className="p-3.5 rounded-xl bg-card/60 border border-border/60 space-y-3"
                   >
-                    <div>
-                      <select
-                        value={r.type}
-                        onChange={(e) => handleUpdateReward(tIdx, rIdx, "type", e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-black/40 border border-border text-foreground text-xs font-bold outline-none"
-                      >
-                        <option value="NC">Nismara Coin (NC)</option>
-                        <option value="FUEL">Fuel Garasi (Liter)</option>
-                        <option value="SAFEBOX_TICKET">Tiket Safebox Penalti</option>
-                        <option value="VOUCHER">Kupon Voucher Diskon</option>
-                        <option value="NPLUS_TRIAL">Trial VIP Nismara+ (Hari)</option>
-                        <option value="CUSTOM">Hadiah Custom / Livery</option>
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <input
-                        type="text"
-                        value={r.title}
-                        onChange={(e) => handleUpdateReward(tIdx, rIdx, "title", e.target.value)}
-                        placeholder="Keterangan Hadiah (misal: 25.000 NC)"
-                        className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-border text-foreground text-xs outline-none"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {["NC", "FUEL", "SAFEBOX_TICKET", "NPLUS_TRIAL"].includes(r.type) ? (
-                        <input
-                          type="number"
-                          value={r.amount || 0}
-                          onChange={(e) => handleUpdateReward(tIdx, rIdx, "amount", Number(e.target.value))}
-                          placeholder="Jumlah"
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-black/40 border border-border text-foreground text-xs font-mono outline-none"
-                        />
-                      ) : r.type === "VOUCHER" ? (
+                    {/* Baris 1: Pilihan Tipe, Judul Hadiah, Input Jumlah / Aksi Hapus */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                      <div className="w-full sm:w-48 shrink-0">
                         <select
-                          value={r.voucherCategory || "FLEET_MAINTENANCE"}
-                          onChange={(e) => handleUpdateReward(tIdx, rIdx, "voucherCategory", e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg bg-black/40 border border-border text-foreground text-[11px] outline-none"
+                          value={r.type}
+                          onChange={(e) => {
+                            const newType = e.target.value;
+                            const updated = [...prizes];
+                            const item = updated[tIdx].rewards[rIdx];
+                            item.type = newType;
+                            if (newType === "VOUCHER") {
+                              item.voucherCategory = item.voucherCategory || "NC_BOOSTER";
+                              item.voucherDiscountValue = item.voucherDiscountValue ?? 50;
+                              item.voucherDurationHours = item.voucherDurationHours ?? 24;
+                              item.voucherExpireDays = item.voucherExpireDays ?? 30;
+                              item.voucherDiscountType = "percentage";
+                              item.title = "Voucher NC Booster +50% (24 Jam)";
+                            } else if (newType === "NC") {
+                              item.amount = item.amount || 25000;
+                              item.title = "25.000 NC";
+                            } else if (newType === "FUEL") {
+                              item.amount = item.amount || 2000;
+                              item.title = "2.000 L Fuel Garasi";
+                            } else if (newType === "SAFEBOX_TICKET") {
+                              item.amount = item.amount || 1;
+                              item.title = "1x Tiket Penebusan Penalti";
+                            } else if (newType === "NPLUS_TRIAL") {
+                              item.amount = item.amount || 7;
+                              item.title = "7 Hari VIP Nismara+";
+                            }
+                            setPrizes(updated);
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-black/40 border border-border text-foreground text-xs font-bold outline-none"
                         >
-                          <option value="FLEET_MAINTENANCE">Bebas Servis</option>
-                          <option value="NC_BOOSTER">NC Booster</option>
-                          <option value="FLEET_BUY">Diskon Fleet</option>
-                          <option value="MARKET_MOD">Diskon Mod</option>
+                          <option value="NC">Nismara Coin (NC)</option>
+                          <option value="FUEL">Fuel Garasi (Liter)</option>
+                          <option value="SAFEBOX_TICKET">Tiket Safebox Penalti</option>
+                          <option value="VOUCHER">Kupon Voucher Diskon</option>
+                          <option value="NPLUS_TRIAL">Trial VIP Nismara+ (Hari)</option>
+                          <option value="CUSTOM">Hadiah Custom / Livery</option>
                         </select>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic w-full text-center">Custom</span>
+                      </div>
+
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={r.title}
+                          onChange={(e) => handleUpdateReward(tIdx, rIdx, "title", e.target.value)}
+                          placeholder="Judul / Keterangan Hadiah"
+                          className="w-full px-3 py-2 rounded-lg bg-black/40 border border-border text-foreground text-xs font-semibold outline-none"
+                        />
+                      </div>
+
+                      {["NC", "FUEL", "SAFEBOX_TICKET", "NPLUS_TRIAL"].includes(r.type) && (
+                        <div className="w-full sm:w-32 shrink-0">
+                          <input
+                            type="number"
+                            min={1}
+                            value={r.amount || 0}
+                            onChange={(e) => handleUpdateReward(tIdx, rIdx, "amount", Number(e.target.value))}
+                            placeholder="Jumlah"
+                            className="w-full px-3 py-2 rounded-lg bg-black/40 border border-border text-foreground text-xs font-mono font-bold outline-none"
+                          />
+                        </div>
                       )}
 
                       <button
                         type="button"
                         onClick={() => handleRemoveRewardFromTier(tIdx, rIdx)}
-                        className="text-red-400 hover:text-red-300 p-1 shrink-0"
+                        className="text-red-400 hover:text-red-300 p-2 shrink-0 self-end sm:self-center transition-colors"
+                        title="Hapus Hadiah"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
+
+                    {/* Baris 2 KHUSUS TIPE VOUCHER: Konfigurasi Kategori, Persen Diskon, Durasi Jam, dan Masa Berlaku Hari */}
+                    {r.type === "VOUCHER" && (
+                      <div className="p-3.5 rounded-xl bg-black/40 border border-border/60 space-y-3">
+                        <div
+                          className={`grid grid-cols-1 sm:grid-cols-2 ${
+                            r.voucherCategory === "NC_BOOSTER" ? "lg:grid-cols-4" : "lg:grid-cols-3"
+                          } gap-3`}
+                        >
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                              Kategori Voucher
+                            </label>
+                            <select
+                              value={r.voucherCategory || "NC_BOOSTER"}
+                              onChange={(e) => {
+                                const cat = e.target.value;
+                                const updated = [...prizes];
+                                const item = updated[tIdx].rewards[rIdx];
+                                item.voucherCategory = cat;
+                                item.voucherExpireDays = item.voucherExpireDays ?? 30;
+                                if (cat === "FLEET_MAINTENANCE") {
+                                  item.voucherDiscountValue = 100;
+                                  item.title = "Voucher Bebas Servis Armada (100%)";
+                                } else if (cat === "NC_BOOSTER") {
+                                  item.voucherDiscountValue = 50;
+                                  item.voucherDurationHours = 24;
+                                  item.title = "Voucher NC Booster +50% (24 Jam)";
+                                } else if (cat === "MARKET_MOD") {
+                                  item.voucherDiscountValue = 25;
+                                  item.title = "Voucher Diskon Mod Market 25%";
+                                } else if (cat === "FLEET_BUY") {
+                                  item.voucherDiscountValue = 15;
+                                  item.title = "Voucher Diskon Beli Fleet 15%";
+                                } else if (cat === "GARAGE_UPGRADE") {
+                                  item.voucherDiscountValue = 20;
+                                  item.title = "Voucher Diskon Upgrade Garasi 20%";
+                                }
+                                setPrizes(updated);
+                              }}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-bold outline-none"
+                            >
+                              <option value="NC_BOOSTER">⚡ Booster NC</option>
+                              <option value="FLEET_MAINTENANCE">🔧 Servis Truk (Bebas / Diskon)</option>
+                              <option value="MARKET_MOD">🛒 Diskon Mod Market</option>
+                              <option value="FLEET_BUY">🚛 Diskon Pembelian Armada</option>
+                              <option value="GARAGE_UPGRADE">🏢 Diskon Upgrade Garasi</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                              {r.voucherCategory === "NC_BOOSTER" ? "Bonus Booster (%)" : "Nilai Diskon (%)"}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={r.voucherDiscountValue ?? 50}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  const updated = [...prizes];
+                                  const item = updated[tIdx].rewards[rIdx];
+                                  item.voucherDiscountValue = val;
+                                  if (item.voucherCategory === "NC_BOOSTER") {
+                                    item.title = `Voucher NC Booster +${val}% (${item.voucherDurationHours || 24} Jam)`;
+                                  } else if (item.voucherCategory === "FLEET_MAINTENANCE") {
+                                    item.title = val === 100 ? "Voucher Bebas Servis Armada (100%)" : `Voucher Diskon Servis ${val}%`;
+                                  }
+                                  setPrizes(updated);
+                                }}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-mono font-bold outline-none"
+                                placeholder="50"
+                              />
+                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-muted-foreground">%</span>
+                            </div>
+                            <span className="text-[9px] text-muted-foreground mt-0.5 block">
+                              {r.voucherCategory === "NC_BOOSTER" ? "Tambahan NC per job" : "Isi 100 untuk gratis 100%"}
+                            </span>
+                          </div>
+
+                          {/* Khusus NC Booster: Input Jam Durasi Aktif */}
+                          {r.voucherCategory === "NC_BOOSTER" && (
+                            <div>
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                Durasi Booster (Jam)
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={r.voucherDurationHours ?? 24}
+                                  onChange={(e) => {
+                                    const hrs = Number(e.target.value);
+                                    const updated = [...prizes];
+                                    const item = updated[tIdx].rewards[rIdx];
+                                    item.voucherDurationHours = hrs;
+                                    item.title = `Voucher NC Booster +${item.voucherDiscountValue || 50}% (${hrs} Jam)`;
+                                    setPrizes(updated);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-mono font-bold outline-none"
+                                  placeholder="24"
+                                />
+                                <span className="absolute right-2.5 top-1.5 text-xs font-bold text-muted-foreground">Jam</span>
+                              </div>
+                              <span className="text-[9px] text-muted-foreground mt-0.5 block">
+                                Durasi aktif boost saat diaktifkan
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Masa Berlaku Voucher Sebelum Hangus (Hari) - Berlaku untuk SEMUA kategori voucher termasuk NC Booster */}
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                              Masa Berlaku Voucher (Hari)
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min={0}
+                                value={r.voucherExpireDays ?? 30}
+                                onChange={(e) => {
+                                  const days = Number(e.target.value);
+                                  const updated = [...prizes];
+                                  const item = updated[tIdx].rewards[rIdx];
+                                  item.voucherExpireDays = days;
+                                  setPrizes(updated);
+                                }}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-mono font-bold outline-none"
+                                placeholder="30"
+                              />
+                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-muted-foreground">Hari</span>
+                            </div>
+                            <span className="text-[9px] text-muted-foreground mt-0.5 block">
+                              {(r.voucherExpireDays ?? 30) === 0 ? "Tidak pernah kadaluarsa" : "Batas waktu klaim sebelum hangus"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -733,7 +1130,12 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
           disabled={loading}
           className="px-8 py-3 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-xl shadow-primary/25 disabled:opacity-50"
         >
-          <Save size={16} /> {loading ? "Menyimpan..." : "Simpan Giveaway"}
+          <Save size={16} />{" "}
+          {loading
+            ? isUploadingImage
+              ? "Mengunggah Gambar WebP..."
+              : "Menyimpan..."
+            : "Simpan Giveaway"}
         </button>
       </div>
     </form>

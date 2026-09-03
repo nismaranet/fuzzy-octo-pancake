@@ -223,10 +223,10 @@ export default function ManageGiveawaysClient({ initialGiveaways }: ManageGiveaw
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredGiveaways.map((g) => {
             const startStr = g.startDate
-              ? new Date(g.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "short" })
+              ? new Date(g.startDate).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta", day: "numeric", month: "short" })
               : "-";
             const endStr = g.endDate
-              ? new Date(g.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+              ? new Date(g.endDate).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta", day: "numeric", month: "short", year: "numeric" })
               : "-";
 
             return (

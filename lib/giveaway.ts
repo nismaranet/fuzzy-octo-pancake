@@ -554,12 +554,12 @@ export async function executeGiveawayDraw(
               createdAt: new Date(),
             });
           } else if (reward.type === "FUEL" && reward.amount && reward.amount > 0) {
-            await Garage.updateOne(
+            await db.collection("garages").updateOne(
               { discordId: String(chosenTicket.discordId) },
               {
                 $inc: { fuelStock: reward.amount },
                 $setOnInsert: {
-                  userId: winnerUser?._id || new mongoose.Types.ObjectId(),
+                  userId: winnerUser?._id || null,
                   discordId: String(chosenTicket.discordId),
                   fleetSlot: 1,
                   fleetSlotUsed: 0,
@@ -579,12 +579,12 @@ export async function executeGiveawayDraw(
               { upsert: true }
             );
           } else if (reward.type === "SAFEBOX_TICKET" && reward.amount && reward.amount > 0) {
-            await Garage.updateOne(
+            await db.collection("garages").updateOne(
               { discordId: String(chosenTicket.discordId) },
               {
                 $inc: { safeboxStock: reward.amount },
                 $setOnInsert: {
-                  userId: winnerUser?._id || new mongoose.Types.ObjectId(),
+                  userId: winnerUser?._id || null,
                   discordId: String(chosenTicket.discordId),
                   fleetSlot: 1,
                   fleetSlotUsed: 0,
@@ -605,19 +605,47 @@ export async function executeGiveawayDraw(
             );
           } else if (reward.type === "VOUCHER" && reward.voucherCategory) {
             const randomCode = `GW-${reward.voucherCategory.slice(0, 3)}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-            await UserVoucher.create({
-              userId: winnerUser?._id || new mongoose.Types.ObjectId(),
+            const discountVal = Number(reward.voucherDiscountValue) || (reward.voucherCategory === "FLEET_MAINTENANCE" ? 100 : 50);
+            const durationHrs = reward.voucherCategory === "NC_BOOSTER" ? (Number(reward.voucherDurationHours) || 24) : 0;
+            const expireDays = typeof reward.voucherExpireDays === "number" ? reward.voucherExpireDays : 30;
+            const expiresAt = expireDays > 0 ? new Date(Date.now() + expireDays * 24 * 60 * 60 * 1000) : null;
+
+            // Tentukan judul voucher yang jelas dan akurat jika tidak diisi manual
+            let voucherTitle = reward.title?.trim();
+            if (!voucherTitle) {
+              if (reward.voucherCategory === "NC_BOOSTER") {
+                voucherTitle = `Booster NC +${discountVal}% (${durationHrs} Jam)`;
+              } else if (reward.voucherCategory === "FLEET_MAINTENANCE") {
+                voucherTitle = discountVal === 100 ? "Bebas Servis Armada (100%)" : `Diskon Servis Truk ${discountVal}%`;
+              } else if (reward.voucherCategory === "MARKET_MOD") {
+                voucherTitle = `Diskon Mod Market ${discountVal}%`;
+              } else if (reward.voucherCategory === "FLEET_BUY") {
+                voucherTitle = `Diskon Pembelian Fleet ${discountVal}%`;
+              } else if (reward.voucherCategory === "GARAGE_UPGRADE") {
+                voucherTitle = `Diskon Upgrade Garasi ${discountVal}%`;
+              } else {
+                voucherTitle = `Voucher ${tier.tierTitle}`;
+              }
+            }
+
+            await db.collection("uservouchers").insertOne({
+              userId: winnerUser?._id || null,
               discordId: String(chosenTicket.discordId),
               guildId: GUILD_ID,
               code: randomCode,
-              title: reward.title || `Voucher ${tier.tierTitle}`,
+              title: voucherTitle,
               description: reward.description || `Hadiah ${tier.tierTitle} dari Giveaway ${lockedGiveaway.title}`,
               category: reward.voucherCategory,
               discountType: reward.voucherDiscountType || "percentage",
-              discountValue: reward.voucherDiscountValue || 100,
-              durationHours: reward.voucherDurationHours || 0,
+              discountValue: discountVal,
+              durationHours: durationHrs,
+              maxDiscount: 0,
+              minSpend: 0,
               status: "ACTIVE",
               source: `GIVEAWAY_${lockedGiveaway.slug.toUpperCase()}`,
+              expiresAt,
+              createdAt: new Date(),
+              updatedAt: new Date(),
             });
           } else if (reward.type === "NPLUS_TRIAL" && reward.amount && reward.amount > 0) {
             const trialDays = reward.amount;
@@ -634,6 +662,14 @@ export async function executeGiveawayDraw(
                 },
               }
             );
+
+            // Invalidate Redis session cache agar badge Nismara+ langsung aktif seketika
+            try {
+              if (winnerUser?._id) {
+                await redis.del(`session:profile:${winnerUser._id}`);
+              }
+              await redis.del(`session:profile:${chosenTicket.discordId}`);
+            } catch (_) {}
           }
         } catch (err: any) {
           console.error(`[Giveaway] Error granting reward ${reward.type} to ${chosenTicket.discordId}:`, err);
