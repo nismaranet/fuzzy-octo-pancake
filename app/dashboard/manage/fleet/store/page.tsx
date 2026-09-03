@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Search, 
   Filter, 
@@ -18,6 +19,7 @@ import { compressImageToWebP } from "@/lib/imageUtils";
 import { useSession } from "next-auth/react";
 
 export default function FleetStoreManager() {
+  const router = useRouter();
   const { data: session } = useSession();
   const [stores, setStores] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
@@ -178,6 +180,7 @@ export default function FleetStoreManager() {
       showToast(isEditMode ? "Kendaraan berhasil diupdate!" : "Kendaraan berhasil ditambahkan!", "success");
       setIsModalOpen(false);
       fetchData();
+      router.refresh();
     } catch (error) {
       showToast("Gagal menyimpan kendaraan.", "error");
     } finally {

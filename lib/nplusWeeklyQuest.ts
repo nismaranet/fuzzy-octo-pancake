@@ -627,73 +627,112 @@ export async function claimWeeklyQuestReward(discordId: string, questId: string)
   let rewardMessage = "";
   let grantedVoucherId = null;
 
-  if (reward.type === "NC" && reward.amount && reward.amount > 0) {
-    // Tambah saldo NC
-    await db.collection("currencies").updateOne(
-      { userId: String(discordId), guildId },
-      { $inc: { totalNC: reward.amount } },
-      { upsert: true }
-    );
+  try {
+    if (reward.type === "NC" && reward.amount && reward.amount > 0) {
+      // Tambah saldo NC
+      await db.collection("currencies").updateOne(
+        { userId: String(discordId), guildId },
+        { $inc: { totalNC: reward.amount } },
+        { upsert: true }
+      );
 
-    // Catat mutasi NC
-    await db.collection("currencyhistories").insertOne({
-      userId: String(discordId),
-      guildId,
-      amount: reward.amount,
-      type: "earn",
-      reason: `Hadiah Quest Mingguan Nismara+ (${weekInfo.weekKey}: ${targetQuest.title})`,
-      createdAt: new Date(),
-    });
+      // Catat mutasi NC
+      await db.collection("currencyhistories").insertOne({
+        userId: String(discordId),
+        guildId,
+        amount: reward.amount,
+        type: "earn",
+        reason: `Hadiah Quest Mingguan Nismara+ (${weekInfo.weekKey}: ${targetQuest.title})`,
+        createdAt: new Date(),
+      });
 
-    rewardMessage = `+${reward.amount.toLocaleString("id-ID")} NC`;
-  } else if (reward.type === "SAFEBOX_TICKET" && reward.amount && reward.amount > 0) {
-    // Tambah Tiket Safebox ke Garasi
-    await Garage.updateOne(
-      { discordId: String(discordId) },
-      { $inc: { safeboxStock: reward.amount } },
-      { upsert: true }
-    );
+      rewardMessage = `+${reward.amount.toLocaleString("id-ID")} NC`;
+    } else if (reward.type === "SAFEBOX_TICKET" && reward.amount && reward.amount > 0) {
+      // Tambah Tiket Safebox ke Garasi dengan schema default jika belum ada
+      await Garage.updateOne(
+        { discordId: String(discordId) },
+        { 
+          $inc: { safeboxStock: reward.amount },
+          $setOnInsert: {
+            fleetSlot: 1,
+            fleetSlotUsed: 0,
+            fleetSlotLevel: 1,
+            safeboxLevel: 1,
+            fuelCapacity: 2000,
+            fuelTankLevel: 1,
+            fuelStock: 0,
+            operational_cost: 0,
+            status: "active",
+            createdAt: new Date(),
+          }
+        },
+        { upsert: true }
+      );
 
-    rewardMessage = `+${reward.amount}x Tiket Safebox Penebusan Penalti`;
-  } else if (reward.type === "FUEL" && reward.amount && reward.amount > 0) {
-    // Tambah Fuel ke Garasi
-    await Garage.updateOne(
-      { discordId: String(discordId) },
-      { $inc: { fuelStock: reward.amount } },
-      { upsert: true }
-    );
+      rewardMessage = `+${reward.amount}x Tiket Safebox Penebusan Penalti`;
+    } else if (reward.type === "FUEL" && reward.amount && reward.amount > 0) {
+      // Tambah Fuel ke Garasi dengan schema default jika belum ada
+      await Garage.updateOne(
+        { discordId: String(discordId) },
+        { 
+          $inc: { fuelStock: reward.amount },
+          $setOnInsert: {
+            fleetSlot: 1,
+            fleetSlotUsed: 0,
+            fleetSlotLevel: 1,
+            safeboxLevel: 1,
+            fuelCapacity: 2000,
+            fuelTankLevel: 1,
+            fuelStock: 0,
+            operational_cost: 0,
+            status: "active",
+            createdAt: new Date(),
+          }
+        },
+        { upsert: true }
+      );
 
-    rewardMessage = `+${reward.amount.toLocaleString("id-ID")} Liter Bahan Bakar`;
-  } else if (reward.type === "VOUCHER" && reward.voucherCategory) {
-    // Terbitkan Voucher
-    const voucher = await grantVoucher({
-      userId: user._id,
-      discordId: String(discordId),
-      guildId,
-      title: reward.title,
-      description: reward.description || `Hadiah dari Quest Mingguan Nismara+ ${weekInfo.weekKey}`,
-      category: reward.voucherCategory,
-      discountType: reward.voucherDiscountType || "percentage",
-      discountValue: reward.voucherDiscountValue || 0,
-      durationHours: reward.voucherDurationHours || 0,
-      source: `NPLUS_WEEKLY_QUEST_${weekInfo.weekKey}`,
-      expiresInDays: 30,
-    });
+      rewardMessage = `+${reward.amount.toLocaleString("id-ID")} Liter Bahan Bakar`;
+    } else if (reward.type === "VOUCHER" && reward.voucherCategory) {
+      // Terbitkan Voucher
+      const voucher = await grantVoucher({
+        userId: user._id,
+        discordId: String(discordId),
+        guildId,
+        title: reward.title,
+        description: reward.description || `Hadiah dari Quest Mingguan Nismara+ ${weekInfo.weekKey}`,
+        category: reward.voucherCategory,
+        discountType: reward.voucherDiscountType || "percentage",
+        discountValue: reward.voucherDiscountValue || 0,
+        durationHours: reward.voucherDurationHours || 0,
+        source: `NPLUS_WEEKLY_QUEST_${weekInfo.weekKey}`,
+        expiresInDays: 30,
+      });
 
-    grantedVoucherId = voucher._id;
-    rewardMessage = `Voucher: ${reward.title}`;
-  }
-
-  // Perbarui snapshot rincian hadiah pada dokumen klaim
-  await NplusWeeklyQuestClaim.updateOne(
-    { _id: claimDoc._id },
-    {
-      $set: {
-        "rewardSnapshot.voucherId": grantedVoucherId,
-        "rewardSnapshot.details": rewardMessage,
-      },
+      grantedVoucherId = voucher._id;
+      rewardMessage = `Voucher: ${reward.title}`;
     }
-  );
+
+    // Perbarui snapshot rincian hadiah pada dokumen klaim
+    await NplusWeeklyQuestClaim.updateOne(
+      { _id: claimDoc._id },
+      {
+        $set: {
+          "rewardSnapshot.voucherId": grantedVoucherId,
+          "rewardSnapshot.details": rewardMessage,
+        },
+      }
+    );
+  } catch (distributionErr) {
+    console.error("[WeeklyQuest] Error during reward distribution, rolling back claimDoc:", distributionErr);
+    // 🛡️ ROLLBACK: Hapus claimDoc agar kesempatan klaim user tidak hangus
+    try {
+      await NplusWeeklyQuestClaim.deleteOne({ _id: claimDoc._id });
+    } catch (cleanupErr) {
+      console.error("[WeeklyQuest] Rollback delete claimDoc error:", cleanupErr);
+    }
+    return { success: false, error: "Gagal memberikan hadiah reward. Silakan coba kembali." };
+  }
 
   // 7. Invalidate Redis Cache
   try {

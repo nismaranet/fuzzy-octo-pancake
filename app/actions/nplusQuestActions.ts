@@ -65,6 +65,8 @@ export async function claimWeeklyQuestAction(questId: string): Promise<{
     if (result.success) {
       revalidatePath("/dashboard/nismaraplus");
       revalidatePath("/dashboard");
+      revalidatePath("/dashboard/currency");
+      revalidatePath("/dashboard/garage");
     }
 
     return result;

@@ -43,7 +43,10 @@ export default function FleetMaintenanceClient({
   useEffect(() => {
     if (isModalOpen) {
       setIsLoadingVouchers(true);
-      fetch("/api/vouchers/my?category=FLEET_MAINTENANCE&status=ACTIVE")
+      fetch("/api/vouchers/my?category=FLEET_MAINTENANCE&status=ACTIVE", {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      })
         .then((res) => res.json())
         .then((data) => {
           if (data.success && Array.isArray(data.vouchers)) {

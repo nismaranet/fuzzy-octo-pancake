@@ -381,6 +381,12 @@ export async function GET(request: Request) {
         totalTickets,
         limit,
       },
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      },
     });
   } catch (error) {
     console.error("Manage Tickets GET Error:", error);

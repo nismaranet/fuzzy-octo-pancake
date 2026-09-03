@@ -8,6 +8,11 @@ import {
   getActiveSeason,
   getUserSeasonProgress,
 } from "@/lib/seasonPass";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function POST(request: Request) {
   try {
@@ -52,10 +57,26 @@ export async function POST(request: Request) {
       seasonNumber
     );
 
+    // Revalidasi cache
+    try {
+      revalidatePath("/dashboard/season-pass");
+      revalidatePath("/dashboard/currency");
+      revalidatePath("/dashboard/garage");
+      revalidatePath("/dashboard");
+    } catch (e) {
+      console.error("Failed to revalidate season pass paths:", e);
+    }
+
     return NextResponse.json({
       success: true,
       result,
       progress: updatedProgress,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
     });
   } catch (error: any) {
     console.error("Season Pass Claim Error:", error);

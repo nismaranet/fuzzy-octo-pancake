@@ -6,6 +6,11 @@ import SeasonPass from "@/lib/models/SeasonPass";
 import SeasonPassOrder from "@/lib/models/SeasonPassOrder";
 import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import User from "@/lib/models/User";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function GET() {
   try {
@@ -30,6 +35,12 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       pendingOrder: pendingOrder ? JSON.parse(JSON.stringify(pendingOrder)) : null,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -208,11 +219,24 @@ export async function POST(request: Request) {
       status: "pending",
     });
 
+    // Revalidasi cache
+    try {
+      revalidatePath("/dashboard/season-pass");
+    } catch (e) {
+      console.error("Failed to revalidate season pass paths:", e);
+    }
+
     return NextResponse.json({
       success: true,
       order: newOrder,
       message: "Pesanan Nismara Pass berhasil dibuat! Silakan selesaikan pembayaran dan tunggu konfirmasi dari Owner / Developer.",
       channelId: createdChannelId,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
     });
   } catch (error: any) {
     console.error("Season Pass Order Error:", error);

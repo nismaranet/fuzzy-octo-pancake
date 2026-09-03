@@ -7,8 +7,13 @@ import FleetMaintenanceOrder from "@/lib/models/FleetMaintenanceOrder";
 import Transaction from "@/lib/models/Transaction";
 import { sendPersonalNotification } from "@/lib/services/NotificationService";
 import { restoreVoucher } from "@/lib/voucher";
+import { revalidatePath } from "next/cache";
 
 import dbConnect from "@/lib/mongoose";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
 export async function POST(
@@ -80,6 +85,14 @@ export async function POST(
           },
         },
       );
+    }
+
+    try {
+      revalidatePath("/dashboard/garage/fleet");
+      revalidatePath("/dashboard/manage/fleet/service");
+      revalidatePath("/dashboard/transactions");
+    } catch (e) {
+      console.error("Failed to revalidate maintenance reject paths", e);
     }
 
     return NextResponse.json({ success: true });

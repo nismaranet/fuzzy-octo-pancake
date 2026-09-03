@@ -6,6 +6,11 @@ import SeasonPass from "@/lib/models/SeasonPass";
 import SeasonPassMerchClaim from "@/lib/models/SeasonPassMerchClaim";
 import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import User from "@/lib/models/User";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function GET(request: Request) {
   try {
@@ -26,6 +31,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       merchClaim: claim ? JSON.parse(JSON.stringify(claim)) : null,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -297,12 +308,25 @@ export async function POST(request: Request) {
     };
     await progress.save();
 
+    // Revalidasi cache
+    try {
+      revalidatePath("/dashboard/season-pass");
+    } catch (e) {
+      console.error("Failed to revalidate season pass paths:", e);
+    }
+
     return NextResponse.json({
       success: true,
       merchClaim: newClaim,
       message:
         "Data pengiriman merchandise Anda berhasil dikirim! Channel tiket privat Discord telah dibuat untuk konfirmasi ongkir & resi bersama Owner & Developer.",
       channelId: createdChannelId,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
     });
   } catch (error: any) {
     console.error("Claim Merch Error:", error);

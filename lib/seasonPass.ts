@@ -906,7 +906,20 @@ export async function claimLevelReward(
       // 2. Tambah Fuel ke Garasi
       await Garage.updateOne(
         { discordId: String(discordId) },
-        { $inc: { fuelStock: r.amount } },
+        { 
+          $inc: { fuelStock: r.amount },
+          $setOnInsert: {
+            fleetSlot: 1,
+            fleetSlotUsed: 0,
+            fleetSlotLevel: 1,
+            safeboxLevel: 1,
+            fuelCapacity: 2000,
+            fuelTankLevel: 1,
+            operational_cost: 0,
+            status: "active",
+            createdAt: new Date(),
+          }
+        },
         { upsert: true }
       );
       results.push(`+${r.amount.toLocaleString("id-ID")} Liter Fuel`);
@@ -914,7 +927,21 @@ export async function claimLevelReward(
       // 3. Tambah Tiket Safebox
       await Garage.updateOne(
         { discordId: String(discordId) },
-        { $inc: { safeboxStock: r.amount } },
+        { 
+          $inc: { safeboxStock: r.amount },
+          $setOnInsert: {
+            fleetSlot: 1,
+            fleetSlotUsed: 0,
+            fleetSlotLevel: 1,
+            safeboxLevel: 1,
+            fuelCapacity: 2000,
+            fuelTankLevel: 1,
+            fuelStock: 0,
+            operational_cost: 0,
+            status: "active",
+            createdAt: new Date(),
+          }
+        },
         { upsert: true }
       );
       results.push(`+${r.amount}x Tiket Safebox Hapus Penalti`);

@@ -47,7 +47,10 @@ export default function BuyFleetWizard({
   useEffect(() => {
     if (step === 3) {
       setIsLoadingVouchers(true);
-      fetch("/api/vouchers/my?category=FLEET_BUY&status=ACTIVE")
+      fetch("/api/vouchers/my?category=FLEET_BUY&status=ACTIVE", {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      })
         .then((res) => res.json())
         .then((data) => {
           if (data.success && Array.isArray(data.vouchers)) {

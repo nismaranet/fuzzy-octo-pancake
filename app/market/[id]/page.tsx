@@ -67,7 +67,10 @@ export default function MarketItemDetail() {
 
   const fetchItemDetail = async () => {
     try {
-      const res = await fetch(`/api/market/${id}`);
+      const res = await fetch(`/api/market/${id}`, {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      });
       if (!res.ok) {
         setError("Barang tidak ditemukan");
         setLoading(false);
@@ -84,7 +87,10 @@ export default function MarketItemDetail() {
 
   const fetchReviews = async () => {
     try {
-      const res = await fetch(`/api/market/${id}/reviews`);
+      const res = await fetch(`/api/market/${id}/reviews`, {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      });
       if (res.ok) {
         const data = await res.json();
         setReviews(data.reviews || []);
@@ -107,7 +113,10 @@ export default function MarketItemDetail() {
 
   const checkIfPurchased = async () => {
     try {
-      const res = await fetch("/api/market/library");
+      const res = await fetch("/api/market/library", {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      });
       const library = await res.json();
       if (Array.isArray(library)) {
         const owned = library.some((p: any) => p.marketItemId && (p.marketItemId._id === id || p.marketItemId.slug === id));
@@ -138,6 +147,7 @@ export default function MarketItemDetail() {
       } else {
         setIsPurchased(true);
         setShowBuyModal(false);
+        router.refresh();
       }
     } catch (err) {
       setError("Terjadi kesalahan jaringan");

@@ -13,9 +13,14 @@ import "@/lib/models/UserVoucher";
 import { getCurrencyDataLogic } from "@/lib/currency";
 import { validateVoucher, calculateVoucherDiscount, consumeVoucher } from "@/lib/voucher";
 import Transaction from "@/lib/models/Transaction";
+import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
 import dbConnect from "@/lib/mongoose";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const CATEGORY_ID = process.env.DISCORD_SERVICE_FLEET_CATEGORY_ID; // Or any specific category for maintenance
@@ -55,9 +60,9 @@ export async function POST(request: Request) {
     }
 
     // Verify ownership
-    if (String(fleet.driver) !== String(user._id)) {
+    if (String(fleet.owner || fleet.driver) !== String(user._id)) {
       return NextResponse.json(
-        { error: "Anda bukan driver kendaraan ini" },
+        { error: "Anda bukan pemilik/driver kendaraan ini" },
         { status: 403 },
       );
     }
@@ -363,6 +368,14 @@ export async function POST(request: Request) {
         voucherDiscount,
       }
     });
+
+    try {
+      revalidatePath("/dashboard/garage/fleet");
+      revalidatePath("/dashboard/manage/fleet/service");
+      revalidatePath("/dashboard/transactions");
+    } catch (e) {
+      console.error("Failed to revalidate maintenance paths", e);
+    }
 
     return NextResponse.json({ success: true, order: newOrder });
   } catch (error) {

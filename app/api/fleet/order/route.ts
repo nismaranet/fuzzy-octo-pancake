@@ -9,9 +9,14 @@ import Transaction from "@/lib/models/Transaction";
 import "@/lib/models/UserVoucher";
 import { getCurrencyDataLogic } from "@/lib/currency";
 import { validateVoucher, calculateVoucherDiscount, consumeVoucher } from "@/lib/voucher";
+import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
 import dbConnect from "@/lib/mongoose";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const CATEGORY_ID = process.env.DISCORD_FLEET_ORDER_CATEGORY_ID;
@@ -296,6 +301,15 @@ export async function POST(request: Request) {
         voucherDiscount,
       }
     });
+
+    try {
+      revalidatePath("/dashboard/garage");
+      revalidatePath("/dashboard/garage/fleet");
+      revalidatePath("/dashboard/manage/fleet/orderlist");
+      revalidatePath("/dashboard/transactions");
+    } catch (e) {
+      console.error("Failed to revalidate fleet order paths", e);
+    }
 
     return NextResponse.json({ success: true, order: newOrder });
   } catch (error) {

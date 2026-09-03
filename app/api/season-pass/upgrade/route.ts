@@ -3,6 +3,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/mongoose";
 import { upgradeToPremiumPass, getUserSeasonProgress } from "@/lib/seasonPass";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function POST(request: Request) {
   try {
@@ -30,10 +35,24 @@ export async function POST(request: Request) {
       seasonNumber
     );
 
+    // Revalidasi cache
+    try {
+      revalidatePath("/dashboard/season-pass");
+      revalidatePath("/dashboard");
+    } catch (e) {
+      console.error("Failed to revalidate season pass paths:", e);
+    }
+
     return NextResponse.json({
       success: true,
       message: result.message,
       progress: updatedProgress,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
     });
   } catch (error: any) {
     console.error("Season Pass Upgrade Error:", error);

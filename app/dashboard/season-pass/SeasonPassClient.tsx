@@ -112,8 +112,10 @@ export default function SeasonPassClient({
     return unlocked;
   }, [season, userXp]);
 
-  // Level yang sedang ditempuh (1-30)
-  const userLevel = Math.min(30, unlockedLevel + (unlockedLevel < 30 ? 1 : 0));
+  const maxLevel = season?.levels?.length || 30;
+
+  // Level yang sedang ditempuh (1-maxLevel)
+  const userLevel = Math.min(maxLevel, unlockedLevel + (unlockedLevel < maxLevel ? 1 : 0));
 
   const handleSubmitMerchClaim = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +132,12 @@ export default function SeasonPassClient({
     try {
       const res = await fetch("/api/season-pass/claim-merch", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        headers: { 
+          "Content-Type": "application/json",
+          "Pragma": "no-cache",
+          "Cache-Control": "no-cache",
+        },
         body: JSON.stringify({
           seasonNumber: season?.seasonNumber || 1,
           ...merchFormData,
@@ -170,7 +177,7 @@ export default function SeasonPassClient({
   const prevLevelCumulative = userLevel > 1 ? season?.levels?.find((l: SeasonLevel) => l.level === userLevel - 1)?.cumulativeXp || 0 : 0;
   const xpInCurrentLevel = Math.max(0, userXp - prevLevelCumulative);
   const xpNeededForCurrentLevel = nextLevelConfig?.xpRequired || 1;
-  const levelProgressPercent = unlockedLevel >= 30 ? 100 : Math.min(100, Math.round((xpInCurrentLevel / xpNeededForCurrentLevel) * 100));
+  const levelProgressPercent = unlockedLevel >= maxLevel ? 100 : Math.min(100, Math.round((xpInCurrentLevel / xpNeededForCurrentLevel) * 100));
 
   // Count available unclaimed rewards up to unlockedLevel
   const unclaimedCount = useMemo(() => {
@@ -183,6 +190,90 @@ export default function SeasonPassClient({
     return count;
   }, [season, progress, unlockedLevel, isPremium]);
 
+  // Dynamic calculation of total season rewards (Free, Premium & Combined)
+  // Menghitung secara nyata seluruh hadiah dari template level yang aktif (bukan hardcoded)
+  const rewardsSummary = useMemo(() => {
+    let premNC = 0;
+    let freeNC = 0;
+    let premFuel = 0;
+    let freeFuel = 0;
+    let premSafebox = 0;
+    let freeSafebox = 0;
+    let premNPlusDays = 0;
+    let freeNPlusDays = 0;
+
+    let premBoosterCount = 0;
+    let freeBoosterCount = 0;
+    let premFreeServiceCount = 0; // 100% Free maintenance
+    let premDiscountServiceCount = 0; // < 100% discount maintenance
+    let premFleetBuyCount = 0;
+    let totalPremVouchers = 0;
+    let totalFreeVouchers = 0;
+
+    let premBadgesCount = 0;
+    let freeBadgesCount = 0;
+
+    season?.levels?.forEach((lvl: SeasonLevel) => {
+      lvl.freeRewards?.forEach((r: RewardItem) => {
+        if (r.type === "NC") freeNC += Number(r.amount || 0);
+        else if (r.type === "FUEL") freeFuel += Number(r.amount || 0);
+        else if (r.type === "SAFEBOX_TICKET") freeSafebox += Number(r.amount || 0);
+        else if (r.type === "NPLUS_TRIAL") freeNPlusDays += Number(r.amount || 0);
+        else if (r.type === "VOUCHER") {
+          totalFreeVouchers++;
+          if (r.voucherCategory === "NC_BOOSTER") freeBoosterCount++;
+        } else if (r.type === "BADGE") freeBadgesCount++;
+      });
+
+      lvl.premiumRewards?.forEach((r: RewardItem) => {
+        if (r.type === "NC") premNC += Number(r.amount || 0);
+        else if (r.type === "FUEL") premFuel += Number(r.amount || 0);
+        else if (r.type === "SAFEBOX_TICKET") premSafebox += Number(r.amount || 0);
+        else if (r.type === "NPLUS_TRIAL") premNPlusDays += Number(r.amount || 0);
+        else if (r.type === "VOUCHER") {
+          totalPremVouchers++;
+          if (r.voucherCategory === "NC_BOOSTER") {
+            premBoosterCount++;
+          } else if (r.voucherCategory === "FLEET_MAINTENANCE") {
+            if (r.voucherDiscountValue === 100) premFreeServiceCount++;
+            else premDiscountServiceCount++;
+          } else if (r.voucherCategory === "FLEET_BUY") {
+            premFleetBuyCount++;
+          }
+        } else if (r.type === "BADGE") {
+          premBadgesCount++;
+        }
+      });
+    });
+
+    return {
+      premNC,
+      freeNC,
+      totalNC: premNC + freeNC,
+      premFuel,
+      freeFuel,
+      totalFuel: premFuel + freeFuel,
+      premSafebox,
+      freeSafebox,
+      totalSafebox: premSafebox + freeSafebox,
+      premNPlusDays,
+      freeNPlusDays,
+      totalNPlusDays: premNPlusDays + freeNPlusDays,
+      premBoosterCount,
+      freeBoosterCount,
+      totalBoosterCount: premBoosterCount + freeBoosterCount,
+      premFreeServiceCount,
+      premDiscountServiceCount,
+      premFleetBuyCount,
+      totalPremVouchers,
+      totalFreeVouchers,
+      totalVouchers: totalPremVouchers + totalFreeVouchers,
+      premBadgesCount,
+      freeBadgesCount,
+      totalBadges: premBadgesCount + freeBadgesCount,
+    };
+  }, [season]);
+
   const isGracePeriod = !isSeasonActive && unclaimedCount > 0;
   const isOffSeason = !isSeasonActive && unclaimedCount === 0;
 
@@ -191,7 +282,12 @@ export default function SeasonPassClient({
     try {
       const res = await fetch("/api/season-pass/claim", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        headers: { 
+          "Content-Type": "application/json",
+          "Pragma": "no-cache",
+          "Cache-Control": "no-cache",
+        },
         body: JSON.stringify({ level, track, seasonNumber: season.seasonNumber }),
       });
 
@@ -215,7 +311,12 @@ export default function SeasonPassClient({
     try {
       const res = await fetch("/api/season-pass/claim", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        headers: { 
+          "Content-Type": "application/json",
+          "Pragma": "no-cache",
+          "Cache-Control": "no-cache",
+        },
         body: JSON.stringify({ claimAll: true, seasonNumber: season.seasonNumber }),
       });
 
@@ -247,7 +348,12 @@ export default function SeasonPassClient({
     try {
       const res = await fetch("/api/season-pass/order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        headers: { 
+          "Content-Type": "application/json",
+          "Pragma": "no-cache",
+          "Cache-Control": "no-cache",
+        },
         body: JSON.stringify({ seasonNumber: season.seasonNumber }),
       });
 
@@ -335,7 +441,7 @@ export default function SeasonPassClient({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-left">
               <div className="p-4 rounded-2xl bg-black/30 border border-border">
                 <span className="text-[9px] font-black text-muted-foreground uppercase">Level Puncak</span>
-                <p className="text-xl font-black text-foreground tabular-nums mt-0.5">Level {userLevel} / 30</p>
+                <p className="text-xl font-black text-foreground tabular-nums mt-0.5">Level {userLevel} / {maxLevel}</p>
               </div>
               <div className="p-4 rounded-2xl bg-black/30 border border-border">
                 <span className="text-[9px] font-black text-muted-foreground uppercase">Total XP Musim</span>
@@ -445,7 +551,7 @@ export default function SeasonPassClient({
                 Nismara Pass <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300">Season {season?.seasonNumber || 1}</span>
               </h1>
               <p className="text-muted-foreground text-sm md:text-base mt-2 leading-relaxed">
-                Narik job di game untuk mengumpulkan Seasonal XP, menaikkan level, dan membuka 30 level hadiah eksklusif NC, Fuel, Kupon Servis, NC Booster, dan Mod Livery!
+                Narik job di game untuk mengumpulkan Seasonal XP, menaikkan level, dan membuka {maxLevel} level hadiah eksklusif NC, Fuel, Kupon Servis, NC Booster, dan Mod Livery!
               </p>
             </div>
 
@@ -457,7 +563,7 @@ export default function SeasonPassClient({
                     Level {userLevel}
                   </span>
                   <span className="text-muted-foreground">
-                    {userLevel >= 30 ? "Maksimal (Tamat)" : `Level Berikutnya: Level ${userLevel + 1}`}
+                    {userLevel >= maxLevel ? "Maksimal (Tamat)" : `Level Berikutnya: Level ${userLevel + 1}`}
                   </span>
                 </div>
                 <span className="text-foreground font-mono">
@@ -1244,24 +1350,105 @@ export default function SeasonPassClient({
               <div className="space-y-2 text-xs text-foreground">
                 <p className="font-bold flex items-center gap-2">
                   <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
-                  <span>Buka seluruh 30 Level Hadiah Premium</span>
+                  <span>Buka seluruh {season?.levels?.length || 30} Level Hadiah Jalur Premium</span>
                 </p>
                 <p className="font-bold flex items-center gap-2">
                   <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
-                  <span>2x Kuota XP Mingguan (40.000 XP vs 20.000 XP/minggu)</span>
+                  <span>
+                    2x Kuota XP Mingguan ({((season?.weeklyCapXp || 20000) * 2).toLocaleString("id-ID")} XP vs {(season?.weeklyCapXp || 20000).toLocaleString("id-ID")} XP/minggu)
+                  </span>
                 </p>
                 <p className="font-bold flex items-center gap-2">
                   <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
-                  <span>Total ~375.500 NC & 149.000 Liter Fuel</span>
+                  <span>
+                    Total Hadiah Season: ~{rewardsSummary.totalNC.toLocaleString("id-ID")} NC & {rewardsSummary.totalFuel.toLocaleString("id-ID")} L Fuel
+                  </span>
                 </p>
-                <p className="font-bold flex items-center gap-2">
-                  <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
-                  <span>6x Voucher NC Booster & 2x 100% Free Servis</span>
-                </p>
+                {rewardsSummary.totalPremVouchers > 0 && (
+                  <p className="font-bold flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
+                    <span>
+                      {[
+                        rewardsSummary.premBoosterCount > 0 ? `${rewardsSummary.premBoosterCount}x Voucher NC Booster` : null,
+                        rewardsSummary.premFreeServiceCount > 0 ? `${rewardsSummary.premFreeServiceCount}x 100% Free Servis` : null,
+                        rewardsSummary.premDiscountServiceCount > 0 ? `${rewardsSummary.premDiscountServiceCount}x Diskon Servis` : null,
+                        rewardsSummary.premFleetBuyCount > 0 ? `${rewardsSummary.premFleetBuyCount}x Diskon Beli Fleet` : null,
+                      ].filter(Boolean).slice(0, 2).join(" & ") || `${rewardsSummary.totalPremVouchers}x Voucher Eksklusif`}
+                    </span>
+                  </p>
+                )}
+                {rewardsSummary.premSafebox > 0 && (
+                  <p className="font-bold flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
+                    <span>+{rewardsSummary.premSafebox}x Tiket Safebox Penebusan Penalti</span>
+                  </p>
+                )}
+                {rewardsSummary.premNPlusDays > 0 && (
+                  <p className="font-bold flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
+                    <span>+{rewardsSummary.premNPlusDays} Hari Akses VIP Nismara+</span>
+                  </p>
+                )}
                 <p className="font-bold flex items-center gap-2">
                   <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
                   <span>Hadiah Puncak: {season?.grandPrize?.title || "Mod Livery Eksklusif"}</span>
                 </p>
+              </div>
+
+              {/* Rincian Transparan Sesuai Template Level yang Aktif */}
+              <div className="pt-2 border-t border-amber-500/20 space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">
+                  Rincian Total Hadiah Sesuai Template Musim:
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-left">
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-border/60">
+                    <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-bold uppercase">
+                      <Coins size={12} /> Total Nismara Coin
+                    </div>
+                    <p className="text-sm font-black text-foreground tabular-nums mt-0.5">
+                      +{rewardsSummary.totalNC.toLocaleString("id-ID")} NC
+                    </p>
+                    <span className="text-[9px] text-muted-foreground block">
+                      (Premium: +{rewardsSummary.premNC.toLocaleString("id-ID")} | Free: +{rewardsSummary.freeNC.toLocaleString("id-ID")})
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-border/60">
+                    <div className="flex items-center gap-1.5 text-[10px] text-cyan-400 font-bold uppercase">
+                      <Fuel size={12} /> Total Fuel Garasi
+                    </div>
+                    <p className="text-sm font-black text-cyan-400 tabular-nums mt-0.5">
+                      +{rewardsSummary.totalFuel.toLocaleString("id-ID")} Liter
+                    </p>
+                    <span className="text-[9px] text-muted-foreground block">
+                      (Premium: +{rewardsSummary.premFuel.toLocaleString("id-ID")} | Free: +{rewardsSummary.freeFuel.toLocaleString("id-ID")})
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-border/60">
+                    <div className="flex items-center gap-1.5 text-[10px] text-purple-400 font-bold uppercase">
+                      <Ticket size={12} /> Voucher & Kupon
+                    </div>
+                    <p className="text-sm font-black text-foreground tabular-nums mt-0.5">
+                      {rewardsSummary.totalVouchers} Kupon Total
+                    </p>
+                    <span className="text-[9px] text-muted-foreground block">
+                      ({rewardsSummary.totalPremVouchers} Premium + {rewardsSummary.totalFreeVouchers} Free)
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-border/60">
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase">
+                      <Gift size={12} /> Safebox & VIP
+                    </div>
+                    <p className="text-sm font-black text-foreground tabular-nums mt-0.5">
+                      {rewardsSummary.totalSafebox}x Tiket | {rewardsSummary.totalNPlusDays} Hari VIP
+                    </p>
+                    <span className="text-[9px] text-muted-foreground block">
+                      Penebusan Penalti & Nismara+
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 

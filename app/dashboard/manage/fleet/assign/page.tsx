@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Filter,
@@ -18,6 +19,7 @@ import {
 import Link from "next/link";
 
 export default function FleetAssignManager() {
+  const router = useRouter();
   const [fleets, setFleets] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -73,9 +75,9 @@ export default function FleetAssignManager() {
   const fetchData = async () => {
     try {
       const [resFleets, resStores, resUsers] = await Promise.all([
-        fetch("/api/fleet/assign", { cache: "no-store" }),
-        fetch("/api/fleet/store", { cache: "no-store" }),
-        fetch("/api/users"),
+        fetch("/api/fleet/assign", { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } }),
+        fetch("/api/fleet/store", { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } }),
+        fetch("/api/users", { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } }),
       ]);
       const dataFleets = await resFleets.json();
       const dataStores = await resStores.json();
@@ -145,6 +147,7 @@ export default function FleetAssignManager() {
       showToast("Fleet berhasil diupdate!", "success");
       setIsModalOpen(false);
       fetchData();
+      router.refresh();
     } catch (error) {
       showToast("Gagal menyimpan fleet.", "error");
     } finally {

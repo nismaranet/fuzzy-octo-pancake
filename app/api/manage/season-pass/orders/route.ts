@@ -7,6 +7,11 @@ import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import Transaction from "@/lib/models/Transaction";
 import User from "@/lib/models/User";
 import { getUserSeasonProgress } from "@/lib/seasonPass";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 function checkIsOwner(discordId?: string | number | null) {
   if (!discordId) return false;
@@ -41,6 +46,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       orders: JSON.parse(JSON.stringify(orders)),
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
     });
   } catch (error: any) {
     console.error("Manage Season Pass Orders GET Error:", error);
@@ -68,22 +79,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "orderId dan action wajib diisi" }, { status: 400 });
     }
 
-    const order = await SeasonPassOrder.findById(orderId);
-    if (!order) {
-      return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+    if (action !== "APPROVE" && action !== "REJECT") {
+      return NextResponse.json({ error: "Aksi tidak valid" }, { status: 400 });
     }
 
-    if (order.status !== "pending") {
-      return NextResponse.json({ error: `Pesanan sudah berstatus ${order.status}` }, { status: 400 });
+    const targetStatus = action === "APPROVE" ? "success" : "rejected";
+    const processedBy = String(session.user.discordId);
+
+    // 🛡️ ATOMIC STATE LOCK: Kunci status dari "pending" ke targetStatus secara atomik
+    // Mencegah double confirmation atau duplikasi pembuatan transaksi
+    const order = await SeasonPassOrder.findOneAndUpdate(
+      { _id: orderId, status: "pending" },
+      { $set: { status: targetStatus, processedBy } },
+      { returnDocument: "after", new: true }
+    );
+
+    if (!order) {
+      return NextResponse.json({ 
+        error: "Pesanan tidak ditemukan atau sudah diproses sebelumnya oleh staff/owner lain." 
+      }, { status: 400 });
     }
 
     const botToken = process.env.DISCORD_BOT_TOKEN;
 
     if (action === "APPROVE") {
-      order.status = "success";
-      order.processedBy = String(session.user.discordId);
-      await order.save();
-
       // Aktifkan Premium Pass
       const progress = await getUserSeasonProgress(order.discordId, order.seasonNumber);
       if (progress) {
@@ -126,40 +145,65 @@ export async function POST(request: Request) {
         }).catch((e) => console.error("Discord order notify error:", e));
       }
 
-      return NextResponse.json({
-        success: true,
-        message: `Pesanan Nismara Pass untuk ${order.discordId} berhasil disetujui dan Pass Premium telah aktif!`,
-        order,
-      });
-    }
-
-    if (action === "REJECT") {
-      order.status = "rejected";
-      order.processedBy = String(session.user.discordId);
-      await order.save();
-
-      // Notifikasi Discord Channel jika ada
-      if (order.channelId && botToken) {
-        await fetch(`https://discord.com/api/v10/channels/${order.channelId}/messages`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bot ${botToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            content: `❌ **PESANAN DITOLAK**\n<@${order.discordId}> Pesanan Nismara Pass Premium Season ${order.seasonNumber} Anda ditolak. Silakan periksa kembali bukti pembayaran Anda atau hubungi Owner / Developer.`,
-          }),
-        }).catch((e) => console.error("Discord order reject notify error:", e));
+      // Revalidasi cache
+      try {
+        revalidatePath("/dashboard/season-pass");
+        revalidatePath("/dashboard/transactions");
+        revalidatePath("/dashboard/manage/season-pass");
+        revalidatePath("/dashboard");
+      } catch (e) {
+        console.error("Failed to revalidate order approve paths:", e);
       }
 
       return NextResponse.json({
         success: true,
-        message: `Pesanan Nismara Pass untuk ${order.discordId} telah ditolak.`,
+        message: `Pesanan Nismara Pass untuk ${order.discordId} berhasil disetujui dan Pass Premium telah aktif!`,
         order,
+      }, {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+          "CDN-Cache-Control": "no-store",
+          "Vercel-CDN-Cache-Control": "no-store",
+        }
       });
     }
 
-    return NextResponse.json({ error: "Aksi tidak valid" }, { status: 400 });
+    // action === "REJECT"
+    // Notifikasi Discord Channel jika ada
+    if (order.channelId && botToken) {
+      await fetch(`https://discord.com/api/v10/channels/${order.channelId}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bot ${botToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: `❌ **PESANAN DITOLAK**\n<@${order.discordId}> Pesanan Nismara Pass Premium Season ${order.seasonNumber} Anda ditolak. Silakan periksa kembali bukti pembayaran Anda atau hubungi Owner / Developer.`,
+        }),
+      }).catch((e) => console.error("Discord order reject notify error:", e));
+    }
+
+    // Revalidasi cache
+    try {
+      revalidatePath("/dashboard/season-pass");
+      revalidatePath("/dashboard/transactions");
+      revalidatePath("/dashboard/manage/season-pass");
+      revalidatePath("/dashboard");
+    } catch (e) {
+      console.error("Failed to revalidate order reject paths:", e);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Pesanan Nismara Pass untuk ${order.discordId} telah ditolak.`,
+      order,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }
+    });
   } catch (error: any) {
     console.error("Manage Season Pass Order Action Error:", error);
     return NextResponse.json({ error: error.message || "Gagal memproses pesanan" }, { status: 500 });
