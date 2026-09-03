@@ -39,6 +39,7 @@ import {
   Sparkle,
   TruckIcon,
   Target,
+  Gift,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -122,6 +123,7 @@ export default function NavbarClient({ session }: { session: any }) {
     { name: "Leaderboard", href: "/leaderboard", icon: Trophy },
     { name: "Achievements", href: "/achievements", icon: Medal },
     { name: "Community Goals", href: "/community-goals", icon: Target },
+    { name: "Giveaways", href: "/giveaways", icon: Gift },
     { name: "TimeZone", href: "/timezone", icon: Gamepad2, separator: true },
     {
       name: "Community Calendar",
@@ -425,6 +427,20 @@ export default function NavbarClient({ session }: { session: any }) {
                               </div>
                               <p className="text-xs text-muted-foreground line-clamp-2">
                                 Berpartisipasi dan capai target bersama komunitas.
+                              </p>
+                            </NavigationMenuLink>
+                          </li>
+                          <li>
+                            <NavigationMenuLink
+                              render={<Link href="/giveaways" />}
+                              className="flex h-full w-full flex-col items-start gap-1 p-3"
+                            >
+                              <div className="flex items-center gap-2 font-medium">
+                                <Gift className="w-4 h-4 text-primary" />
+                                Giveaways
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                Event undian berhadiah resmi bagi seluruh pengemudi.
                               </p>
                             </NavigationMenuLink>
                           </li>

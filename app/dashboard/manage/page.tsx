@@ -488,12 +488,13 @@ export default async function ManageOverview() {
                 <Truck size={15} /> Operasi & Event
               </span>
               <span className="text-[9px] font-bold text-muted-foreground uppercase">
-                5 Layanan
+                6 Layanan
               </span>
             </div>
 
             <div className="space-y-2">
               {[
+                { name: "Giveaways Engine", href: "/dashboard/manage/giveaways", desc: "Undian hadiah & quest tiket pengemudi" },
                 { name: "Special Contracts", href: "/dashboard/manage/events/contracts", desc: "Kontrak logistik khusus ETS2 & ATS" },
                 { name: "Convoy Lobby", href: "/dashboard/manage/events/convoy", desc: "Jadwal & rute konvoi komunitas" },
                 { name: "Coupon Engine", href: "/dashboard/manage/events/coupon", desc: "Kode kupon hadiah NC & tiket" },
