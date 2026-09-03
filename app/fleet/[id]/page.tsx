@@ -451,9 +451,26 @@ export default async function PublicFleetProfilePage({
                     </div>
                   </div>
                   <div className="text-left sm:text-right flex flex-col justify-center">
-                    <p className="font-black text-emerald-500 text-lg">
-                      +{job.nc?.total?.toLocaleString("id-ID") || 0} NC
-                    </p>
+                    {(() => {
+                      const val =
+                        typeof job.revenue === "number"
+                          ? job.revenue
+                          : (job.nc?.total ?? 0);
+                      return (
+                        <p
+                          className={`font-black text-lg ${
+                            val < 0
+                              ? "text-red-400"
+                              : val > 0
+                                ? "text-emerald-500"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {val > 0 ? "+" : ""}
+                          {val.toLocaleString("id-ID")} NC
+                        </p>
+                      );
+                    })()}
                     <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">
                       {new Date(job.completedAt).toLocaleDateString("id-ID", {
                         day: "numeric",

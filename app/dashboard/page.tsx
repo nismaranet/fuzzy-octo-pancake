@@ -309,9 +309,26 @@ export default async function DashboardPage() {
                     <p className="font-medium text-sm text-foreground truncate">
                       {`Job #${job?.jobId}` || "Kargo Selesai"}
                     </p>
-                    <p className="text-xs text-green-500/80 mt-1">
-                      +{job?.nc?.total || 0} NC
-                    </p>
+                    {(() => {
+                      const val =
+                        typeof job?.revenue === "number"
+                          ? job.revenue
+                          : (job?.nc?.total ?? 0);
+                      return (
+                        <p
+                          className={`text-xs mt-1 font-semibold ${
+                            val < 0
+                              ? "text-red-400"
+                              : val > 0
+                                ? "text-green-500/80"
+                                : "text-gray-400"
+                          }`}
+                        >
+                          {val > 0 ? "+" : ""}
+                          {val.toLocaleString("id-ID")} NC
+                        </p>
+                      );
+                    })()}
                     <p className="text-xs text-gray-400 mt-1">
                       {job?.game || 0}
                     </p>

@@ -171,8 +171,11 @@ export default async function JobDetailPage(props: {
       const membersMap = await getCompanyMembersMap(35643);
       const member = membersMap[Number(truckyId)];
       if (member) {
-        driverRank = member.rank?.name || driverRank;
-        rankColor = member.rank?.color || rankColor;
+        driverRank = member.rank?.name || member.role?.name || driverRank;
+        rankColor = member.rank?.color || member.role?.color || rankColor;
+      } else if (mongoUser.truckyRole) {
+        driverRank = mongoUser.truckyRole;
+        rankColor = mongoUser.truckyRoleColor || rankColor;
       }
     } else if (truckyId) {
       const membersMap = await getCompanyMembersMap(35643);
@@ -509,26 +512,28 @@ export default async function JobDetailPage(props: {
                         <span className="font-black text-foreground uppercase text-sm tracking-wider">
                           Pendapatan Bersih
                         </span>
-                        <span
-                          className={`text-3xl font-black ${
-                            (localJob?.nc?.total || 0) -
-                              (localJob?.ncCost?.total || 0) >=
-                            0
-                              ? "text-green-600 dark:text-green-400"
-                              : "text-red-600 dark:text-red-400"
-                          }`}
-                        >
-                          {(localJob?.nc?.total || 0) -
-                            (localJob?.ncCost?.total || 0) >=
-                          0
-                            ? "+"
-                            : ""}
-                          {(
-                            (localJob?.nc?.total || 0) -
-                            (localJob?.ncCost?.total || 0)
-                          ).toLocaleString()}{" "}
-                          NC
-                        </span>
+                        {(() => {
+                          const netRevenue =
+                            typeof localJob?.revenue === "number"
+                              ? localJob.revenue
+                              : (localJob?.nc?.total || 0) -
+                                (localJob?.ncCost?.total || 0);
+                          const isPositive = netRevenue > 0;
+                          const isNegative = netRevenue < 0;
+
+                          return (
+                            <span
+                              className={`text-3xl font-black ${
+                                isNegative
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-green-600 dark:text-green-400"
+                              }`}
+                            >
+                              {isPositive ? "+" : ""}
+                              {netRevenue.toLocaleString("id-ID")} NC
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

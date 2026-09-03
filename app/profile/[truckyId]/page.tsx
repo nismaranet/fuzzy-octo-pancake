@@ -527,9 +527,26 @@ export default async function PublicProfilePage(props: {
                                   )
                                 : "Baru saja"}
                             </p>
-                            <p className="font-black text-primary text-xl">
-                              +{formatNum(job.nc?.total || job.revenue || 0)} NC
-                            </p>
+                            {(() => {
+                              const val =
+                                typeof job.revenue === "number"
+                                  ? job.revenue
+                                  : (job.nc?.total ?? 0);
+                              return (
+                                <p
+                                  className={`font-black text-xl ${
+                                    val < 0
+                                      ? "text-red-400"
+                                      : val > 0
+                                        ? "text-primary"
+                                        : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {val > 0 ? "+" : ""}
+                                  {formatNum(val)} NC
+                                </p>
+                              );
+                            })()}
                           </div>
                         </div>
                       </Link>
