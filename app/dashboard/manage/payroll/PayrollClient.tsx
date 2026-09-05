@@ -64,7 +64,10 @@ interface PayrollClientProps {
   };
 }
 
-export default function PayrollClient({ initialData, currentUser }: PayrollClientProps) {
+export default function PayrollClient({
+  initialData,
+  currentUser,
+}: PayrollClientProps) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -81,7 +84,11 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
   } = data;
 
   const currentPoints = currentMonthPerf?.totalPoints || 0;
-  const currentRewards = currentMonthPerf?.rewards || { totalNc: 10000, bonusNc: 0, penaltyTickets: 0 };
+  const currentRewards = currentMonthPerf?.rewards || {
+    totalNc: 10000,
+    bonusNc: 0,
+    penaltyTickets: 0,
+  };
   const currentBreakdown = currentMonthPerf?.breakdown || {};
 
   // Find next milestone tier
@@ -93,8 +100,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
     if (!mStr || !mStr.includes("-")) return mStr;
     const [year, month] = mStr.split("-");
     const monthNames = [
-      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
     ];
     const idx = parseInt(month, 10) - 1;
     return `${monthNames[idx] || month} ${year}`;
@@ -105,7 +122,7 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
     try {
       const res = await fetch("/api/manage/payroll", {
         cache: "no-store",
-        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
       });
       const json = await res.json();
       if (json.success) {
@@ -123,12 +140,12 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
 
     const confirmed = await showConfirm(
       `Klaim gaji dan insentif performa periode ${formatMonthLabel(previousMonth)}?\n\n` +
-      `• Total Poin: ${previousMonthData.performance?.totalPoints || 0} Poin\n` +
-      `• Total Cair: ${(previousMonthData.performance?.rewards?.totalNc || 10000).toLocaleString("id-ID")} NC\n` +
-      `• Tiket Safebox: +${previousMonthData.performance?.rewards?.penaltyTickets || 0} Tiket\n` +
-      `• Voucher: ${previousMonthData.performance?.rewards?.vouchers?.length || 0} Voucher\n\n` +
-      `Seluruh reward akan langsung dicairkan ke saldo dan garasi akun Anda. Lanjutkan?`,
-      "Konfirmasi Pencairan Gaji"
+        `• Total Poin: ${previousMonthData.performance?.totalPoints || 0} Poin\n` +
+        `• Total Cair: ${(previousMonthData.performance?.rewards?.totalNc || 10000).toLocaleString("id-ID")} NC\n` +
+        `• Tiket Safebox: +${previousMonthData.performance?.rewards?.penaltyTickets || 0} Tiket\n` +
+        `• Voucher: ${previousMonthData.performance?.rewards?.vouchers?.length || 0} Voucher\n\n` +
+        `Seluruh reward akan langsung dicairkan ke saldo dan garasi akun Anda. Lanjutkan?`,
+      "Konfirmasi Pencairan Gaji",
     );
 
     if (!confirmed) return;
@@ -139,7 +156,7 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Pragma": "no-cache",
+          Pragma: "no-cache",
           "Cache-Control": "no-cache",
         },
         body: JSON.stringify({ month: previousMonth }),
@@ -148,7 +165,10 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
       const resData = await res.json();
 
       if (!res.ok || !resData.success) {
-        await showAlert(resData.error || "Gagal memproses klaim gaji.", "Gagal");
+        await showAlert(
+          resData.error || "Gagal memproses klaim gaji.",
+          "Gagal",
+        );
         return;
       }
 
@@ -156,7 +176,7 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
         `Selamat! Gaji & insentif performa periode ${formatMonthLabel(previousMonth)} sebesar ${(
           resData.data?.ncAmount || 0
         ).toLocaleString("id-ID")} NC berhasil dicairkan!`,
-        "Pencairan Berhasil 🎉"
+        "Pencairan Berhasil 🎉",
       );
 
       // Refresh data
@@ -186,7 +206,9 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               Sistem Gaji & Insentif Performa
             </h1>
             <p className="text-sm md:text-base text-zinc-400 max-w-2xl">
-              Evaluasi kinerja bulanan staf manajemen VTC Nismara. Dihitung otomatis setiap tanggal 1 awal bulan (*full calendar month*) dengan sistem reward berjenjang anti-inflasi.
+              Evaluasi kinerja bulanan staf manajemen VTC Nismara. Dihitung
+              otomatis setiap tanggal 1 awal bulan dengan sistem reward
+              berjenjang.
             </p>
           </div>
 
@@ -197,7 +219,9 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium border border-zinc-700/60 transition shadow-sm disabled:opacity-50"
               title="Perbarui Data"
             >
-              <RotateCcw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <RotateCcw
+                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
               Refresh Data
             </button>
             <Link
@@ -215,29 +239,43 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
           <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-950/50 border border-zinc-800/50">
             <Calendar className="w-5 h-5 text-amber-400 shrink-0" />
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Periode Berjalan</div>
-              <div className="text-sm font-bold text-white">{formatMonthLabel(currentMonth)}</div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">
+                Periode Berjalan
+              </div>
+              <div className="text-sm font-bold text-white">
+                {formatMonthLabel(currentMonth)}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-950/50 border border-zinc-800/50">
             <Coins className="w-5 h-5 text-yellow-400 shrink-0" />
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Base Gaji Pokok</div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">
+                Base Gaji Pokok
+              </div>
               <div className="text-sm font-bold text-white">10.000 NC</div>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-950/50 border border-zinc-800/50">
             <Clock className="w-5 h-5 text-indigo-400 shrink-0" />
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Siklus Evaluasi</div>
-              <div className="text-sm font-bold text-white">Tgl 1 Awal Bulan</div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">
+                Siklus Evaluasi
+              </div>
+              <div className="text-sm font-bold text-white">
+                Tgl 1 Awal Bulan
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-950/50 border border-zinc-800/50">
             <ShieldAlert className="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Proteksi Manipulasi</div>
-              <div className="text-sm font-bold text-emerald-400">Anti-Abuse Active</div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">
+                Proteksi Manipulasi
+              </div>
+              <div className="text-sm font-bold text-emerald-400">
+                Anti-Abuse Active
+              </div>
             </div>
           </div>
         </div>
@@ -258,7 +296,8 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                     Gaji & Insentif Periode {formatMonthLabel(previousMonth)}
                   </h2>
                   <p className="text-sm text-zinc-300 max-w-xl">
-                    Evaluasi performa bulan lalu telah ditutup. Anda mengumpulkan total{" "}
+                    Evaluasi performa bulan lalu telah ditutup. Anda
+                    mengumpulkan total{" "}
                     <span className="font-bold text-amber-400">
                       {previousMonthData.performance?.totalPoints || 0} Poin
                     </span>{" "}
@@ -268,18 +307,28 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                   <div className="flex flex-wrap items-center gap-4 pt-2">
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-amber-500/30 text-amber-400 font-bold text-sm">
                       <Coins className="w-4 h-4" />
-                      {(previousMonthData.performance?.rewards?.totalNc || 10000).toLocaleString("id-ID")} NC
+                      {(
+                        previousMonthData.performance?.rewards?.totalNc || 10000
+                      ).toLocaleString("id-ID")}{" "}
+                      NC
                     </div>
-                    {previousMonthData.performance?.rewards?.penaltyTickets > 0 && (
+                    {previousMonthData.performance?.rewards?.penaltyTickets >
+                      0 && (
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-red-500/30 text-red-400 font-bold text-sm">
-                        <Ticket className="w-4 h-4" />
-                        +{previousMonthData.performance?.rewards?.penaltyTickets} Tiket Safebox
+                        <Ticket className="w-4 h-4" />+
+                        {previousMonthData.performance?.rewards?.penaltyTickets}{" "}
+                        Tiket Safebox
                       </div>
                     )}
-                    {previousMonthData.performance?.rewards?.vouchers?.length > 0 && (
+                    {previousMonthData.performance?.rewards?.vouchers?.length >
+                      0 && (
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-indigo-500/30 text-indigo-300 font-bold text-sm">
                         <Gift className="w-4 h-4" />
-                        {previousMonthData.performance?.rewards?.vouchers?.length} Voucher Diskon
+                        {
+                          previousMonthData.performance?.rewards?.vouchers
+                            ?.length
+                        }{" "}
+                        Voucher Diskon
                       </div>
                     )}
                   </div>
@@ -318,7 +367,9 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                   </div>
                   <div className="text-xs text-zinc-400">
                     Dicairkan pada:{" "}
-                    {new Date(previousMonthData.record?.claimedAt).toLocaleString("id-ID", {
+                    {new Date(
+                      previousMonthData.record?.claimedAt,
+                    ).toLocaleString("id-ID", {
                       timeZone: "Asia/Jakarta",
                       day: "2-digit",
                       month: "long",
@@ -351,12 +402,15 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               Live KPI Tracker — Periode {formatMonthLabel(currentMonth)}
             </h2>
             <p className="text-xs text-zinc-400">
-              Pantau poin performa Anda secara langsung di bulan ini sebelum dievaluasi pada tanggal 1 berikutnya.
+              Pantau poin performa Anda secara langsung di bulan ini sebelum
+              dievaluasi pada tanggal 1 berikutnya.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-zinc-400">Poin Terkumpul:</span>
+            <span className="text-xs font-medium text-zinc-400">
+              Poin Terkumpul:
+            </span>
             <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-extrabold text-sm">
               {currentPoints} Poin
             </span>
@@ -376,7 +430,8 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                 {currentRewards.totalNc.toLocaleString("id-ID")} NC
               </div>
               <div className="text-[11px] text-zinc-500 mt-1">
-                Base 10.000 NC + Bonus {currentRewards.bonusNc.toLocaleString("id-ID")} NC
+                Base 10.000 NC + Bonus{" "}
+                {currentRewards.bonusNc.toLocaleString("id-ID")} NC
               </div>
             </div>
 
@@ -385,8 +440,8 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                 Bonus Tiket Safebox
               </div>
               <div className="text-2xl font-black text-red-400 flex items-center gap-2">
-                <Ticket className="w-6 h-6" />
-                +{currentRewards.penaltyTickets} Tiket
+                <Ticket className="w-6 h-6" />+{currentRewards.penaltyTickets}{" "}
+                Tiket
               </div>
               <div className="text-[11px] text-zinc-500 mt-1">
                 Otomatis masuk ke Safebox Stock garasi
@@ -432,7 +487,9 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
             <div className="relative w-full h-3.5 bg-zinc-950 rounded-full border border-zinc-800 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 rounded-full transition-all duration-700 shadow-sm"
-                style={{ width: `${Math.min(100, Math.max(0, currentPoints))}%` }}
+                style={{
+                  width: `${Math.min(100, Math.max(0, currentPoints))}%`,
+                }}
               />
             </div>
 
@@ -463,7 +520,9 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
 
                     {/* Tooltip on Hover */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 rounded-xl bg-zinc-950 border border-zinc-700 shadow-2xl text-[11px] text-zinc-200 hidden group-hover:block z-50 pointer-events-none">
-                      <div className="font-bold text-amber-400 mb-0.5">Milestone {m.tier} Poin</div>
+                      <div className="font-bold text-amber-400 mb-0.5">
+                        Milestone {m.tier} Poin
+                      </div>
                       <div className="text-zinc-300">{m.label}</div>
                     </div>
                   </div>
@@ -486,14 +545,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Tiket Support Ditangani</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Tiket Support Ditangani
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {currentBreakdown.ticketsHandled || 0} Tiket
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.ticketPoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.ticketPoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -508,14 +571,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Order Pembelian Fleet</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Order Pembelian Fleet
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {currentBreakdown.fleetOrdersHandled || 0} Order
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.fleetOrderPoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.fleetOrderPoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -530,14 +597,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Konfirmasi Servis Armada</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Konfirmasi Servis Armada
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {currentBreakdown.fleetServicesHandled || 0} Servis
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.fleetServicePoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.fleetServicePoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -552,14 +623,19 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Penyelenggaraan Konvoi</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Penyelenggaraan Konvoi
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
-                {currentBreakdown.convoysHosted || 0} Konvoi ({currentBreakdown.convoyParticipants || 0} Peserta)
+                {currentBreakdown.convoysHosted || 0} Konvoi (
+                {currentBreakdown.convoyParticipants || 0} Peserta)
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.convoyPoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.convoyPoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -574,14 +650,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Pembuatan Special Contract</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Pembuatan Special Contract
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {currentBreakdown.contractsCreated || 0} Kontrak
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.contractPoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.contractPoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -596,14 +676,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Pembuatan Event NC Boost</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Pembuatan Event NC Boost
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {currentBreakdown.boostEventsCreated || 0} Event
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.boostPoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.boostPoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -618,14 +702,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Review Mod Market Items</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Review Mod Market Items
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {currentBreakdown.modsReviewed || 0} Mod
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.modPoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.modPoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -640,14 +728,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Jarak Tempuh Job Driver</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Jarak Tempuh Job Driver
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {(currentBreakdown.distanceKm || 0).toLocaleString("id-ID")} KM
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.distancePoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.distancePoints || 0} Poin
+              </span>
             </div>
           </div>
 
@@ -662,14 +754,18 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               </span>
             </div>
             <div>
-              <div className="text-xs text-zinc-400 font-semibold">Kelulusan Driver Magang</div>
+              <div className="text-xs text-zinc-400 font-semibold">
+                Kelulusan Driver Magang
+              </div>
               <div className="text-xl font-black text-white mt-0.5">
                 {currentBreakdown.internPromotionsHandled || 0} Dipromosikan
               </div>
             </div>
             <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs">
               <span className="text-zinc-500">Poin Didapat:</span>
-              <span className="font-bold text-amber-400">+{currentBreakdown.internPromotionPoints || 0} Poin</span>
+              <span className="font-bold text-amber-400">
+                +{currentBreakdown.internPromotionPoints || 0} Poin
+              </span>
             </div>
           </div>
         </div>
@@ -683,7 +779,8 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
             Arsip Slip Gaji & Klaim Masa Lalu
           </h2>
           <p className="text-xs text-zinc-400">
-            Daftar lengkap riwayat pencairan gaji dan bonus performa manager yang telah Anda klaim.
+            Daftar lengkap riwayat pencairan gaji dan bonus performa manager
+            yang telah Anda klaim.
           </p>
         </div>
 
@@ -704,7 +801,10 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
                   {historyRecords.map((r: any) => (
-                    <tr key={r._id || r.month} className="hover:bg-zinc-800/40 transition">
+                    <tr
+                      key={r._id || r.month}
+                      className="hover:bg-zinc-800/40 transition"
+                    >
                       <td className="px-6 py-4 font-bold text-white whitespace-nowrap">
                         {formatMonthLabel(r.month)}
                       </td>
@@ -715,7 +815,10 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                         {r.totalPoints} Poin
                       </td>
                       <td className="px-6 py-4 font-extrabold text-amber-400">
-                        {(r.rewardsGranted?.ncAmount || 0).toLocaleString("id-ID")} NC
+                        {(r.rewardsGranted?.ncAmount || 0).toLocaleString(
+                          "id-ID",
+                        )}{" "}
+                        NC
                       </td>
                       <td className="px-6 py-4 text-xs text-zinc-300">
                         <div className="flex flex-col gap-0.5">
@@ -726,12 +829,14 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                           )}
                           {r.rewardsGranted?.vouchers?.length > 0 && (
                             <span className="text-indigo-400 font-semibold">
-                              +{r.rewardsGranted?.vouchers?.length} Voucher Diskon
+                              +{r.rewardsGranted?.vouchers?.length} Voucher
+                              Diskon
                             </span>
                           )}
-                          {!r.rewardsGranted?.penaltyTickets && !r.rewardsGranted?.vouchers?.length && (
-                            <span className="text-zinc-500">-</span>
-                          )}
+                          {!r.rewardsGranted?.penaltyTickets &&
+                            !r.rewardsGranted?.vouchers?.length && (
+                              <span className="text-zinc-500">-</span>
+                            )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-xs text-zinc-400 whitespace-nowrap">
@@ -764,9 +869,12 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
         ) : (
           <div className="p-8 rounded-2xl bg-zinc-900/40 border border-zinc-800 text-center space-y-2">
             <Receipt className="w-8 h-8 text-zinc-600 mx-auto" />
-            <div className="text-sm font-bold text-zinc-400">Belum Ada Arsip Slip Gaji</div>
+            <div className="text-sm font-bold text-zinc-400">
+              Belum Ada Arsip Slip Gaji
+            </div>
             <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              Riwayat slip gaji akan muncul secara otomatis setelah Anda mencairkan gaji bulanan pertama Anda.
+              Riwayat slip gaji akan muncul secara otomatis setelah Anda
+              mencairkan gaji bulanan pertama Anda.
             </p>
           </div>
         )}
@@ -782,8 +890,12 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                   <Receipt className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Slip Gaji Digital Manager</h3>
-                  <p className="text-xs text-zinc-400">Nismara Logistics Official Payroll</p>
+                  <h3 className="text-base font-bold text-white">
+                    Slip Gaji Digital Manager
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Nismara Logistics Official Payroll
+                  </p>
                 </div>
               </div>
               <button
@@ -798,28 +910,37 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80 text-xs">
                 <div>
                   <span className="text-zinc-500 block">Periode Evaluasi:</span>
-                  <span className="font-bold text-white">{formatMonthLabel(selectedReceipt.month)}</span>
+                  <span className="font-bold text-white">
+                    {formatMonthLabel(selectedReceipt.month)}
+                  </span>
                 </div>
                 <div>
                   <span className="text-zinc-500 block">Status Klaim:</span>
-                  <span className="font-bold text-emerald-400">LUNAS / CLAIMED</span>
+                  <span className="font-bold text-emerald-400">
+                    LUNAS / CLAIMED
+                  </span>
                 </div>
                 <div>
                   <span className="text-zinc-500 block">ID Transaksi:</span>
-                  <span className="font-mono text-amber-400">{selectedReceipt.claimedTrxId || "-"}</span>
+                  <span className="font-mono text-amber-400">
+                    {selectedReceipt.claimedTrxId || "-"}
+                  </span>
                 </div>
                 <div>
                   <span className="text-zinc-500 block">Waktu Pencairan:</span>
                   <span className="text-zinc-300">
                     {selectedReceipt.claimedAt
-                      ? `${new Date(selectedReceipt.claimedAt).toLocaleString("id-ID", {
-                          timeZone: "Asia/Jakarta",
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })} WIB`
+                      ? `${new Date(selectedReceipt.claimedAt).toLocaleString(
+                          "id-ID",
+                          {
+                            timeZone: "Asia/Jakarta",
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )} WIB`
                       : "-"}
                   </span>
                 </div>
@@ -827,7 +948,9 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
 
               {/* Rincian Poin & Nilai */}
               <div className="space-y-2">
-                <div className="text-xs font-bold uppercase tracking-wider text-zinc-400">Rincian Performa</div>
+                <div className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Rincian Performa
+                </div>
                 <div className="p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/60 space-y-1.5 text-xs">
                   <div className="flex justify-between text-zinc-400">
                     <span>Gaji Pokok (Base):</span>
@@ -835,42 +958,66 @@ export default function PayrollClient({ initialData, currentUser }: PayrollClien
                   </div>
                   <div className="flex justify-between text-zinc-400">
                     <span>Total Poin Performa Tercapai:</span>
-                    <span className="font-bold text-amber-400">{selectedReceipt.totalPoints} Poin</span>
+                    <span className="font-bold text-amber-400">
+                      {selectedReceipt.totalPoints} Poin
+                    </span>
                   </div>
                   <div className="flex justify-between text-zinc-400">
                     <span>Bonus Tambahan Poin:</span>
                     <span className="font-bold text-white">
-                      {((selectedReceipt.rewardsGranted?.ncAmount || 10000) - 10000).toLocaleString("id-ID")} NC
+                      {(
+                        (selectedReceipt.rewardsGranted?.ncAmount || 10000) -
+                        10000
+                      ).toLocaleString("id-ID")}{" "}
+                      NC
                     </span>
                   </div>
                   <div className="pt-2 border-t border-zinc-800 flex justify-between text-sm font-black text-amber-400">
                     <span>TOTAL NC DITERIMA:</span>
-                    <span>{(selectedReceipt.rewardsGranted?.ncAmount || 0).toLocaleString("id-ID")} NC</span>
+                    <span>
+                      {(
+                        selectedReceipt.rewardsGranted?.ncAmount || 0
+                      ).toLocaleString("id-ID")}{" "}
+                      NC
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Item Tambahan */}
               {(selectedReceipt.rewardsGranted?.penaltyTickets > 0 ||
-                (selectedReceipt.rewardsGranted?.vouchers && selectedReceipt.rewardsGranted.vouchers.length > 0)) && (
+                (selectedReceipt.rewardsGranted?.vouchers &&
+                  selectedReceipt.rewardsGranted.vouchers.length > 0)) && (
                 <div className="space-y-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-zinc-400">Item Tambahan Diterima</div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Item Tambahan Diterima
+                  </div>
                   <div className="p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/60 space-y-2 text-xs">
                     {selectedReceipt.rewardsGranted?.penaltyTickets > 0 && (
                       <div className="flex items-center gap-2 text-red-400 font-bold">
                         <Ticket className="w-4 h-4" />
-                        <span>+{selectedReceipt.rewardsGranted.penaltyTickets} Tiket Penghapus Penalti (Safebox)</span>
+                        <span>
+                          +{selectedReceipt.rewardsGranted.penaltyTickets} Tiket
+                          Penghapus Penalti (Safebox)
+                        </span>
                       </div>
                     )}
-                    {selectedReceipt.rewardsGranted?.vouchers?.map((v: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between text-zinc-300 font-medium">
-                        <div className="flex items-center gap-2">
-                          <Gift className="w-4 h-4 text-indigo-400" />
-                          <span>{v.title}</span>
+                    {selectedReceipt.rewardsGranted?.vouchers?.map(
+                      (v: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-zinc-300 font-medium"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Gift className="w-4 h-4 text-indigo-400" />
+                            <span>{v.title}</span>
+                          </div>
+                          <span className="font-mono text-amber-400 text-[11px] font-bold">
+                            {v.code}
+                          </span>
                         </div>
-                        <span className="font-mono text-amber-400 text-[11px] font-bold">{v.code}</span>
-                      </div>
-                    ))}
+                      ),
+                    )}
                   </div>
                 </div>
               )}
