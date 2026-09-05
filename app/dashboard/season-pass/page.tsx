@@ -44,11 +44,19 @@ export default async function SeasonPassPage() {
 
   const progressDoc = await getUserSeasonProgress(discordId, seasonNumber);
 
-  const pendingOrderDoc = await SeasonPassOrder.findOne({
+  const pendingPassOrderDoc = await SeasonPassOrder.findOne({
     discordId,
     seasonNumber,
+    orderType: { $ne: "LEVEL_SKIP" },
     status: "pending",
-  }).lean();
+  }).sort({ createdAt: -1 }).lean();
+
+  const pendingLevelOrderDoc = await SeasonPassOrder.findOne({
+    discordId,
+    seasonNumber,
+    orderType: "LEVEL_SKIP",
+    status: "pending",
+  }).sort({ createdAt: -1 }).lean();
 
   const merchClaimDoc = await SeasonPassMerchClaim.findOne({
     discordId,
@@ -64,8 +72,11 @@ export default async function SeasonPassPage() {
         )
       )
     : null;
-  const pendingOrder = pendingOrderDoc
-    ? JSON.parse(JSON.stringify(pendingOrderDoc))
+  const pendingOrder = pendingPassOrderDoc
+    ? JSON.parse(JSON.stringify(pendingPassOrderDoc))
+    : null;
+  const pendingLevelOrder = pendingLevelOrderDoc
+    ? JSON.parse(JSON.stringify(pendingLevelOrderDoc))
     : null;
   const merchClaim = merchClaimDoc
     ? JSON.parse(JSON.stringify(merchClaimDoc))
@@ -81,6 +92,7 @@ export default async function SeasonPassPage() {
         initialProgress={progress}
         initialWeekInfo={weekInfo}
         initialPendingOrder={pendingOrder}
+        initialPendingLevelOrder={pendingLevelOrder}
         initialMerchClaim={merchClaim}
         guildId={guildId}
         isSeasonActive={isSeasonActive}

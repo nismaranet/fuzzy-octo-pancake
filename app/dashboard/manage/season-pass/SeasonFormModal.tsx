@@ -37,7 +37,9 @@ export default function SeasonFormModal({
     grandPrizeDesc: "Hadiah puncak edisi terbatas resmi Nismara Transport",
     grandPrizeType: "MOD_LIVERY",
     grandPrizeUrl: "",
+    grandPrizeImageUrl: "/images/season-pass/grandprize-mod-default.jpg",
     premiumPriceIdr: 35000,
+    levelPriceIdr: 2000,
     status: "DRAFT",
   });
 
@@ -62,6 +64,11 @@ export default function SeasonFormModal({
 
   useEffect(() => {
     if (mode === "EDIT" && initialData) {
+      const defaultImg =
+        initialData.grandPrize?.type === "PHYSICAL_MERCH" || initialData.grandPrize?.type === "PHYSICAL"
+          ? "/images/season-pass/grandprize-merch-default.jpg"
+          : "/images/season-pass/grandprize-mod-default.jpg";
+
       setFormData({
         seasonNumber: initialData.seasonNumber,
         title: initialData.title || "",
@@ -77,7 +84,9 @@ export default function SeasonFormModal({
         grandPrizeDesc: initialData.grandPrize?.description || "",
         grandPrizeType: initialData.grandPrize?.type || "MOD_LIVERY",
         grandPrizeUrl: initialData.grandPrize?.downloadUrl || "",
+        grandPrizeImageUrl: initialData.grandPrize?.imageUrl || defaultImg,
         premiumPriceIdr: initialData.premiumPriceIdr || 35000,
+        levelPriceIdr: initialData.levelPriceIdr || 2000,
         status: initialData.status || "DRAFT",
       });
     } else if (mode === "CREATE") {
@@ -85,6 +94,10 @@ export default function SeasonFormModal({
         ...prev,
         seasonNumber: latestSeasonNumber + 1,
         title: `Season ${latestSeasonNumber + 1}: Road Conqueror`,
+        grandPrizeImageUrl:
+          prev.grandPrizeType === "PHYSICAL_MERCH" || prev.grandPrizeType === "PHYSICAL"
+            ? "/images/season-pass/grandprize-merch-default.jpg"
+            : "/images/season-pass/grandprize-mod-default.jpg",
       }));
     }
   }, [mode, initialData, latestSeasonNumber, isOpen]);
@@ -419,30 +432,124 @@ export default function SeasonFormModal({
                       : "💡 Driver yang menamatkan Level 30 akan melihat tombol 'Unduh Mod / Konten' untuk mendownload file mod secara langsung."}
                   </p>
                 </div>
+
+                {/* Grand Prize Preview Image URL */}
+                <div className="space-y-2 md:col-span-2 pt-1 border-t border-border/30">
+                  <label className="text-[11px] font-bold text-muted-foreground flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-amber-400" /> URL Gambar Pratinjau Hadiah Puncak (Showcase Image)
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-mono">Format WebP / JPG / PNG</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.grandPrizeImageUrl}
+                    onChange={(e) => setFormData({ ...formData, grandPrizeImageUrl: e.target.value })}
+                    placeholder="https://images.nismara.my.id/... atau /images/season-pass/..."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-amber-500 focus:outline-none text-sm font-mono text-xs"
+                  />
+
+                  {/* Quick Preset Buttons */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-[10px] font-bold text-muted-foreground">Pilihan Preset Cepat:</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          grandPrizeImageUrl: "/images/season-pass/grandprize-mod-default.jpg",
+                        })
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-muted/50 hover:bg-muted border border-border text-[10px] font-semibold text-foreground transition flex items-center gap-1"
+                    >
+                      💾 Preset Showcase Mod Livery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          grandPrizeImageUrl: "/images/season-pass/grandprize-merch-default.jpg",
+                        })
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-muted/50 hover:bg-muted border border-border text-[10px] font-semibold text-foreground transition flex items-center gap-1"
+                    >
+                      📦 Preset Showcase Merchandise
+                    </button>
+                  </div>
+
+                  {/* Live Image Thumbnail Preview */}
+                  {formData.grandPrizeImageUrl && (
+                    <div className="mt-2 relative rounded-2xl overflow-hidden border border-border/80 bg-black/40 p-2 flex items-center gap-3">
+                      <div className="w-24 h-16 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-border/50 relative">
+                        <img
+                          src={formData.grandPrizeImageUrl}
+                          alt="Preview Hadiah Puncak"
+                          className="w-full h-full object-cover"
+                          onError={(e: any) => {
+                            e.target.style.display = "none";
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 text-xs">
+                        <span className="text-[10px] uppercase font-bold text-amber-400 block tracking-wider">
+                          Pratinjau Gambar Aktif
+                        </span>
+                        <p className="font-bold text-foreground truncate mt-0.5">
+                          {formData.grandPrizeTitle || "Hadiah Puncak Level 30"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground truncate font-mono mt-0.5">
+                          {formData.grandPrizeImageUrl}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Pricing Config */}
-            <div className="md:col-span-2 pt-2 border-t border-border/40 space-y-3">
+            <div className="md:col-span-2 pt-2 border-t border-border/40 space-y-4">
               <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <DollarSign size={14} /> Biaya Upgrade Nismara Pass Premium (IDR)
+                <DollarSign size={14} /> Pengaturan Biaya Pembelian (IDR)
               </h4>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-muted-foreground flex items-center justify-between">
-                  <span>Harga Pembelian Season Pass (Rupiah)</span>
-                  <span className="text-[10px] text-amber-400 font-mono">Invoice Discord (QRIS / Transfer Bank)</span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={formData.premiumPriceIdr}
-                  onChange={(e) => setFormData({ ...formData, premiumPriceIdr: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-amber-500 focus:outline-none text-sm font-bold"
-                />
-                <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
-                  💡 Season Pass Premium hanya dapat dibeli menggunakan mata uang Rupiah (IDR) melalui invoice channel Discord. Tidak dapat dibeli menggunakan Nismara Coin (NC).
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-muted-foreground flex items-center justify-between">
+                    <span>Harga Pass Premium (Rupiah)</span>
+                    <span className="text-[10px] text-amber-400 font-mono">Akses 30 Level</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={formData.premiumPriceIdr}
+                    onChange={(e) => setFormData({ ...formData, premiumPriceIdr: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-amber-500 focus:outline-none text-sm font-bold"
+                  />
+                  <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                    💡 Biaya pembelian Nismara Pass Premium (akses seluruh 30 level reward premium).
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-muted-foreground flex items-center justify-between">
+                    <span>Harga Beli per 1 Level Skip (Rupiah)</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">Dinamis Per Musim</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={formData.levelPriceIdr}
+                    onChange={(e) => setFormData({ ...formData, levelPriceIdr: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-amber-500 focus:outline-none text-sm font-bold"
+                  />
+                  <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                    💡 Biaya per 1 level jika driver ingin membeli level secara instan (misal: Rp 2.000 atau Rp 3.000).
+                  </p>
+                </div>
               </div>
             </div>
           </div>

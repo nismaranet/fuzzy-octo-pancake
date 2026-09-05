@@ -99,6 +99,7 @@ const seasonPassSchema = new mongoose.Schema(
       imageUrl: { type: String, default: "" },
     },
     premiumPriceIdr: { type: Number, default: 35000 },
+    levelPriceIdr: { type: Number, default: 2000 },
   },
   { timestamps: true }
 );

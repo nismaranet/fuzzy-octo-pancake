@@ -7,6 +7,10 @@ import { signOut } from "next-auth/react";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "@/components/ui/NotificationBell";
 import { getCurrencyData } from "@/app/dashboard/currency/actions";
+import {
+  getSeasonPassSummary,
+  type SeasonPassSummary,
+} from "@/app/dashboard/season-pass/actions";
 import { NismaraIcon, DiscordIcon } from "./icons/SocialMedia";
 import {
   Menu,
@@ -74,6 +78,7 @@ export default function NavbarClient({ session }: { session: any }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [currency, setCurrency] = useState<number | null>(null);
+  const [seasonPass, setSeasonPass] = useState<SeasonPassSummary | null>(null);
 
   // Note: If you need to close the menu on route change, you would normally use usePathname from next/navigation.
   // We'll keep the state simple for now without breaking existing code.
@@ -89,6 +94,10 @@ export default function NavbarClient({ session }: { session: any }) {
       getCurrencyData()
         .then((data) => setCurrency(data.balance))
         .catch((err) => console.error("Gagal mengambil currency:", err));
+
+      getSeasonPassSummary()
+        .then((data) => setSeasonPass(data))
+        .catch((err) => console.error("Gagal mengambil season pass:", err));
     }
   }, [mounted, session]);
 
@@ -114,6 +123,7 @@ export default function NavbarClient({ session }: { session: any }) {
   // Mobile-specific menu items (flattened)
   const mobileMenuItems = [
     { name: "Home", href: "/", icon: Home },
+    { name: "Season Pass", href: "/dashboard/season-pass", icon: Trophy },
     { name: "Jobs Details", href: "/jobs", icon: Briefcase },
     { name: "Cargo Market", href: "/cargo-market", icon: Package },
     { name: "Fuel Market", href: "/fuel-market", icon: Fuel },
@@ -524,7 +534,7 @@ export default function NavbarClient({ session }: { session: any }) {
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="w-64 mt-2 p-2 rounded-2xl bg-card border border-border/50 shadow-xl"
+                  className="w-72 mt-2 p-2 rounded-2xl bg-card border border-border/50 shadow-xl"
                   align="end"
                 >
                   <div className="bg-muted/80 backdrop-blur-md rounded-xl p-3 flex items-center gap-3 mb-2 border border-white/5">
@@ -665,6 +675,23 @@ export default function NavbarClient({ session }: { session: any }) {
                         className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
                         render={
                           <Link
+                            href="/dashboard/manage/season-pass"
+                            className="flex items-center w-full"
+                          />
+                        }
+                      >
+                        <Trophy className="mr-3 h-4 w-4 text-red-400" />
+                        <span className="font-medium text-red-400">
+                          Manage Season Pass
+                        </span>
+                      </DropdownMenuItem>
+                    )}
+                    {(session.user?.role === "manager" ||
+                      session.user?.role === "admin") && (
+                      <DropdownMenuItem
+                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
+                        render={
+                          <Link
                             href="/dashboard/manage/data"
                             className="flex items-center w-full"
                           />
@@ -680,9 +707,90 @@ export default function NavbarClient({ session }: { session: any }) {
 
                   <div className="h-px bg-border my-2 mx-2" />
 
-                  <div className="px-1 py-1">
+                  {/* EXCLUSIVE MEMBERSHIP & PASS SECTION */}
+                  <div className="px-1 py-1 space-y-1.5">
+                    {/* SEASON PASS EXCLUSIVE CARD */}
                     <DropdownMenuItem
-                      className={`cursor-pointer rounded-lg hover:bg-white/5 focus:bg-white/5 flex items-center justify-between group ${session.user?.nismaraplus?.status ? "bg-amber-400/10 hover:bg-amber-400/20 focus:bg-amber-400/20 border border-amber-400/20" : ""}`}
+                      className={`cursor-pointer rounded-xl p-2.5 flex flex-col gap-1.5 group transition-all duration-200 ${
+                        seasonPass?.isPremium
+                          ? "bg-amber-500/10 hover:bg-amber-500/20 focus:bg-amber-500/20 border border-amber-500/30"
+                          : "bg-white/[0.03] hover:bg-white/[0.07] focus:bg-white/[0.07] border border-white/5 hover:border-amber-500/30"
+                      }`}
+                      render={
+                        <Link
+                          href="/dashboard/season-pass"
+                          className="block w-full"
+                        />
+                      }
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`p-1.5 rounded-lg shrink-0 transition-colors ${
+                              seasonPass?.isPremium
+                                ? "bg-amber-500/20 text-amber-400"
+                                : "bg-slate-800 text-slate-400 group-hover:text-amber-400 group-hover:bg-amber-500/10"
+                            }`}
+                          >
+                            <Trophy className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span
+                              className={`text-xs font-bold truncate leading-tight ${
+                                seasonPass?.isPremium
+                                  ? "text-amber-400"
+                                  : "text-foreground group-hover:text-amber-400 transition-colors"
+                              }`}
+                            >
+                              Season Pass
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-medium leading-tight mt-0.5">
+                              {seasonPass
+                                ? `S${seasonPass.seasonNumber} • Level ${seasonPass.currentLevel}`
+                                : "Season 1 • Level 0"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${
+                            seasonPass?.isPremium
+                              ? "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs shadow-amber-500/20"
+                              : "bg-slate-800/80 text-slate-400 border-slate-700/60 group-hover:border-slate-600"
+                          }`}
+                        >
+                          {seasonPass?.isPremium ? "PREMIUM" : "FREE"}
+                        </span>
+                      </div>
+
+                      {/* Mini progress bar (Level 0 - 30) */}
+                      <div className="w-full bg-slate-800/80 rounded-full h-1 overflow-hidden mt-0.5">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            seasonPass?.isPremium
+                              ? "bg-linear-to-r from-amber-500 to-yellow-400"
+                              : "bg-slate-600 group-hover:bg-amber-400"
+                          }`}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.max(
+                                seasonPass?.currentLevel ? 4 : 2,
+                                Math.round(((seasonPass?.currentLevel ?? 0) / 30) * 100)
+                              )
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </DropdownMenuItem>
+
+                    {/* NISMARA+ CARD */}
+                    <DropdownMenuItem
+                      className={`cursor-pointer rounded-xl p-2.5 flex items-center justify-between group transition-all duration-200 ${
+                        session.user?.nismaraplus?.status
+                          ? "bg-amber-400/10 hover:bg-amber-400/20 focus:bg-amber-400/20 border border-amber-400/20"
+                          : "bg-white/[0.03] hover:bg-white/[0.07] focus:bg-white/[0.07] border border-white/5 hover:border-amber-400/30"
+                      }`}
                       render={
                         <Link
                           href="/dashboard/nismaraplus"
@@ -690,32 +798,46 @@ export default function NavbarClient({ session }: { session: any }) {
                         />
                       }
                     >
-                      <div className="flex items-center">
-                        <NismaraIcon
-                          className={`mr-3 h-4 w-4 ${session.user?.nismaraplus?.status ? "text-amber-400" : "text-slate-400 group-hover:text-amber-400 transition-colors"}`}
-                        />
-                        <div className="flex flex-col">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`p-1.5 rounded-lg shrink-0 transition-colors ${
+                            session.user?.nismaraplus?.status
+                              ? "bg-amber-400/20 text-amber-400"
+                              : "bg-slate-800 text-slate-400 group-hover:text-amber-400 group-hover:bg-amber-400/10"
+                          }`}
+                        >
+                          <NismaraIcon className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
                           <span
-                            className={`font-medium leading-none ${session.user?.nismaraplus?.status ? "text-amber-400 font-bold" : "group-hover:text-amber-400 transition-colors"}`}
+                            className={`text-xs font-bold leading-tight truncate ${
+                              session.user?.nismaraplus?.status
+                                ? "text-amber-400"
+                                : "text-foreground group-hover:text-amber-400 transition-colors"
+                            }`}
                           >
                             Nismara+
                           </span>
-                          {session.user?.nismaraplus?.status && (
-                            <span className="text-[9px] text-amber-500/80 uppercase tracking-widest font-black mt-1">
+                          {session.user?.nismaraplus?.status ? (
+                            <span className="text-[9px] text-amber-500/80 uppercase tracking-widest font-black leading-tight mt-0.5">
                               Aktif s.d{" "}
                               {new Date(
-                                session.user.nismaraplus.expiredAt,
+                                session.user.nismaraplus.expiredAt
                               ).toLocaleDateString("id-ID", {
                                 day: "numeric",
                                 month: "short",
                                 year: "numeric",
                               })}
                             </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground font-medium leading-tight mt-0.5">
+                              Membership VIP
+                            </span>
                           )}
                         </div>
                       </div>
                       {!session.user?.nismaraplus?.status && (
-                        <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        <span className="text-[9px] bg-primary/20 text-primary border border-primary/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">
                           VIP
                         </span>
                       )}

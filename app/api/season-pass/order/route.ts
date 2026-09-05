@@ -6,6 +6,7 @@ import SeasonPass from "@/lib/models/SeasonPass";
 import SeasonPassOrder from "@/lib/models/SeasonPassOrder";
 import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import User from "@/lib/models/User";
+import { getUserSeasonProgress, calculateLevelFromXp } from "@/lib/seasonPass";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -26,15 +27,20 @@ export async function GET() {
       return NextResponse.json({ error: "Tidak ada musim aktif" }, { status: 404 });
     }
 
-    const pendingOrder = await SeasonPassOrder.findOne({
+    const pendingOrders = await SeasonPassOrder.find({
       discordId: String(session.user.discordId),
       seasonNumber: season.seasonNumber,
       status: "pending",
-    }).lean();
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const pendingOrder = pendingOrders[0] || null;
 
     return NextResponse.json({
       success: true,
       pendingOrder: pendingOrder ? JSON.parse(JSON.stringify(pendingOrder)) : null,
+      pendingOrders: JSON.parse(JSON.stringify(pendingOrders)),
     }, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -57,7 +63,7 @@ export async function POST(request: Request) {
     await dbConnect();
 
     const body = await request.json().catch(() => ({}));
-    const { seasonNumber = 1 } = body;
+    const { seasonNumber = 1, orderType = "PREMIUM_PASS", levelCount = 1 } = body;
 
     const season = await SeasonPass.findOne({ seasonNumber });
     if (!season) {
@@ -69,22 +75,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
     }
 
-    const progress = await UserSeasonProgress.findOne({
-      discordId: String(session.user.discordId),
-      seasonNumber,
-    });
+    let progress = await getUserSeasonProgress(session.user.discordId, seasonNumber);
+    if (!progress) {
+      return NextResponse.json({ error: "Gagal memuat progress driver" }, { status: 500 });
+    }
 
-    if (progress?.isPremium) {
+    const isLevelSkip = orderType === "LEVEL_SKIP";
+
+    if (!isLevelSkip && progress.isPremium) {
       return NextResponse.json(
         { error: "Anda sudah memiliki Nismara Pass Premium musim ini!" },
         { status: 400 }
       );
     }
 
-    // Cek apakah sudah ada pesanan pending
+    const currentLvl = calculateLevelFromXp(progress.currentXp, season.levels);
+
+    if (isLevelSkip && currentLvl >= 30) {
+      return NextResponse.json(
+        { error: "Level Season Pass Anda sudah mencapai batas maksimal (Level 30)!" },
+        { status: 400 }
+      );
+    }
+
+    const validLevelCount = isLevelSkip
+      ? Math.max(1, Math.min(30 - currentLvl, Math.floor(Number(levelCount))))
+      : 0;
+    const startLevel = currentLvl;
+    const targetLevel = isLevelSkip ? Math.min(30, currentLvl + validLevelCount) : 1;
+
+    // Cek apakah sudah ada pesanan pending untuk tipe yang sama
     const existingOrder = await SeasonPassOrder.findOne({
       discordId: String(session.user.discordId),
       seasonNumber,
+      orderType,
       status: "pending",
     });
 
@@ -92,11 +116,16 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         order: existingOrder,
-        message: "Anda masih memiliki pesanan Nismara Pass yang sedang menunggu konfirmasi Owner / Developer.",
+        message: isLevelSkip
+          ? "Anda masih memiliki pesanan Level Skip yang sedang menunggu konfirmasi Owner / Developer."
+          : "Anda masih memiliki pesanan Nismara Pass yang sedang menunggu konfirmasi Owner / Developer.",
       });
     }
 
-    const amountIDR = season.premiumPriceIdr || 35000;
+    const amountIDR = isLevelSkip
+      ? validLevelCount * (season.levelPriceIdr || 2000)
+      : (season.premiumPriceIdr || 35000);
+
     const formattedPrice = `Rp ${amountIDR.toLocaleString("id-ID")},-`;
     const discordId = String(session.user.discordId);
     const username = session.user.name || "driver";
@@ -137,6 +166,11 @@ export async function POST(request: Request) {
           });
         }
 
+        const channelPrefix = isLevelSkip ? "⚡lvlskip" : "🏆pass";
+        const channelTopic = isLevelSkip
+          ? `Channel Pembelian Level Skip (+${validLevelCount} Level: Lvl ${startLevel} ➔ Lvl ${targetLevel}) S${seasonNumber} (${formattedPrice}) | Driver: ${discordId}`
+          : `Channel Pembelian Nismara Pass Season ${seasonNumber} (${formattedPrice}) | Driver: ${discordId}`;
+
         const channelRes = await fetch(
           `https://discord.com/api/v10/guilds/${guildId}/channels`,
           {
@@ -146,10 +180,10 @@ export async function POST(request: Request) {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              name: `🏆pass-s${seasonNumber}-${username.toLowerCase().replace(/\s+/g, "-")}`,
+              name: `${channelPrefix}-s${seasonNumber}-${username.toLowerCase().replace(/\s+/g, "-")}`,
               type: 0,
               parent_id: categoryId || null,
-              topic: `Channel Pembelian Nismara Pass Season ${seasonNumber} (${formattedPrice}) | Driver: ${discordId}`,
+              topic: channelTopic,
               permission_overwrites: permissionOverwrites,
             }),
           }
@@ -158,6 +192,38 @@ export async function POST(request: Request) {
         if (channelRes.ok) {
           const channelData = await channelRes.json();
           createdChannelId = channelData.id;
+
+          const embedTitle = isLevelSkip
+            ? `⚡ Permintaan Beli Level Season Pass Season ${seasonNumber}`
+            : `✨ Permintaan Pembelian Nismara Pass Season ${seasonNumber}`;
+
+          const embedDesc = isLevelSkip
+            ? `Halo **${username}**, terima kasih telah memilih layanan Level Skip Nismara Pass!\n\nSilakan lakukan pembayaran sesuai rincian di bawah:`
+            : `Halo **${username}**, terima kasih telah memilih untuk mendukung operasional Nismara Transport!\n\nSilakan lakukan pembayaran sesuai dengan rincian paket yang Anda pilih di bawah ini:`;
+
+          const packageField = isLevelSkip
+            ? {
+                name: "📦 Paket yang Dipilih",
+                value: `**Level Skip (+${validLevelCount} Level)**\n*(Progres: Level ${startLevel} ➔ Level ${targetLevel})*`,
+                inline: true,
+              }
+            : {
+                name: "📦 Paket yang Dipilih",
+                value: `**Nismara Pass Premium Season ${seasonNumber}** (90 Hari)`,
+                inline: true,
+              };
+
+          const priceField = isLevelSkip
+            ? {
+                name: "💵 Total Tagihan",
+                value: `**${formattedPrice}**\n*(${validLevelCount} Level × Rp ${(season.levelPriceIdr || 2000).toLocaleString("id-ID")})*`,
+                inline: true,
+              }
+            : {
+                name: "💵 Total Tagihan",
+                value: `**${formattedPrice}**\n*(Akses Penuh 30 Level Premium)*`,
+                inline: true,
+              };
 
           // Kirim Embed Invoice ke channel
           await fetch(
@@ -172,20 +238,12 @@ export async function POST(request: Request) {
                 content: `<@${discordId}> | <@${owner1}> <@${owner2}>`,
                 embeds: [
                   {
-                    title: `✨ Permintaan Pembelian Nismara Pass Season ${seasonNumber}`,
-                    description: `Halo **${username}**, terima kasih telah memilih untuk mendukung operasional Nismara Transport!\n\nSilakan lakukan pembayaran sesuai dengan rincian paket yang Anda pilih di bawah ini:`,
-                    color: 16098851, // Amber Gold
+                    title: embedTitle,
+                    description: embedDesc,
+                    color: isLevelSkip ? 16753920 : 16098851, // Orange vs Amber Gold
                     fields: [
-                      {
-                        name: "📦 Paket yang Dipilih",
-                        value: `**Nismara Pass Premium Season ${seasonNumber}** (90 Hari)`,
-                        inline: true,
-                      },
-                      {
-                        name: "💵 Total Tagihan",
-                        value: `**${formattedPrice}**\n*(Akses Penuh 30 Level Premium)*`,
-                        inline: true,
-                      },
+                      packageField,
+                      priceField,
                       {
                         name: "🏦 Metode Pembayaran",
                         value: "",
@@ -196,7 +254,9 @@ export async function POST(request: Request) {
                       url: "https://images.nismara.my.id/Nismara_QR.jpg",
                     },
                     footer: {
-                      text: "Silahkan lakukan pembayaran dengan QR diatas. Apabila sudah melakukan pembayaran kamu dapat mengirimkan foto/screenshot bukti transfer yang valid lalu silahkan tunggu sampai Nismara Pass anda diaktifkan.",
+                      text: isLevelSkip
+                        ? "Silahkan lakukan pembayaran dengan QR diatas. Kirimkan bukti transfer valid ke channel ini lalu tunggu konfirmasi Owner / Developer."
+                        : "Silahkan lakukan pembayaran dengan QR diatas. Apabila sudah melakukan pembayaran kamu dapat mengirimkan foto/screenshot bukti transfer yang valid lalu silahkan tunggu sampai Nismara Pass anda diaktifkan.",
                     },
                     timestamp: new Date().toISOString(),
                   },
@@ -214,6 +274,10 @@ export async function POST(request: Request) {
       discordId,
       userId: user._id,
       seasonNumber,
+      orderType,
+      levelCount: isLevelSkip ? validLevelCount : 0,
+      startLevel: isLevelSkip ? startLevel : 1,
+      targetLevel: isLevelSkip ? targetLevel : 1,
       amountIDR,
       channelId: createdChannelId,
       status: "pending",
@@ -229,7 +293,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       order: newOrder,
-      message: "Pesanan Nismara Pass berhasil dibuat! Silakan selesaikan pembayaran dan tunggu konfirmasi dari Owner / Developer.",
+      message: isLevelSkip
+        ? `Pesanan Level Skip (+${validLevelCount} Level) berhasil dibuat! Silakan selesaikan pembayaran dan tunggu konfirmasi Owner / Developer.`
+        : "Pesanan Nismara Pass berhasil dibuat! Silakan selesaikan pembayaran dan tunggu konfirmasi dari Owner / Developer.",
       channelId: createdChannelId,
     }, {
       headers: {

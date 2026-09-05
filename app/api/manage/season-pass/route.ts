@@ -104,9 +104,11 @@ export async function POST(request: Request) {
         grandPrizeTitle,
         grandPrizeDesc,
         grandPrizeUrl,
+        grandPrizeImageUrl,
         grandPrizeType = "MOD_LIVERY",
         premiumPriceIdr = 35000,
         premiumPriceNc = 75000,
+        levelPriceIdr = 2000,
         templateId,
         copyRewardsFromSeason,
       } = body;
@@ -155,10 +157,11 @@ export async function POST(request: Request) {
           description: grandPrizeDesc || `Hadiah eksklusif edisi terbatas untuk Season ${seasonNumber}`,
           type: grandPrizeType || "MOD_LIVERY",
           downloadUrl: grandPrizeUrl || "",
-          imageUrl: "",
+          imageUrl: grandPrizeImageUrl || (grandPrizeType === "PHYSICAL_MERCH" || grandPrizeType === "PHYSICAL" ? "/images/season-pass/grandprize-merch-default.jpg" : "/images/season-pass/grandprize-mod-default.jpg"),
         },
         premiumPriceIdr: Number(premiumPriceIdr),
         premiumPriceNc: Number(premiumPriceNc),
+        levelPriceIdr: Number(levelPriceIdr),
       });
 
       return NextResponse.json({
@@ -182,9 +185,11 @@ export async function POST(request: Request) {
         grandPrizeTitle,
         grandPrizeDesc,
         grandPrizeUrl,
+        grandPrizeImageUrl,
         grandPrizeType,
         premiumPriceIdr,
         premiumPriceNc,
+        levelPriceIdr,
         status,
       } = body;
 
@@ -201,17 +206,19 @@ export async function POST(request: Request) {
       if (totalXp) season.totalXp = Number(totalXp);
       if (weeklyCapXp) season.weeklyCapXp = Number(weeklyCapXp);
       if (finalRushWeeks !== undefined) season.finalRushWeeks = Number(finalRushWeeks);
-      if (premiumPriceIdr) season.premiumPriceIdr = Number(premiumPriceIdr);
-      if (premiumPriceNc) season.premiumPriceNc = Number(premiumPriceNc);
+      if (premiumPriceIdr !== undefined) season.premiumPriceIdr = Number(premiumPriceIdr);
+      if (premiumPriceNc !== undefined) season.premiumPriceNc = Number(premiumPriceNc);
+      if (levelPriceIdr !== undefined) season.levelPriceIdr = Number(levelPriceIdr);
       if (status) season.status = status;
 
-      if (grandPrizeTitle || grandPrizeDesc || grandPrizeUrl !== undefined || grandPrizeType) {
+      if (grandPrizeTitle || grandPrizeDesc || grandPrizeUrl !== undefined || grandPrizeImageUrl !== undefined || grandPrizeType) {
         season.grandPrize = {
           ...season.grandPrize,
           title: grandPrizeTitle || season.grandPrize?.title,
           description: grandPrizeDesc || season.grandPrize?.description,
           type: grandPrizeType || season.grandPrize?.type || "MOD_LIVERY",
           downloadUrl: grandPrizeUrl !== undefined ? grandPrizeUrl : season.grandPrize?.downloadUrl,
+          imageUrl: grandPrizeImageUrl !== undefined ? grandPrizeImageUrl : season.grandPrize?.imageUrl,
         };
       }
 

@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     if (!progress || progress.currentLevel < 30) {
       return NextResponse.json(
         {
-          error: `Anda belum mencapai Level 30 untuk mengklaim Grand Prize! (Level Anda: ${progress?.currentLevel || 1})`,
+          error: `Anda belum mencapai Level 30 untuk mengklaim Grand Prize! (Level Anda: ${progress?.currentLevel ?? 0})`,
         },
         { status: 403 },
       );

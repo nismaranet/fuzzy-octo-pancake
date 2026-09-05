@@ -7,7 +7,7 @@ const userSeasonProgressSchema = new mongoose.Schema(
     discordId: { type: String, required: true, index: true },
     guildId: { type: String, required: true, default: process.env.DISCORD_GUILD_ID || "863959415702028318" },
     currentXp: { type: Number, required: true, default: 0 },
-    currentLevel: { type: Number, required: true, default: 1 },
+    currentLevel: { type: Number, required: true, default: 0 },
     isPremium: { type: Boolean, default: false },
     purchasedAt: { type: Date, default: null },
     claimedFreeLevels: { type: [Number], default: [] }, // Array of level numbers claimed in Free Track

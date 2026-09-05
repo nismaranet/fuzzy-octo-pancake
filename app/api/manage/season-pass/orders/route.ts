@@ -6,7 +6,7 @@ import SeasonPassOrder from "@/lib/models/SeasonPassOrder";
 import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import Transaction from "@/lib/models/Transaction";
 import User from "@/lib/models/User";
-import { getUserSeasonProgress } from "@/lib/seasonPass";
+import { getUserSeasonProgress, applySeasonLevelSkip } from "@/lib/seasonPass";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -101,74 +101,147 @@ export async function POST(request: Request) {
     }
 
     const botToken = process.env.DISCORD_BOT_TOKEN;
+    const isLevelSkip = order.orderType === "LEVEL_SKIP";
 
     if (action === "APPROVE") {
-      // Aktifkan Premium Pass
-      const progress = await getUserSeasonProgress(order.discordId, order.seasonNumber);
-      if (progress) {
-        progress.isPremium = true;
-        progress.purchasedAt = new Date();
-        await progress.save();
-      }
-
-      // Catat ke transaksi resmi
       const randomTrx = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const trxId = `TRX-PASS-S${order.seasonNumber}-${randomTrx}`;
 
-      await Transaction.create({
-        trxId,
-        discordId: order.discordId,
-        userId: order.userId,
-        title: `Nismara Pass Premium Season ${order.seasonNumber}`,
-        category: "nismaraplus",
-        amount: order.amountIDR,
-        currency: "IDR",
-        status: "success",
-        metadata: {
-          seasonNumber: order.seasonNumber,
-          orderId: order._id.toString(),
-          approvedBy: session.user.discordId,
-        },
-      });
+      if (isLevelSkip) {
+        // Terapkan Level Skip
+        const skipRes = await applySeasonLevelSkip(
+          order.discordId,
+          order.seasonNumber,
+          order.levelCount || 1
+        );
 
-      // Notifikasi Discord Channel jika ada
-      if (order.channelId && botToken) {
-        await fetch(`https://discord.com/api/v10/channels/${order.channelId}/messages`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bot ${botToken}`,
-            "Content-Type": "application/json",
+        // Catat ke transaksi resmi
+        const trxId = `TRX-LVLSKIP-S${order.seasonNumber}-${randomTrx}`;
+        await Transaction.create({
+          trxId,
+          discordId: order.discordId,
+          userId: order.userId,
+          title: `Beli ${order.levelCount || 1} Level Season Pass Season ${order.seasonNumber}`,
+          category: "nismaraplus",
+          amount: order.amountIDR,
+          currency: "IDR",
+          status: "success",
+          metadata: {
+            seasonNumber: order.seasonNumber,
+            orderType: "LEVEL_SKIP",
+            levelCount: order.levelCount,
+            startLevel: order.startLevel,
+            targetLevel: skipRes?.newLevel || order.targetLevel,
+            orderId: order._id.toString(),
+            approvedBy: session.user.discordId,
           },
-          body: JSON.stringify({
-            content: `🎉 **PEMBAYARAN DITERIMA & DIKONFIRMASI!**\n<@${order.discordId}> Nismara Pass Premium Season ${order.seasonNumber} Anda telah aktif! Anda sekarang dapat mengklaim seluruh 30 level hadiah premium di Dashboard. Terima kasih atas dukungannya! 👑`,
-          }),
-        }).catch((e) => console.error("Discord order notify error:", e));
-      }
+        });
 
-      // Revalidasi cache
-      try {
-        revalidatePath("/dashboard/season-pass");
-        revalidatePath("/dashboard/transactions");
-        revalidatePath("/dashboard/manage/season-pass");
-        revalidatePath("/dashboard");
-      } catch (e) {
-        console.error("Failed to revalidate order approve paths:", e);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: `Pesanan Nismara Pass untuk ${order.discordId} berhasil disetujui dan Pass Premium telah aktif!`,
-        order,
-      }, {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-          "CDN-Cache-Control": "no-store",
-          "Vercel-CDN-Cache-Control": "no-store",
+        // Notifikasi Discord Channel jika ada
+        if (order.channelId && botToken) {
+          await fetch(`https://discord.com/api/v10/channels/${order.channelId}/messages`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bot ${botToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: `🎉 **PEMBAYARAN LEVEL SKIP DIKONFIRMASI!**\n<@${order.discordId}> Pembelian **${order.levelCount || 1} Level** Season Pass Season ${order.seasonNumber} Anda telah aktif! Progres Anda sekarang berada di **Level ${skipRes?.newLevel || order.targetLevel}**. Silakan klaim seluruh reward baru Anda di Dashboard! ⚡🚀`,
+            }),
+          }).catch((e) => console.error("Discord level skip order notify error:", e));
         }
-      });
+
+        // Revalidasi cache
+        try {
+          revalidatePath("/dashboard/season-pass");
+          revalidatePath("/dashboard/transactions");
+          revalidatePath("/dashboard/manage/season-pass");
+          revalidatePath("/dashboard");
+        } catch (e) {
+          console.error("Failed to revalidate order approve paths:", e);
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Pesanan Level Skip (+${order.levelCount || 1} Level) untuk ${order.discordId} berhasil disetujui!`,
+          order,
+        }, {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "CDN-Cache-Control": "no-store",
+            "Vercel-CDN-Cache-Control": "no-store",
+          }
+        });
+      } else {
+        // Aktifkan Premium Pass
+        const progress = await getUserSeasonProgress(order.discordId, order.seasonNumber);
+        if (progress) {
+          progress.isPremium = true;
+          progress.purchasedAt = new Date();
+          await progress.save();
+        }
+
+        // Catat ke transaksi resmi
+        const trxId = `TRX-PASS-S${order.seasonNumber}-${randomTrx}`;
+        await Transaction.create({
+          trxId,
+          discordId: order.discordId,
+          userId: order.userId,
+          title: `Nismara Pass Premium Season ${order.seasonNumber}`,
+          category: "nismaraplus",
+          amount: order.amountIDR,
+          currency: "IDR",
+          status: "success",
+          metadata: {
+            seasonNumber: order.seasonNumber,
+            orderType: "PREMIUM_PASS",
+            orderId: order._id.toString(),
+            approvedBy: session.user.discordId,
+          },
+        });
+
+        // Notifikasi Discord Channel jika ada
+        if (order.channelId && botToken) {
+          await fetch(`https://discord.com/api/v10/channels/${order.channelId}/messages`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bot ${botToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: `🎉 **PEMBAYARAN DITERIMA & DIKONFIRMASI!**\n<@${order.discordId}> Nismara Pass Premium Season ${order.seasonNumber} Anda telah aktif! Anda sekarang dapat mengklaim seluruh 30 level hadiah premium di Dashboard. Terima kasih atas dukungannya! 👑`,
+            }),
+          }).catch((e) => console.error("Discord order notify error:", e));
+        }
+
+        // Revalidasi cache
+        try {
+          revalidatePath("/dashboard/season-pass");
+          revalidatePath("/dashboard/transactions");
+          revalidatePath("/dashboard/manage/season-pass");
+          revalidatePath("/dashboard");
+        } catch (e) {
+          console.error("Failed to revalidate order approve paths:", e);
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Pesanan Nismara Pass untuk ${order.discordId} berhasil disetujui dan Pass Premium telah aktif!`,
+          order,
+        }, {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "CDN-Cache-Control": "no-store",
+            "Vercel-CDN-Cache-Control": "no-store",
+          }
+        });
+      }
     }
 
     // action === "REJECT"
+    const orderTitle = isLevelSkip
+      ? `Level Skip (+${order.levelCount || 1} Level)`
+      : `Nismara Pass Premium Season ${order.seasonNumber}`;
+
     // Notifikasi Discord Channel jika ada
     if (order.channelId && botToken) {
       await fetch(`https://discord.com/api/v10/channels/${order.channelId}/messages`, {
@@ -178,7 +251,7 @@ export async function POST(request: Request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          content: `❌ **PESANAN DITOLAK**\n<@${order.discordId}> Pesanan Nismara Pass Premium Season ${order.seasonNumber} Anda ditolak. Silakan periksa kembali bukti pembayaran Anda atau hubungi Owner / Developer.`,
+          content: `❌ **PESANAN DITOLAK**\n<@${order.discordId}> Pesanan ${orderTitle} Anda ditolak. Silakan periksa kembali bukti pembayaran Anda atau hubungi Owner / Developer.`,
         }),
       }).catch((e) => console.error("Discord order reject notify error:", e));
     }

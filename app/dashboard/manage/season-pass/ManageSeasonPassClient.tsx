@@ -474,11 +474,16 @@ export default function ManageSeasonPassClient({
                     </div>
 
                     <div className="p-2 rounded-lg bg-muted/30">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Harga IDR</span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Harga Pass</span>
                       <span className="font-semibold text-amber-400">Rp {s.premiumPriceIdr?.toLocaleString("id-ID")}</span>
                     </div>
 
                     <div className="p-2 rounded-lg bg-muted/30">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Harga Level</span>
+                      <span className="font-semibold text-emerald-400">Rp {(s.levelPriceIdr || 2000).toLocaleString("id-ID")} / lvl</span>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-muted/30 col-span-2">
                       <span className="text-[10px] text-muted-foreground uppercase font-bold block">Hadiah Puncak</span>
                       <span className="font-semibold text-foreground truncate block">{s.grandPrize?.title || "-"}</span>
                     </div>
@@ -767,6 +772,7 @@ export default function ManageSeasonPassClient({
                 <thead className="bg-muted/50 border-b border-border/60 text-muted-foreground uppercase font-black tracking-wider">
                   <tr>
                     <th className="p-3.5">Driver / Pemesan</th>
+                    <th className="p-3.5">Paket / Tipe</th>
                     <th className="p-3.5">Musim</th>
                     <th className="p-3.5">Total Tagihan</th>
                     <th className="p-3.5">Tanggal Order</th>
@@ -780,6 +786,7 @@ export default function ManageSeasonPassClient({
                       const isPending = o.status === "pending";
                       const isSuccess = o.status === "success";
                       const isRejected = o.status === "rejected";
+                      const isLevelSkip = o.orderType === "LEVEL_SKIP";
 
                       return (
                         <tr key={o._id} className="hover:bg-muted/20 transition">
@@ -793,6 +800,22 @@ export default function ManageSeasonPassClient({
                                 <p className="text-[10px] text-muted-foreground font-mono">{o.discordId}</p>
                               </div>
                             </div>
+                          </td>
+                          <td className="p-3.5">
+                            {isLevelSkip ? (
+                              <div>
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 font-bold text-[10px] uppercase">
+                                  <Zap size={11} className="fill-orange-400" /> Level Skip (+{o.levelCount || 1} Lvl)
+                                </span>
+                                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                                  Lvl {o.startLevel || "?"} ➔ Lvl {o.targetLevel || "?"}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px] uppercase">
+                                <Crown size={11} className="fill-amber-400" /> Pass Premium
+                              </span>
+                            )}
                           </td>
                           <td className="p-3.5 font-black text-foreground">
                             Season {o.seasonNumber}
@@ -847,7 +870,7 @@ export default function ManageSeasonPassClient({
                     })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={7} className="p-8 text-center text-muted-foreground">
                         Belum ada pesanan Nismara Pass yang masuk.
                       </td>
                     </tr>

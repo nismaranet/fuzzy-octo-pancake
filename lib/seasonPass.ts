@@ -575,7 +575,14 @@ export async function ensureSeasonInitialized() {
         imageUrl: "/images/season1-livery.webp",
       },
       premiumPriceIdr: 35000,
+      levelPriceIdr: 2000,
     });
+  } else if (!season.levelPriceIdr) {
+    season.levelPriceIdr = 2000;
+    await SeasonPass.updateOne(
+      { _id: season._id },
+      { $set: { levelPriceIdr: 2000 } }
+    );
   }
 
   // Pre-seed semua Master Achievement Season agar langsung muncul di Manage Achievement
@@ -647,7 +654,7 @@ export async function getUserSeasonProgress(
       discordId: String(discordId),
       guildId: process.env.DISCORD_GUILD_ID || "863959415702028318",
       currentXp: 0,
-      currentLevel: 1,
+      currentLevel: 0,
       isPremium: false,
       claimedFreeLevels: [],
       claimedPremiumLevels: [],
@@ -717,11 +724,10 @@ export function calculateUnlockedLevel(currentXp: number, levels: SeasonLevelCon
 }
 
 /**
- * Menghitung level yang sedang ditempuh (1-30) berdasarkan total akumulasi XP
+ * Menghitung level yang telah dicapai (0-30) berdasarkan total akumulasi XP
  */
 export function calculateLevelFromXp(currentXp: number, levels: SeasonLevelConfig[]): number {
-  const unlocked = calculateUnlockedLevel(currentXp, levels);
-  return Math.min(30, unlocked + (unlocked < 30 ? 1 : 0));
+  return calculateUnlockedLevel(currentXp, levels);
 }
 
 /**
@@ -1154,3 +1160,49 @@ export async function upgradeToPremiumPass(
     message: `Selamat! Nismara Pass Premium Season ${seasonNumber} Anda telah aktif.`,
   };
 }
+
+/**
+ * Terapkan Level Skip ke progress driver (meningkatkan level dan cumulative XP secara instan)
+ */
+export async function applySeasonLevelSkip(
+  discordId: string | number,
+  seasonNumber: number,
+  levelCount: number
+) {
+  await dbConnect();
+
+  const season = await SeasonPass.findOne({ seasonNumber: Number(seasonNumber) });
+  if (!season) return { success: false, error: "Musim tidak ditemukan" };
+
+  const progress = await getUserSeasonProgress(discordId, seasonNumber);
+  if (!progress) return { success: false, error: "Progress user tidak ditemukan" };
+
+  const count = Math.max(1, Math.floor(Number(levelCount)));
+  const currentLvl = calculateLevelFromXp(progress.currentXp, season.levels);
+  const targetLevel = Math.min(30, currentLvl + count);
+
+  // Ambil cumulative XP target level
+  const targetLevelConfig = season.levels.find((l: any) => l.level === targetLevel);
+  if (!targetLevelConfig) {
+    return { success: false, error: `Konfigurasi Level ${targetLevel} tidak ditemukan` };
+  }
+
+  const targetCumulativeXp = targetLevelConfig.cumulativeXp;
+  const newXp = Math.max(progress.currentXp, targetCumulativeXp);
+  const newLevel = calculateLevelFromXp(newXp, season.levels);
+
+  progress.currentXp = newXp;
+  progress.currentLevel = newLevel;
+  progress.levelSkipsPurchased = (progress.levelSkipsPurchased || 0) + count;
+  await progress.save();
+
+  return {
+    success: true,
+    previousLevel: currentLvl,
+    newLevel: progress.currentLevel,
+    currentXp: progress.currentXp,
+    levelSkipsPurchased: progress.levelSkipsPurchased,
+    message: `Berhasil meningkatkan ${count} level ke Level ${progress.currentLevel}!`,
+  };
+}
+
