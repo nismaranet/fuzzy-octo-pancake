@@ -12,6 +12,7 @@ import {
   Info,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import VoucherPickerModal, { VoucherTriggerBar } from "@/components/voucher/VoucherPickerModal";
 
 interface UserData {
   discordId: string;
@@ -41,6 +42,7 @@ export default function BuyFleetWizard({
   const [error, setError] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
 
   // Fetch available fleet buy vouchers when entering Step 3
@@ -475,8 +477,8 @@ export default function BuyFleetWizard({
                   </div>
 
                   {/* Voucher Selection Section */}
-                  <div className="mt-6 pt-6 border-t border-border/50">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="mt-6 pt-6 border-t border-border/50 space-y-2">
+                    <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                         <Ticket size={14} className="text-teal-400" /> Kupon Diskon Pembelian
                       </span>
@@ -487,65 +489,14 @@ export default function BuyFleetWizard({
                       )}
                     </div>
 
-                    {isLoadingVouchers ? (
-                      <div className="p-3 text-xs text-muted-foreground bg-background/50 border border-border/50 rounded-xl animate-pulse">
-                        Memuat voucher diskon Anda...
-                      </div>
-                    ) : vouchers.length === 0 ? (
-                      <div className="p-3 text-xs text-muted-foreground bg-background/50 border border-border/50 rounded-xl flex items-center gap-2">
-                        <Info size={14} className="text-muted-foreground shrink-0" />
-                        <span>Tidak ada kupon diskon armada aktif di akun Anda.</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div
-                          onClick={() => setSelectedVoucherId(null)}
-                          className={`p-3 rounded-xl border text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${
-                            selectedVoucherId === null
-                              ? "bg-primary/10 border-primary text-foreground"
-                              : "bg-background/50 border-border/50 text-muted-foreground hover:border-border"
-                          }`}
-                        >
-                          <span>Tanpa Kupon (Harga Normal)</span>
-                          {selectedVoucherId === null && <CheckCircle2 size={16} className="text-primary" />}
-                        </div>
-
-                        {vouchers.map((v) => {
-                          const isSelected = selectedVoucherId === v._id;
-                          const discLabel =
-                            v.discountType === "percentage"
-                              ? `Diskon ${v.discountValue}%`
-                              : `Potongan ${v.discountValue.toLocaleString("id-ID")} NC`;
-
-                          return (
-                            <div
-                              key={v._id}
-                              onClick={() => setSelectedVoucherId(v._id)}
-                              className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
-                                isSelected
-                                  ? "bg-teal-500/15 border-teal-500/60 text-teal-400 ring-1 ring-teal-500/30"
-                                  : "bg-background/50 border-border/50 hover:border-teal-500/40 text-foreground"
-                              }`}
-                            >
-                              <div className="space-y-0.5">
-                                <div className="font-bold flex items-center gap-1.5">
-                                  <Ticket size={13} className="text-teal-400 shrink-0" />
-                                  <span>{v.title}</span>
-                                </div>
-                                <div className="text-[11px] text-muted-foreground font-mono">
-                                  Kode: {v.code}
-                                </div>
-                              </div>
-                              <div className="text-right shrink-0 ml-2">
-                                <span className="inline-block px-2 py-0.5 bg-teal-500/20 text-teal-400 rounded-md font-black text-[11px] border border-teal-500/30">
-                                  {discLabel}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <VoucherTriggerBar
+                      vouchers={vouchers}
+                      selectedVoucher={selectedVoucher}
+                      isLoading={isLoadingVouchers}
+                      onOpenModal={() => setIsVoucherModalOpen(true)}
+                      onRemoveVoucher={() => setSelectedVoucherId(null)}
+                      accentColor="teal"
+                    />
                   </div>
 
                   <div className="mt-6 pt-6 border-t border-border border-dashed">
@@ -600,6 +551,17 @@ export default function BuyFleetWizard({
           </div>
         )}
       </div>
+
+      {/* Dedicated Voucher Picker Modal */}
+      <VoucherPickerModal
+        isOpen={isVoucherModalOpen}
+        onClose={() => setIsVoucherModalOpen(false)}
+        vouchers={vouchers}
+        selectedVoucherId={selectedVoucherId}
+        onSelectVoucher={(id) => setSelectedVoucherId(id)}
+        title="Pilih Kupon Diskon Armada"
+        categoryLabel="Pembelian Armada"
+      />
     </div>
   );
 }

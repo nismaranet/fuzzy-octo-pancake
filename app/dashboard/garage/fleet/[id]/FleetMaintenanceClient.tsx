@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { AlertCircle, Wrench, Calendar, Receipt, Info, Ticket, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import VoucherPickerModal, { VoucherTriggerBar } from "@/components/voucher/VoucherPickerModal";
 
 interface FleetMaintenanceClientProps {
   fleetId: string;
@@ -32,6 +33,7 @@ export default function FleetMaintenanceClient({
   orderType,
 }: FleetMaintenanceClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
@@ -133,8 +135,8 @@ export default function FleetMaintenanceClient({
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-border/50 bg-muted/30">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-border/50 bg-muted/30 shrink-0">
               <h2 className="text-xl font-black uppercase italic tracking-wider flex items-center gap-2">
                 <AlertCircle
                   className={
@@ -147,7 +149,7 @@ export default function FleetMaintenanceClient({
               </h2>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {error && (
                 <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl text-sm font-medium">
                   {error}
@@ -211,67 +213,14 @@ export default function FleetMaintenanceClient({
                   )}
                 </h3>
 
-                {isLoadingVouchers ? (
-                  <div className="p-3 text-xs text-muted-foreground bg-background/50 border border-border/50 rounded-xl animate-pulse">
-                    Memuat voucher Anda...
-                  </div>
-                ) : vouchers.length === 0 ? (
-                  <div className="p-3 text-xs text-muted-foreground bg-background/50 border border-border/50 rounded-xl flex items-center gap-2">
-                    <Info size={14} className="text-muted-foreground shrink-0" />
-                    <span>Tidak ada voucher servis aktif di akun Anda.</span>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div
-                      onClick={() => setSelectedVoucherId(null)}
-                      className={`p-3 rounded-xl border text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${
-                        selectedVoucherId === null
-                          ? "bg-primary/10 border-primary text-foreground"
-                          : "bg-background/50 border-border/50 text-muted-foreground hover:border-border"
-                      }`}
-                    >
-                      <span>Tanpa Voucher (Bayar Normal)</span>
-                      {selectedVoucherId === null && <CheckCircle2 size={16} className="text-primary" />}
-                    </div>
-
-                    {vouchers.map((v) => {
-                      const isSelected = selectedVoucherId === v._id;
-                      const discLabel =
-                        v.discountType === "percentage"
-                          ? v.discountValue === 100
-                            ? "Free Service (100%)"
-                            : `Diskon ${v.discountValue}%`
-                          : `Potongan ${v.discountValue.toLocaleString("id-ID")} NC`;
-
-                      return (
-                        <div
-                          key={v._id}
-                          onClick={() => setSelectedVoucherId(v._id)}
-                          className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
-                            isSelected
-                              ? "bg-emerald-500/15 border-emerald-500/60 text-emerald-400 ring-1 ring-emerald-500/30"
-                              : "bg-background/50 border-border/50 hover:border-emerald-500/40 text-foreground"
-                          }`}
-                        >
-                          <div className="space-y-0.5">
-                            <div className="font-bold flex items-center gap-1.5">
-                              <Ticket size={13} className="text-emerald-400 shrink-0" />
-                              <span>{v.title}</span>
-                            </div>
-                            <div className="text-[11px] text-muted-foreground font-mono">
-                              Kode: {v.code}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0 ml-2">
-                            <span className="inline-block px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-md font-black text-[11px] border border-emerald-500/30">
-                              {discLabel}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <VoucherTriggerBar
+                  vouchers={vouchers}
+                  selectedVoucher={selectedVoucher}
+                  isLoading={isLoadingVouchers}
+                  onOpenModal={() => setIsVoucherModalOpen(true)}
+                  onRemoveVoucher={() => setSelectedVoucherId(null)}
+                  accentColor="emerald"
+                />
               </div>
 
               <div className="space-y-3">
@@ -326,7 +275,7 @@ export default function FleetMaintenanceClient({
               </div>
             </div>
 
-            <div className="p-4 border-t border-border/50 bg-muted/30 flex justify-end gap-3">
+            <div className="p-4 border-t border-border/50 bg-muted/30 flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => setIsModalOpen(false)}
                 disabled={isSubmitting}
@@ -352,6 +301,17 @@ export default function FleetMaintenanceClient({
           </div>
         </div>
       )}
+
+      {/* Dedicated Voucher Picker Modal */}
+      <VoucherPickerModal
+        isOpen={isVoucherModalOpen}
+        onClose={() => setIsVoucherModalOpen(false)}
+        vouchers={vouchers}
+        selectedVoucherId={selectedVoucherId}
+        onSelectVoucher={(id) => setSelectedVoucherId(id)}
+        title="Pilih Kupon Servis"
+        categoryLabel="Servis & Perawatan"
+      />
     </>
   );
 }
