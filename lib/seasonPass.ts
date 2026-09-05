@@ -7,6 +7,7 @@ import dbConnect from "@/lib/mongoose";
 import { grantVoucher } from "@/lib/voucher";
 import Achievement from "@/lib/models/Achievement";
 import UserAchievement from "@/lib/models/UserAchievement";
+import UserVoucher from "@/lib/models/UserVoucher";
 
 export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
   // TIER 1: STARTER ZONE (Level 1 - 10)
@@ -509,8 +510,8 @@ export const SEASON_1_LEVELS: SeasonLevelConfig[] = [
   },
   {
     level: 30,
-    xpRequired: 0,
-    cumulativeXp: 225000,
+    xpRequired: 25000,
+    cumulativeXp: 250000,
     freeRewards: [
       { type: "NC", title: "35.000 Nismara Coin", amount: 35000 },
       { type: "FUEL", title: "6.000 Liter Fuel Garasi", amount: 6000 },
@@ -563,7 +564,7 @@ export async function ensureSeasonInitialized() {
       startAt: startDate,
       endAt: endDate,
       status: "ACTIVE",
-      totalXp: 225000,
+      totalXp: 250000,
       weeklyCapXp: 20000,
       finalRushWeeks: 2,
       levels: SEASON_1_LEVELS,
@@ -770,7 +771,7 @@ export async function addSeasonXp(
     }
   } else {
     // Mode Final Rush: Bebas hingga batas maksimum level 30 (totalXp)
-    const maxPossibleXp = season.totalXp || 225000;
+    const maxPossibleXp = season.totalXp || 250000;
     if (progress.currentXp + xpToAdd > maxPossibleXp) {
       xpToAdd = Math.max(0, maxPossibleXp - progress.currentXp);
     }
@@ -889,194 +890,311 @@ export async function claimLevelReward(
   const guildId = process.env.DISCORD_GUILD_ID || "863959415702028318";
   const results: string[] = [];
 
-  // Eksekusi penyerahan masing-masing hadiah
-  for (const r of rewardsToGrant) {
-    if (r.type === "NC" && r.amount && r.amount > 0) {
-      // 1. Tambah NC di currencies collection
-      await mongoose.connection.collection("currencies").updateOne(
-        { userId: String(discordId), guildId },
-        { $inc: { totalNC: r.amount } },
-        { upsert: true }
-      );
-      // Log ke currencyhistories
-      await mongoose.connection.collection("currencyhistories").insertOne({
-        userId: String(discordId),
-        guildId,
-        amount: r.amount,
-        type: "earn",
-        reason: `Hadiah Nismara Pass S${seasonNumber} (Level ${levelNum} - ${track.toUpperCase()})`,
-        createdAt: new Date(),
-      });
-      results.push(`+${r.amount.toLocaleString("id-ID")} NC`);
-    } else if (r.type === "FUEL" && r.amount && r.amount > 0) {
-      // 2. Tambah Fuel ke Garasi
-      await Garage.updateOne(
-        { discordId: String(discordId) },
-        { 
-          $inc: { fuelStock: r.amount },
-          $setOnInsert: {
-            fleetSlot: 1,
-            fleetSlotUsed: 0,
-            fleetSlotLevel: 1,
-            safeboxLevel: 1,
-            fuelCapacity: 2000,
-            fuelTankLevel: 1,
-            operational_cost: 0,
-            status: "active",
-            createdAt: new Date(),
-          }
-        },
-        { upsert: true }
-      );
-      results.push(`+${r.amount.toLocaleString("id-ID")} Liter Fuel`);
-    } else if (r.type === "SAFEBOX_TICKET" && r.amount && r.amount > 0) {
-      // 3. Tambah Tiket Safebox
-      await Garage.updateOne(
-        { discordId: String(discordId) },
-        { 
-          $inc: { safeboxStock: r.amount },
-          $setOnInsert: {
-            fleetSlot: 1,
-            fleetSlotUsed: 0,
-            fleetSlotLevel: 1,
-            safeboxLevel: 1,
-            fuelCapacity: 2000,
-            fuelTankLevel: 1,
-            fuelStock: 0,
-            operational_cost: 0,
-            status: "active",
-            createdAt: new Date(),
-          }
-        },
-        { upsert: true }
-      );
-      results.push(`+${r.amount}x Tiket Safebox Hapus Penalti`);
-    } else if (r.type === "VOUCHER" && r.voucherCategory) {
-      // 4. Terbitkan UserVoucher
-      await grantVoucher({
-        userId: user._id,
-        discordId: String(discordId),
-        guildId,
-        title: r.title,
-        description: r.description || `Hadiah dari Nismara Pass Season ${seasonNumber} Level ${levelNum}`,
-        category: r.voucherCategory,
-        discountType: r.voucherDiscountType || "percentage",
-        discountValue: r.voucherDiscountValue || 0,
-        durationHours: r.voucherDurationHours || 0,
-        source: `SEASONAL_PASS_S${seasonNumber}`,
-        expiresInDays: 90,
-      });
-      results.push(`Kupon: ${r.title}`);
-    } else if (r.type === "NPLUS_TRIAL" && r.amount && r.amount > 0) {
-      // 5. Perpanjang / Aktifkan Nismara+ VIP
-      const now = new Date();
-      const currentNPlus = user.nismaraplus || {};
-      const durationMs = r.amount * 24 * 60 * 60 * 1000;
+  // Tracker untuk multi-collection rollback jika terjadi error saat mendistribusikan reward
+  let ncGranted = 0;
+  let fuelGranted = 0;
+  let safeboxTicketsGranted = 0;
+  const createdVoucherIds: any[] = [];
+  let previousNPlusState: any = null;
+  let nplusUpdated = false;
+  const createdUserAchIds: any[] = [];
 
-      let newStartedAt = now;
-      let newExpiredAt = new Date(now.getTime() + durationMs);
-
-      // Jika user sudah aktif dan belum expired, perpanjang masa aktif dari expiredAt yang sudah ada!
-      if (
-        currentNPlus.status &&
-        currentNPlus.expiredAt &&
-        new Date(currentNPlus.expiredAt) > now
-      ) {
-        newStartedAt = currentNPlus.startedAt ? new Date(currentNPlus.startedAt) : now;
-        newExpiredAt = new Date(new Date(currentNPlus.expiredAt).getTime() + durationMs);
-      }
-
-      await User.updateOne(
-        { discordId: String(discordId) },
-        {
-          $set: {
-            "nismaraplus.status": true,
-            "nismaraplus.startedAt": newStartedAt,
-            "nismaraplus.expiredAt": newExpiredAt,
+  try {
+    // Eksekusi penyerahan masing-masing hadiah
+    for (const r of rewardsToGrant) {
+      if (r.type === "NC" && r.amount && r.amount > 0) {
+        // 1. Tambah NC di currencies collection
+        await mongoose.connection.collection("currencies").updateOne(
+          { userId: String(discordId), guildId },
+          { $inc: { totalNC: r.amount } },
+          { upsert: true }
+        );
+        // Log ke currencyhistories
+        await mongoose.connection.collection("currencyhistories").insertOne({
+          userId: String(discordId),
+          guildId,
+          amount: r.amount,
+          type: "earn",
+          reason: `Hadiah Nismara Pass S${seasonNumber} (Level ${levelNum} - ${track.toUpperCase()})`,
+          createdAt: new Date(),
+        });
+        ncGranted += r.amount;
+        results.push(`+${r.amount.toLocaleString("id-ID")} NC`);
+      } else if (r.type === "FUEL" && r.amount && r.amount > 0) {
+        // 2. Tambah Fuel ke Garasi
+        await Garage.updateOne(
+          { discordId: String(discordId) },
+          { 
+            $inc: { fuelStock: r.amount },
+            $setOnInsert: {
+              fleetSlot: 1,
+              fleetSlotUsed: 0,
+              fleetSlotLevel: 1,
+              safeboxLevel: 1,
+              fuelCapacity: 2000,
+              fuelTankLevel: 1,
+              operational_cost: 0,
+              status: "active",
+              createdAt: new Date(),
+            }
           },
+          { upsert: true }
+        );
+        fuelGranted += r.amount;
+        results.push(`+${r.amount.toLocaleString("id-ID")} Liter Fuel`);
+      } else if (r.type === "SAFEBOX_TICKET" && r.amount && r.amount > 0) {
+        // 3. Tambah Tiket Safebox
+        await Garage.updateOne(
+          { discordId: String(discordId) },
+          { 
+            $inc: { safeboxStock: r.amount },
+            $setOnInsert: {
+              fleetSlot: 1,
+              fleetSlotUsed: 0,
+              fleetSlotLevel: 1,
+              safeboxLevel: 1,
+              fuelCapacity: 2000,
+              fuelTankLevel: 1,
+              fuelStock: 0,
+              operational_cost: 0,
+              status: "active",
+              createdAt: new Date(),
+            }
+          },
+          { upsert: true }
+        );
+        safeboxTicketsGranted += r.amount;
+        results.push(`+${r.amount}x Tiket Safebox Hapus Penalti`);
+      } else if (r.type === "VOUCHER" && r.voucherCategory) {
+        // 4. Terbitkan UserVoucher
+        const createdVoucher = await grantVoucher({
+          userId: user._id,
+          discordId: String(discordId),
+          guildId,
+          title: r.title,
+          description: r.description || `Hadiah dari Nismara Pass Season ${seasonNumber} Level ${levelNum}`,
+          category: r.voucherCategory,
+          discountType: r.voucherDiscountType || "percentage",
+          discountValue: r.voucherDiscountValue || 0,
+          durationHours: r.voucherDurationHours || 0,
+          source: `SEASONAL_PASS_S${seasonNumber}`,
+          expiresInDays: 90,
+        });
+        if (createdVoucher?._id) {
+          createdVoucherIds.push(createdVoucher._id);
         }
-      );
+        results.push(`Kupon: ${r.title}`);
+      } else if (r.type === "NPLUS_TRIAL" && r.amount && r.amount > 0) {
+        // 5. Perpanjang / Aktifkan Nismara+ VIP
+        const now = new Date();
+        const currentNPlus = user.nismaraplus || {};
+        previousNPlusState = currentNPlus ? JSON.parse(JSON.stringify(currentNPlus)) : null;
+        const durationMs = r.amount * 24 * 60 * 60 * 1000;
 
-      // Berikan Role Discord Nismara+ jika bot token dan role ID tersedia
-      const botToken = process.env.DISCORD_BOT_TOKEN;
-      const guildId = process.env.DISCORD_GUILD_ID;
-      const plusRoleId = process.env.DISCORD_NISMARAPLUS_ROLE_ID;
-      if (botToken && guildId && plusRoleId) {
-        await fetch(
-          `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${plusRoleId}`,
+        let newStartedAt = now;
+        let newExpiredAt = new Date(now.getTime() + durationMs);
+
+        // Jika user sudah aktif dan belum expired, perpanjang masa aktif dari expiredAt yang sudah ada!
+        if (
+          currentNPlus.status &&
+          currentNPlus.expiredAt &&
+          new Date(currentNPlus.expiredAt) > now
+        ) {
+          newStartedAt = currentNPlus.startedAt ? new Date(currentNPlus.startedAt) : now;
+          newExpiredAt = new Date(new Date(currentNPlus.expiredAt).getTime() + durationMs);
+        }
+
+        await User.updateOne(
+          { discordId: String(discordId) },
           {
-            method: "PUT",
-            headers: {
-              Authorization: `Bot ${botToken}`,
-              "X-Audit-Log-Reason": `Nismara+ Trial ${r.amount} Hari (Season Pass S${seasonNumber})`,
+            $set: {
+              "nismaraplus.status": true,
+              "nismaraplus.startedAt": newStartedAt,
+              "nismaraplus.expiredAt": newExpiredAt,
             },
           }
-        ).catch((e) => console.error("Discord Role Error:", e));
-      }
+        );
+        nplusUpdated = true;
 
-      // Hapus cache session Redis agar profil driver langsung update
-      try {
-        const { redis } = await import("@/lib/redis");
-        if (redis) {
-          await redis.del(`session:profile:${user._id}`);
-        }
-      } catch (redisErr) {
-        // ignore redis error
-      }
-
-      results.push(`+${r.amount} Hari VIP Nismara+ (Aktif s.d. ${newExpiredAt.toLocaleDateString("id-ID")})`);
-    } else if (r.type === "BADGE" && r.badgeId) {
-      // 6. Masukkan ke Koleksi Achievement & UserAchievement agar tampil di Profil Driver
-      try {
-        const codeId = `PASS_${r.badgeId.toUpperCase()}`;
-        const slug = `season-${progress.seasonNumber}-${r.badgeId.toLowerCase().replace(/_/g, "-")}`;
-
-        let ach = await Achievement.findOne({ codeId });
-        if (!ach) {
-          ach = await Achievement.create({
-            codeId,
-            slug,
-            name: r.title,
-            description: `Penghargaan Milestone Resmi Nismara Pass Season ${progress.seasonNumber}`,
-            category: "event",
-            imageUrl: `/images/badges/${r.badgeId}.webp`,
-          });
+        // Berikan Role Discord Nismara+ jika bot token dan role ID tersedia (non-fatal)
+        const botToken = process.env.DISCORD_BOT_TOKEN;
+        const guildId = process.env.DISCORD_GUILD_ID;
+        const plusRoleId = process.env.DISCORD_NISMARAPLUS_ROLE_ID;
+        if (botToken && guildId && plusRoleId) {
+          try {
+            await fetch(
+              `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${plusRoleId}`,
+              {
+                method: "PUT",
+                headers: {
+                  Authorization: `Bot ${botToken}`,
+                  "X-Audit-Log-Reason": `Nismara+ Trial ${r.amount} Hari (Season Pass S${seasonNumber})`,
+                },
+              }
+            );
+          } catch (discordErr) {
+            console.error("Discord Role Error (non-fatal):", discordErr);
+          }
         }
 
-        const existingGrant = await UserAchievement.findOne({
-          discordId: String(progress.discordId),
-          achievementId: ach._id,
-        });
+        // Hapus cache session Redis agar profil driver langsung update (non-fatal)
+        try {
+          const { redis } = await import("@/lib/redis");
+          if (redis) {
+            await redis.del(`session:profile:${user._id}`);
+          }
+        } catch (redisErr) {
+          // ignore redis error
+        }
 
-        if (!existingGrant) {
-          await UserAchievement.create({
+        results.push(`+${r.amount} Hari VIP Nismara+ (Aktif s.d. ${newExpiredAt.toLocaleDateString("id-ID")})`);
+      } else if (r.type === "BADGE" && r.badgeId) {
+        // 6. Masukkan ke Koleksi Achievement & UserAchievement agar tampil di Profil Driver
+        try {
+          const codeId = `PASS_${r.badgeId.toUpperCase()}`;
+          const slug = `season-${progress.seasonNumber}-${r.badgeId.toLowerCase().replace(/_/g, "-")}`;
+
+          let ach = await Achievement.findOne({ codeId });
+          if (!ach) {
+            ach = await Achievement.create({
+              codeId,
+              slug,
+              name: r.title,
+              description: `Penghargaan Milestone Resmi Nismara Pass Season ${progress.seasonNumber}`,
+              category: "event",
+              imageUrl: `/images/badges/${r.badgeId}.webp`,
+            });
+          }
+
+          const existingGrant = await UserAchievement.findOne({
             discordId: String(progress.discordId),
-            truckyId: user.truckyId ? String(user.truckyId) : "",
             achievementId: ach._id,
-            remarks: `Hadiah Nismara Pass Season ${progress.seasonNumber} (Level ${levelNum})`,
           });
-        }
 
-        results.push(`Badge: ${r.title}`);
-      } catch (badgeErr) {
-        console.error("Badge Grant Error:", badgeErr);
+          if (!existingGrant) {
+            const newAch = await UserAchievement.create({
+              discordId: String(progress.discordId),
+              truckyId: user.truckyId ? String(user.truckyId) : "",
+              achievementId: ach._id,
+              remarks: `Hadiah Nismara Pass Season ${progress.seasonNumber} (Level ${levelNum})`,
+            });
+            if (newAch?._id) {
+              createdUserAchIds.push(newAch._id);
+            }
+          }
+
+          results.push(`Badge: ${r.title}`);
+        } catch (badgeErr) {
+          console.error("Badge Grant Error (non-fatal):", badgeErr);
+          results.push(r.title);
+        }
+      } else if (
+        r.type === "MOD_LIVERY" ||
+        r.type === "PHYSICAL_MERCH" ||
+        r.type === "DOWNLOADABLE" ||
+        r.type === "DISCORD_ROLE"
+      ) {
         results.push(r.title);
       }
-    } else if (
-      r.type === "MOD_LIVERY" ||
-      r.type === "PHYSICAL_MERCH" ||
-      r.type === "DOWNLOADABLE" ||
-      r.type === "DISCORD_ROLE"
-    ) {
-      results.push(r.title);
     }
-  }
 
-  return {
-    success: true,
-    message: `Berhasil mengklaim Level ${levelNum} (${track.toUpperCase()}): ${results.join(", ")}`,
-    claimedRewards: results,
-  };
+    return {
+      success: true,
+      message: `Berhasil mengklaim Level ${levelNum} (${track.toUpperCase()}): ${results.join(", ")}`,
+      claimedRewards: results,
+    };
+  } catch (err: any) {
+    console.error(`Gagal memberikan reward Season Pass Level ${levelNum} (${track}), menjalankan rollback:`, err);
+
+    // Rollback Voucher
+    if (createdVoucherIds.length > 0) {
+      try {
+        await UserVoucher.deleteMany({ _id: { $in: createdVoucherIds } });
+      } catch (rbVoucherErr) {
+        console.error("Rollback voucher failed:", rbVoucherErr);
+      }
+    }
+
+    // Rollback Fuel
+    if (fuelGranted > 0) {
+      try {
+        await Garage.updateOne(
+          { discordId: String(discordId) },
+          { $inc: { fuelStock: -fuelGranted } }
+        );
+      } catch (rbFuelErr) {
+        console.error("Rollback fuel failed:", rbFuelErr);
+      }
+    }
+
+    // Rollback Safebox Tickets
+    if (safeboxTicketsGranted > 0) {
+      try {
+        await Garage.updateOne(
+          { discordId: String(discordId) },
+          { $inc: { safeboxStock: -safeboxTicketsGranted } }
+        );
+      } catch (rbSafeboxErr) {
+        console.error("Rollback safebox ticket failed:", rbSafeboxErr);
+      }
+    }
+
+    // Rollback NC
+    if (ncGranted > 0) {
+      try {
+        await mongoose.connection.collection("currencies").updateOne(
+          { userId: String(discordId), guildId },
+          { $inc: { totalNC: -ncGranted } }
+        );
+        await mongoose.connection.collection("currencyhistories").insertOne({
+          userId: String(discordId),
+          guildId,
+          amount: ncGranted,
+          type: "spend",
+          reason: `[ROLLBACK] Koreksi kegagalan klaim Season Pass S${seasonNumber} Level ${levelNum}`,
+          createdAt: new Date(),
+        });
+      } catch (rbNcErr) {
+        console.error("Rollback NC failed:", rbNcErr);
+      }
+    }
+
+    // Rollback NPlus
+    if (nplusUpdated && previousNPlusState) {
+      try {
+        await User.updateOne(
+          { discordId: String(discordId) },
+          { $set: { nismaraplus: previousNPlusState } }
+        );
+      } catch (rbNPlusErr) {
+        console.error("Rollback NPlus failed:", rbNPlusErr);
+      }
+    }
+
+    // Rollback UserAchievement
+    if (createdUserAchIds.length > 0) {
+      try {
+        await UserAchievement.deleteMany({ _id: { $in: createdUserAchIds } });
+      } catch (rbAchErr) {
+        console.error("Rollback achievement failed:", rbAchErr);
+      }
+    }
+
+    // PENTING: Rollback gate pada UserSeasonProgress agar level tidak hangus dan user tetap bisa mengklaim ulang!
+    try {
+      await UserSeasonProgress.updateOne(
+        { discordId: String(discordId), seasonNumber: Number(seasonNumber) },
+        { $pull: { [updateField]: Number(levelNum) } }
+      );
+    } catch (gateErr) {
+      console.error("Rollback Season Pass gate failed:", gateErr);
+    }
+
+    return {
+      success: false,
+      error: `Terjadi kendala saat memproses hadiah Level ${levelNum}: ${err.message || "Unknown error"}. Sistem telah melakukan rollback otomatis sehingga hadiah Anda tidak hangus dan dapat dicoba klaim kembali.`,
+    };
+  }
 }
 
 /**
@@ -1095,22 +1213,37 @@ export async function claimAllAvailableRewards(
   if (!progress) return { success: false, error: "Progress user tidak ditemukan" };
 
   const claimedResults: string[] = [];
+  const failedLevels: { level: number; track: string; error: string }[] = [];
   const unlockedLevel = calculateUnlockedLevel(progress.currentXp, season.levels);
 
   for (let lvl = 1; lvl <= unlockedLevel; lvl++) {
     // Claim Free Track jika belum
     if (!progress.claimedFreeLevels.includes(lvl)) {
-      const freeRes = await claimLevelReward(discordId, seasonNumber, lvl, "free");
-      if (freeRes.success && freeRes.claimedRewards) {
-        claimedResults.push(...freeRes.claimedRewards);
+      try {
+        const freeRes = await claimLevelReward(discordId, seasonNumber, lvl, "free");
+        if (freeRes.success && freeRes.claimedRewards) {
+          claimedResults.push(...freeRes.claimedRewards);
+          progress.claimedFreeLevels.push(lvl);
+        } else if (!freeRes.success) {
+          failedLevels.push({ level: lvl, track: "free", error: freeRes.error || "Gagal" });
+        }
+      } catch (freeErr: any) {
+        failedLevels.push({ level: lvl, track: "free", error: freeErr.message || "Unknown error" });
       }
     }
 
     // Claim Premium Track jika user premium dan belum klaim
     if (progress.isPremium && !progress.claimedPremiumLevels.includes(lvl)) {
-      const premRes = await claimLevelReward(discordId, seasonNumber, lvl, "premium");
-      if (premRes.success && premRes.claimedRewards) {
-        claimedResults.push(...premRes.claimedRewards);
+      try {
+        const premRes = await claimLevelReward(discordId, seasonNumber, lvl, "premium");
+        if (premRes.success && premRes.claimedRewards) {
+          claimedResults.push(...premRes.claimedRewards);
+          progress.claimedPremiumLevels.push(lvl);
+        } else if (!premRes.success) {
+          failedLevels.push({ level: lvl, track: "premium", error: premRes.error || "Gagal" });
+        }
+      } catch (premErr: any) {
+        failedLevels.push({ level: lvl, track: "premium", error: premErr.message || "Unknown error" });
       }
     }
   }
@@ -1119,6 +1252,12 @@ export async function claimAllAvailableRewards(
     success: true,
     totalClaimedCount: claimedResults.length,
     claimedResults,
+    failedLevels,
+    hasFailures: failedLevels.length > 0,
+    message:
+      failedLevels.length > 0
+        ? `Berhasil mengklaim ${claimedResults.length} hadiah. Terdapat ${failedLevels.length} level yang mengalami kendala dan telah di-rollback secara otomatis agar tidak hangus dan bisa Anda coba klaim kembali.`
+        : `Berhasil mengklaim ${claimedResults.length} hadiah sekaligus!`,
   };
 }
 

@@ -98,7 +98,7 @@ export async function POST(request: Request) {
         theme = "default",
         startAt,
         endAt,
-        totalXp = 225000,
+        totalXp = 250000,
         weeklyCapXp = 20000,
         finalRushWeeks = 2,
         grandPrizeTitle,

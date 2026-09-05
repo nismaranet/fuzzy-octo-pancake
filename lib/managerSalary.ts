@@ -2,6 +2,7 @@ import clientPromise from "@/lib/mongodb";
 import dbConnect from "@/lib/mongoose";
 import ManagerSalaryRecord from "@/lib/models/ManagerSalaryRecord";
 import User from "@/lib/models/User";
+import UserVoucher from "@/lib/models/UserVoucher";
 import { grantVoucher } from "@/lib/voucher";
 import { sendPersonalNotification } from "@/lib/services/NotificationService";
 
@@ -72,15 +73,15 @@ export const MILESTONE_TIERS: MilestoneTierConfig[] = [
   },
   {
     tier: 50,
-    label: "Bonus 25.000 NC + Voucher Booster 2x (6 Jam)",
+    label: "Bonus 25.000 NC + Voucher Booster +100% (6 Jam)",
     bonusNc: 25000,
     penaltyTickets: 0,
     vouchers: [
       {
-        title: "NC Booster 2x (6 Jam) (Reward Manager)",
+        title: "Voucher Booster +100% NC (6 Jam) (Reward Manager)",
         category: "NC_BOOSTER",
-        discountType: "fixed",
-        discountValue: 2,
+        discountType: "percentage",
+        discountValue: 100,
         durationHours: 6,
       },
     ],
@@ -495,6 +496,10 @@ export async function claimManagerSalary(managerId: string, month: string) {
   }
 
   const generatedVouchers: any[] = [];
+  const createdVoucherIds: any[] = [];
+  let ncCredited = false;
+  let safeboxCredited = false;
+  let topManagerAwarded = false;
   const trxId = `SALARY-${month.replace("-", "")}-${String(managerId).slice(-4)}-${Date.now()
     .toString()
     .slice(-4)}`;
@@ -517,25 +522,7 @@ export async function claimManagerSalary(managerId: string, month: string) {
         reason: `Gaji & Insentif Performa Manager Periode ${month} (${perf.totalPoints} Poin)`,
         createdAt: new Date(),
       });
-
-      await db.collection("transactions").insertOne({
-        trxId,
-        discordId: String(managerId),
-        userId: String(managerId),
-        title: `Gaji & Insentif Performa Manager (${month})`,
-        category: "salary",
-        amount: ncAmount,
-        currency: "NC",
-        metadata: {
-          month,
-          totalPoints: perf.totalPoints,
-          baseSalary: perf.rewards.baseSalary,
-          bonusNc: perf.rewards.bonusNc,
-          penaltyTickets: perf.rewards.penaltyTickets,
-          unlockedTiers: perf.rewards.unlockedTiers,
-        },
-        createdAt: new Date(),
-      });
+      ncCredited = true;
     }
 
     // 6. Distribusi Tiket Safebox (Penghapus Penalti)
@@ -545,6 +532,7 @@ export async function claimManagerSalary(managerId: string, month: string) {
         { $inc: { safeboxStock: perf.rewards.penaltyTickets } },
         { upsert: true }
       );
+      safeboxCredited = true;
     }
 
     // 7. Distribusi Vouchers
@@ -562,6 +550,10 @@ export async function claimManagerSalary(managerId: string, month: string) {
         source: `MANAGER_SALARY_${month}`,
         expiresInDays: 60, // Masa berlaku voucher 60 hari
       });
+
+      if (createdVoucher?._id) {
+        createdVoucherIds.push(createdVoucher._id);
+      }
 
       generatedVouchers.push({
         code: createdVoucher.code,
@@ -587,6 +579,7 @@ export async function claimManagerSalary(managerId: string, month: string) {
           },
         }
       );
+      topManagerAwarded = true;
     }
 
     // 8. Selesaikan status record menjadi CLAIMED
@@ -600,16 +593,20 @@ export async function claimManagerSalary(managerId: string, month: string) {
     };
     await lockedRecord.save();
 
-    // 9. Kirim notifikasi konfirmasi personal
-    await sendPersonalNotification(
-      String(managerId),
-      "Gaji & Bonus Manager Berhasil Diklaim! 🎉",
-      `Gaji periode ${month} sebesar ${ncAmount.toLocaleString("id-ID")} NC dan ${
-        perf.rewards.penaltyTickets
-      } Tiket Safebox telah berhasil dicairkan ke akun Anda.`,
-      "success",
-      "/dashboard/manage/payroll"
-    );
+    // 9. Kirim notifikasi konfirmasi personal (non-fatal, ditangani tersendiri agar kegagalan notifikasi tidak membatalkan klaim yang sudah sah)
+    try {
+      await sendPersonalNotification(
+        String(managerId),
+        "Gaji & Bonus Manager Berhasil Diklaim! 🎉",
+        `Gaji periode ${month} sebesar ${ncAmount.toLocaleString("id-ID")} NC dan ${
+          perf.rewards.penaltyTickets
+        } Tiket Safebox telah berhasil dicairkan ke akun Anda.`,
+        "success",
+        "/dashboard/manage/payroll"
+      );
+    } catch (notifErr) {
+      console.warn("Gagal mengirim notifikasi personal klaim gaji (non-fatal):", notifErr);
+    }
 
     return {
       success: true,
@@ -624,15 +621,70 @@ export async function claimManagerSalary(managerId: string, month: string) {
       },
     };
   } catch (error: any) {
-    console.error("Gagal mendistribusikan reward gaji manager, melakukan rollback gate:", error);
-    // Rollback gate agar user tidak kehilangan hak klaim
+    console.error("Gagal mendistribusikan reward gaji manager, menjalankan rollback multi-koleksi:", error);
+
+    // Rollback Vouchers yang sempat terbuat
+    if (createdVoucherIds.length > 0) {
+      try {
+        await UserVoucher.deleteMany({ _id: { $in: createdVoucherIds } });
+      } catch (rbVoucherErr) {
+        console.error("Rollback voucher failed:", rbVoucherErr);
+      }
+    }
+
+    // Rollback Tiket Safebox
+    if (safeboxCredited && perf.rewards.penaltyTickets > 0) {
+      try {
+        await db.collection("garages").updateOne(
+          { discordId: String(managerId) },
+          { $inc: { safeboxStock: -perf.rewards.penaltyTickets } }
+        );
+      } catch (rbSafeboxErr) {
+        console.error("Rollback safebox failed:", rbSafeboxErr);
+      }
+    }
+
+    // Rollback NC
+    if (ncCredited && perf.rewards.totalNc > 0) {
+      try {
+        await db.collection("currencies").updateOne(
+          { userId: String(managerId), guildId: GUILD_ID },
+          { $inc: { totalNC: -perf.rewards.totalNc } }
+        );
+        await db.collection("currencyhistories").insertOne({
+          userId: String(managerId),
+          guildId: GUILD_ID,
+          amount: perf.rewards.totalNc,
+          type: "spend",
+          reason: `[ROLLBACK] Koreksi kegagalan klaim gaji manager periode ${month}`,
+          createdAt: new Date(),
+        });
+      } catch (rbNcErr) {
+        console.error("Rollback NC failed:", rbNcErr);
+      }
+    }
+
+    // Rollback status Top Manager
+    if (topManagerAwarded) {
+      try {
+        await db.collection("users").updateOne(
+          { discordId: String(managerId) },
+          { $set: { "topManager.status": false } }
+        );
+      } catch (rbTopMgrErr) {
+        console.error("Rollback Top Manager status failed:", rbTopMgrErr);
+      }
+    }
+
+    // Rollback gate agar user tidak kehilangan hak klaim dan bisa mencoba klaim ulang
     await ManagerSalaryRecord.updateOne(
       { month, managerId: String(managerId) },
       { $set: { status: "UNCLAIMED" } }
     );
+
     return {
       success: false,
-      error: `Terjadi kesalahan saat memproses klaim: ${error.message || "Unknown error"}`,
+      error: `Terjadi kesalahan saat memproses klaim: ${error.message || "Unknown error"}. Sistem telah melakukan rollback otomatis, hak klaim Anda aman dan dapat dicoba kembali.`,
     };
   }
 }

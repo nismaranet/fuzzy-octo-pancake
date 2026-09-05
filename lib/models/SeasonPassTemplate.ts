@@ -64,7 +64,7 @@ const seasonPassTemplateSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     isDefault: { type: Boolean, default: false },
-    totalXp: { type: Number, required: true, default: 225000 },
+    totalXp: { type: Number, required: true, default: 250000 },
     levels: [seasonLevelSchema],
     createdBy: { type: String, default: "Manager" },
   },

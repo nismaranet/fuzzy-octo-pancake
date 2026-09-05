@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         name: "Template Standar (Season 1: Pioneer of Asphalt)",
         description: "Template default resmi 30 Level dengan kombinasi NC, Fuel, Voucher Servis, NC Booster, dan Mod Livery Eksklusif.",
         isDefault: true,
-        totalXp: 225000,
+        totalXp: 250000,
         levels: SEASON_1_LEVELS,
         createdBy: "System",
       });
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
     await dbConnect();
     const body = await request.json();
-    const { action = "CREATE", name, description, sourceTemplateId, levels, totalXp = 225000 } = body;
+    const { action = "CREATE", name, description, sourceTemplateId, levels, totalXp = 250000 } = body;
 
     if (action === "DUPLICATE") {
       if (!sourceTemplateId || !name) {
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
         name,
         description: description || `Duplikat dari ${source.name}`,
         isDefault: false,
-        totalXp: source.totalXp || 225000,
+        totalXp: source.totalXp || 250000,
         levels: source.levels,
         createdBy: session.user.name || "Manager",
       });
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       name,
       description: description || "",
       isDefault: false,
-      totalXp: Number(totalXp) || 225000,
+      totalXp: Number(totalXp) || 250000,
       levels: levels && levels.length ? levels : SEASON_1_LEVELS,
       createdBy: session.user.name || "Manager",
     });

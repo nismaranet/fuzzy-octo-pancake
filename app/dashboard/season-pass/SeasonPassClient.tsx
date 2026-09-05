@@ -379,13 +379,19 @@ export default function SeasonPassClient({
       }
 
       setProgress(data.progress);
-      await showAlert(
-        `🎉 Berhasil mengklaim ${data.result?.totalClaimedCount || 0} hadiah sekaligus!\n\n${data.result?.claimedResults?.slice(0, 6).join("\n")}${
-          data.result?.claimedResults?.length > 6
-            ? `\n...dan ${data.result?.claimedResults?.length - 6} hadiah lainnya`
-            : ""
-        }`,
-      );
+      if (data.result?.hasFailures) {
+        await showAlert(
+          `⚠️ ${data.result?.message}\n\nHadiah yang berhasil dicairkan:\n${data.result?.claimedResults?.slice(0, 6).join("\n") || "-"}`
+        );
+      } else {
+        await showAlert(
+          `🎉 Berhasil mengklaim ${data.result?.totalClaimedCount || 0} hadiah sekaligus!\n\n${data.result?.claimedResults?.slice(0, 6).join("\n")}${
+            data.result?.claimedResults?.length > 6
+              ? `\n...dan ${data.result?.claimedResults?.length - 6} hadiah lainnya`
+              : ""
+          }`,
+        );
+      }
       router.refresh();
     } catch (err: any) {
       await showAlert(`Gagal: ${err.message}`);
