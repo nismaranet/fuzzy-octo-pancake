@@ -350,6 +350,7 @@ export default function MarketItemDetail() {
                   isBooster={item.sellerIsBooster}
                   isNismaraPlus={item.sellerIsNismaraPlus}
                   nismaraPlusStartedAt={item.sellerNismaraPlusStartedAt}
+                  topManager={item.sellerTopManager}
                 />
               </div>
             </div>
@@ -547,6 +548,7 @@ export default function MarketItemDetail() {
                           isNismaraPlus={review.user?.isNismaraPlus} 
                           nismaraPlusStartedAt={review.user?.nismaraPlusStartedAt}
                           truckyRank={review.user?.truckyRank}
+                          topManager={review.user?.topManager}
                           className="w-4 h-4" 
                         />
                       </div>

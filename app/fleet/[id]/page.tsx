@@ -279,6 +279,8 @@ export default async function PublicFleetProfilePage({
                       nismaraPlusStartedAt={
                         fleet.ownerInfo.nismaraplus?.startedAt
                       }
+                      isTopManager={fleet.ownerInfo.topManager?.status === true && (!fleet.ownerInfo.topManager?.expiredAt || new Date(fleet.ownerInfo.topManager.expiredAt) > new Date())}
+                      topManagerMonth={fleet.ownerInfo.topManager?.month}
                       truckyRank={fleet.ownerInfo.truckyRank}
                       className="w-3.5 h-3.5"
                     />

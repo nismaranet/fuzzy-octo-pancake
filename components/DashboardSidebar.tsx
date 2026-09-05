@@ -50,6 +50,7 @@ const menuItems = [
 
 const managementItems = [
   { name: "Manager Overview", href: "/dashboard/manage", icon: ShieldCheck },
+  { name: "Payroll & KPI", href: "/dashboard/manage/payroll", icon: Coins },
   { name: "Manage Season Pass", href: "/dashboard/manage/season-pass", icon: Trophy },
   { name: "Manage N+ Quests", href: "/dashboard/manage/nismaraplus/quests", icon: Crown },
   { name: "Manage Data", href: "/dashboard/manage/data", icon: User2 },

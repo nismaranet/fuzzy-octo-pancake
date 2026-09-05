@@ -222,6 +222,7 @@ export default async function LottoPage() {
                           isNismaraPlus={p.nismaraplus?.status === true} 
                           nismaraPlusStartedAt={p.nismaraplus?.startedAt}
                           truckyRank={p.truckyRank}
+                          topManager={p.topManager}
                           className="w-3 h-3" 
                         />
                       </div>

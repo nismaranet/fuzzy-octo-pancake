@@ -298,6 +298,7 @@ export default function BoostDetailClient({ event }: { event: any }) {
                             isNismaraPlus={p.isNismaraPlus}
                             nismaraPlusStartedAt={p.nismaraPlusStartedAt}
                             truckyRank={p.truckyRank}
+                            topManager={p.topManager}
                             className="w-4 h-4"
                           />
                         </div>

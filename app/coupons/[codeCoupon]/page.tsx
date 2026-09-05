@@ -150,6 +150,7 @@ export default async function CouponDetailPage(props: DetailPageProps) {
           isBooster: 1,
           nismaraplus: 1,
           truckyRank: 1,
+          topManager: 1,
         },
       },
     )
@@ -352,6 +353,7 @@ export default async function CouponDetailPage(props: DetailPageProps) {
                               isNismaraPlus={claim.user.nismaraplus?.status}
                               nismaraPlusStartedAt={claim.user.nismaraplus?.startedAt}
                               truckyRank={claim.user.truckyRank}
+                              topManager={claim.user.topManager}
                               className="w-4 h-4"
                             />
                           )}

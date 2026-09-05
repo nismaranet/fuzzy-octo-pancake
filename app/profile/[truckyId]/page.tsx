@@ -268,6 +268,8 @@ export default async function PublicProfilePage(props: {
                       isBooster={user.isBooster === true}
                       isNismaraPlus={user.nismaraplus?.status === true}
                       nismaraPlusStartedAt={user.nismaraplus?.startedAt}
+                      isTopManager={user.topManager?.status === true && (!user.topManager?.expiredAt || new Date(user.topManager.expiredAt) > new Date())}
+                      topManagerMonth={user.topManager?.month}
                       truckyRank={user.truckyRank}
                       className="w-7 h-7 md:w-9 md:h-9"
                     />
@@ -740,6 +742,7 @@ export default async function PublicProfilePage(props: {
               profileIsNismaraPlus={user.nismaraplus?.status === true}
               profileIsBooster={user.isBooster === true}
               profileRole={user.discordRole || "user"}
+              profileTopManager={user.topManager}
               isManager={isManager}
             />
           </div>

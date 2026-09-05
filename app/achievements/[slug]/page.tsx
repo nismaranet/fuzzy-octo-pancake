@@ -210,6 +210,7 @@ export default async function AchievementDetailPage({
                             p.userInfo.nismaraplus?.startedAt
                           }
                           truckyRank={p.userInfo.truckyRank}
+                          topManager={p.userInfo.topManager}
                           className="w-4 h-4"
                         />
                       </h3>

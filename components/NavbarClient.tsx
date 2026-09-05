@@ -44,6 +44,7 @@ import {
   TruckIcon,
   Target,
   Gift,
+  Coins,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -617,6 +618,24 @@ export default function NavbarClient({ session }: { session: any }) {
                       <FileText className="mr-3 h-4 w-4 text-slate-400" />
                       <span className="font-medium">Tickets</span>
                     </DropdownMenuItem>
+
+                    {(session.user?.role === "manager" ||
+                      session.user?.role === "admin") && (
+                      <DropdownMenuItem
+                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
+                        render={
+                          <Link
+                            href="/dashboard/manage/payroll"
+                            className="flex items-center w-full"
+                          />
+                        }
+                      >
+                        <Coins className="mr-3 h-4 w-4 text-red-400" />
+                        <span className="font-medium text-red-400">
+                          Payroll & KPI
+                        </span>
+                      </DropdownMenuItem>
+                    )}
 
                     {(session.user?.role === "manager" ||
                       session.user?.role === "admin") && (

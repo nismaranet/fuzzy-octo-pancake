@@ -390,6 +390,7 @@ export default async function CargoDetailPage({
                                   isNismaraPlus={driverUser?.nismaraplus?.status} 
                                   nismaraPlusStartedAt={driverUser?.nismaraplus?.startedAt}
                                   truckyRank={driverUser?.truckyRank}
+                                  topManager={driverUser?.topManager}
                                   className="w-3.5 h-3.5" 
                                 />
                               </div>

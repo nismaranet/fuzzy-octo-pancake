@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import clientPromise from "@/lib/mongodb";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -44,6 +45,42 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!removeRoleRes.ok && removeRoleRes.status !== 204) {
       console.error("Failed to remove Intern role:", await removeRoleRes.text());
       // Tetap sukseskan secara parsial karena role driver sudah masuk
+    }
+
+    // Catat riwayat promosi ke MongoDB untuk audit & perhitungan performa KPI manager
+    try {
+      const client = await clientPromise;
+      const db = client.db();
+
+      const latestQuiz = await db
+        .collection("quizattempts")
+        .findOne({ discordId }, { sort: { createdAt: -1 } });
+
+      await db.collection("internpromotions").insertOne({
+        internDiscordId: discordId,
+        managerId: String(session.user.discordId),
+        managerName: session.user.name || "Manager",
+        quizScore: latestQuiz?.score ?? null,
+        promotedAt: new Date(),
+        createdAt: new Date(),
+      });
+
+      await db.collection("users").updateOne(
+        { discordId },
+        {
+          $set: {
+            isDriver: true,
+            promotedBy: String(session.user.discordId),
+            promotedAt: new Date(),
+          },
+          $unset: {
+            isInterviewing: "",
+            interviewChannelId: "",
+          },
+        }
+      );
+    } catch (dbErr) {
+      console.error("Gagal mencatat data promosi ke MongoDB:", dbErr);
     }
 
     return NextResponse.json({ success: true, message: "Intern berhasil dipromosikan menjadi Sopir!" });

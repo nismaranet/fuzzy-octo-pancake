@@ -66,6 +66,7 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
       isBooster: user?.isBooster,
       isNismaraPlus: user?.nismaraplus?.status === true,
       nismaraPlusStartedAt: user?.nismaraplus?.startedAt,
+      topManager: user?.topManager || null,
     };
   });
 
@@ -99,6 +100,7 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
         isBooster: p.isBooster,
         isNismaraPlus: p.isNismaraPlus,
         nismaraPlusStartedAt: p.nismaraPlusStartedAt,
+        topManager: p.topManager,
       }))
       .sort((a: any, b: any) => b.totalEarned - a.totalEarned),
   };

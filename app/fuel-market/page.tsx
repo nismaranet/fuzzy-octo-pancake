@@ -595,6 +595,7 @@ export default function FuelMarketPage() {
                                       isNismaraPlus={item.sellerId?.nismaraplus?.status} 
                                       nismaraPlusStartedAt={item.sellerId?.nismaraplus?.startedAt}
                                       truckyRank={item.sellerId?.truckyRank}
+                                      topManager={item.sellerId?.topManager}
                                       className="w-3.5 h-3.5" 
                                     />
                                   </div>

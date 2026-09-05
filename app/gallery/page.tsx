@@ -82,7 +82,8 @@ export default async function GlobalGalleryPage() {
             isNismaraPlus: "$uploader.nismaraplus.status",
             nismaraPlusStartedAt: "$uploader.nismaraplus.startedAt",
             isBooster: "$uploader.isBooster",
-            role: "$uploader.discordRole"
+            role: "$uploader.discordRole",
+            topManager: "$uploader.topManager",
           },
         },
       },

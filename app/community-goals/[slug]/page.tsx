@@ -61,14 +61,14 @@ export default async function GoalDetailPage({ params }: any) {
   // Get Creator data
   const creator = await db.collection("users").findOne(
     { discordId: goal.creatorId },
-    { projection: { name: 1, image: 1, avatarUrl: 1, discordRole: 1, truckyRank: 1, isBooster: 1, nismaraplus: 1, truckyId: 1 } }
+    { projection: { name: 1, image: 1, avatarUrl: 1, discordRole: 1, truckyRank: 1, isBooster: 1, nismaraplus: 1, truckyId: 1, topManager: 1 } }
   );
 
   // Get Participants Data
   const participantIds = goal.participants?.map((p: any) => p.discordId) || [];
   const participantUsers = await db.collection("users").find(
     { discordId: { $in: participantIds } },
-    { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, discordRole: 1, nismaraplus: 1, truckyRank: 1, isBooster: 1, truckyId: 1 } }
+    { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, discordRole: 1, nismaraplus: 1, truckyRank: 1, isBooster: 1, truckyId: 1, topManager: 1 } }
   ).toArray();
 
   const enrichedParticipants = (goal.participants || []).map((p: any) => {
@@ -82,6 +82,7 @@ export default async function GoalDetailPage({ params }: any) {
       truckyRank: u?.truckyRank || null,
       isBooster: u?.isBooster || false,
       truckyId: u?.truckyId || null,
+      topManager: u?.topManager || null,
     };
   }).sort((a: any, b: any) => b.contributed - a.contributed);
 
@@ -117,7 +118,8 @@ export default async function GoalDetailPage({ params }: any) {
       nismaraplus: creator.nismaraplus,
       truckyRank: creator.truckyRank,
       truckyId: creator.truckyId,
-      discordId: goal.creatorId
+      discordId: goal.creatorId,
+      topManager: creator.topManager || null,
     } : { name: "Unknown", discordId: goal.creatorId },
     participants: enrichedParticipants,
   };

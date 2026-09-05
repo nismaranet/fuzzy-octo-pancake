@@ -560,12 +560,13 @@ export default async function ManageOverview() {
                 <Users size={15} /> Driver & Komunitas
               </span>
               <span className="text-[9px] font-bold text-muted-foreground uppercase">
-                6 Layanan
+                7 Layanan
               </span>
             </div>
 
             <div className="space-y-2">
               {[
+                { name: "Manager Payroll & KPI", href: "/dashboard/manage/payroll", desc: "Sistem gaji bulanan & insentif performa" },
                 { name: "Driver Directory", href: "/dashboard/manage/data/users", desc: "Audit data seluruh pengemudi" },
                 { name: "Intern Monitor", href: "/dashboard/manage/data/intern", desc: "Pantau kelulusan masa magang" },
                 { name: "Achievement Registry", href: "/dashboard/manage/data/achievement", desc: "Lencana dan penghargaan driver" },

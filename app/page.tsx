@@ -170,7 +170,7 @@ export default async function Home() {
       const driverIds = topDriversAgg.map((d: any) => d._id);
       const usersData = await db.collection("users").find(
         { discordId: { $in: driverIds } },
-        { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, truckyId: 1, discordRole: 1, isBooster: 1, nismaraplus: 1, truckyRank: 1 } }
+        { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, truckyId: 1, discordRole: 1, isBooster: 1, nismaraplus: 1, truckyRank: 1, topManager: 1 } }
       ).toArray();
 
       const mappedTop3 = topDriversAgg.map((agg: any) => {
@@ -185,7 +185,8 @@ export default async function Home() {
           isBooster: user?.isBooster,
           isNismaraPlus: user?.nismaraplus?.status,
           nismaraPlusStartedAt: user?.nismaraplus?.startedAt,
-          truckyRank: user?.truckyRank
+          truckyRank: user?.truckyRank,
+          topManager: user?.topManager,
         };
       });
 
@@ -522,6 +523,7 @@ export default async function Home() {
                             isNismaraPlus={driver.isNismaraPlus}
                             nismaraPlusStartedAt={driver.nismaraPlusStartedAt}
                             truckyRank={driver.truckyRank}
+                            topManager={driver.topManager}
                           />
                         </div>
 

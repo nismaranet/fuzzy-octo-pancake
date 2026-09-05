@@ -95,7 +95,8 @@ export default async function GlobalFeedsPage({
             nismaraPlusStartedAt: "$uploader.nismaraplus.startedAt",
             isBooster: "$uploader.isBooster",
             role: "$uploader.discordRole",
-            truckyRank: "$uploader.truckyRank"
+            truckyRank: "$uploader.truckyRank",
+            topManager: "$uploader.topManager"
           },
         },
       },

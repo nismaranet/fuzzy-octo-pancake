@@ -116,6 +116,7 @@ export default async function ContractDetailPage(props: {
       role: mongoUser?.role || null,
       serverBooster: mongoUser?.serverBooster || false,
       truckyRank: truckyData?.role?.name || truckyData?.role || null,
+      topManager: mongoUser?.topManager || null,
     };
   });
 
@@ -294,6 +295,7 @@ export default async function ContractDetailPage(props: {
                                 nismaraPlusStartedAt={driver.nismaraplus?.startedAt}
                                 isBooster={driver.serverBooster}
                                 truckyRank={driver.truckyRank}
+                                topManager={driver.topManager}
                                 className="w-5 h-5"
                               />
                             </div>

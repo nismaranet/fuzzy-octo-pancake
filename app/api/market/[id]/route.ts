@@ -45,6 +45,7 @@ export async function GET(
       itemWithSeller.sellerNismaraPlusStartedAt = seller.nismaraplus?.startedAt || null;
       itemWithSeller.sellerIsBooster = seller.isBooster === true;
       itemWithSeller.sellerRole = seller.discordRole || seller.role;
+      itemWithSeller.sellerTopManager = seller.topManager || null;
     } else {
       itemWithSeller.sellerName = "Unknown Seller";
       itemWithSeller.sellerImage = null;
@@ -52,6 +53,7 @@ export async function GET(
       itemWithSeller.sellerIsNismaraPlus = false;
       itemWithSeller.sellerNismaraPlusStartedAt = null;
       itemWithSeller.sellerIsBooster = false;
+      itemWithSeller.sellerTopManager = null;
     }
 
     return NextResponse.json(itemWithSeller, {

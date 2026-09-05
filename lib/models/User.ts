@@ -30,6 +30,13 @@ const userSchema = new mongoose.Schema(
       expiredAt: { type: Date, default: null },
     },
 
+    topManager: {
+      status: { type: Boolean, default: false },
+      month: { type: String, default: null },
+      awardedAt: { type: Date, default: null },
+      expiredAt: { type: Date, default: null },
+    },
+
     ncBoost: {
       active: { type: Boolean, default: false },
       multiplier: { type: Number, default: 0 },
