@@ -5,6 +5,9 @@ import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getDriverStats, getCompanyMemberStats } from "@/lib/trucky";
+import DriverMonthlyJobAnalytics, {
+  MonthlyJobStatItem,
+} from "@/components/dashboard/DriverMonthlyJobAnalytics";
 import {
 
   Truck,
@@ -114,6 +117,99 @@ export default async function DashboardPage() {
     .collection("jobhistories")
     .find({ driverId: discordId, guildId: GUILD_ID })
     .toArray();
+
+  // 4b. Analisis Pekerjaan Month-by-Month (ETS2 & ATS + Tempat Bermain)
+  const rawMonthlyJobStats = await db
+    .collection("jobhistories")
+    .aggregate([
+      {
+        $match: {
+          driverId: String(discordId),
+          jobStatus: { $in: ["COMPLETED", "CANCELED"] },
+        },
+      },
+      {
+        $project: {
+          month: {
+            $dateToString: {
+              date: { $ifNull: ["$completedAt", "$createdAt"] },
+              timezone: "Asia/Jakarta",
+              format: "%Y-%m",
+            },
+          },
+          game: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ["$gameId", "2"] },
+                  {
+                    $regexMatch: {
+                      input: { $ifNull: ["$game", ""] },
+                      regex: /american/i,
+                    },
+                  },
+                ],
+              },
+              "ATS",
+              "ETS2",
+            ],
+          },
+          gameMode: {
+            $cond: [
+              {
+                $regexMatch: {
+                  input: { $ifNull: ["$gameMode", ""] },
+                  regex: /truckersmp/i,
+                },
+              },
+              "truckersmp",
+              "sp",
+            ],
+          },
+          jobStatus: 1,
+          distanceKm: { $ifNull: ["$distanceKm", 0] },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            month: "$month",
+            game: "$game",
+            gameMode: "$gameMode",
+          },
+          totalCompleted: {
+            $sum: { $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, 1, 0] },
+          },
+          totalCanceled: {
+            $sum: { $cond: [{ $eq: ["$jobStatus", "CANCELED"] }, 1, 0] },
+          },
+          totalDistanceKm: {
+            $sum: {
+              $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, "$distanceKm", 0],
+            },
+          },
+        },
+      },
+      {
+        $sort: {
+          "_id.month": -1,
+          "_id.game": 1,
+          "_id.gameMode": 1,
+        },
+      },
+    ])
+    .toArray();
+
+  const monthlyJobStats: MonthlyJobStatItem[] = rawMonthlyJobStats.map(
+    (item: any) => ({
+      month: item._id.month,
+      game: item._id.game,
+      gameMode: item._id.gameMode,
+      totalCompleted: item.totalCompleted || 0,
+      totalCanceled: item.totalCanceled || 0,
+      totalDistanceKm: item.totalDistanceKm || 0,
+    })
+  );
 
   // 5. Ambil Data Insights Riwayat NC (Earn) & Poin Penalty
   // Ganti "histories" dengan nama collection riwayat Anda
@@ -231,6 +327,9 @@ export default async function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* --- SECTION: Analisis Pekerjaan Month-by-Month (ETS2 & ATS) --- */}
+      <DriverMonthlyJobAnalytics stats={monthlyJobStats} />
 
       {/* --- SECTION: Insights Pekerjaan (Jobs) --- */}
       <div className="flex items-center justify-between mb-6 mt-12">

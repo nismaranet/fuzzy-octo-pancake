@@ -83,7 +83,7 @@ const seasonPassSchema = new mongoose.Schema(
       default: "ACTIVE",
       index: true,
     },
-    totalXp: { type: Number, required: true, default: 225000 },
+    totalXp: { type: Number, required: true, default: 250000 },
     weeklyCapXp: { type: Number, required: true, default: 20000 },
     finalRushWeeks: { type: Number, default: 2 }, // Last 2 weeks uncapped + double XP
     levels: [seasonLevelSchema],
