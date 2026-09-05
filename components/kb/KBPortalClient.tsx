@@ -16,7 +16,10 @@ export default function KBPortalClient({ session }: { session: any }) {
   const fetchCategories = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/kb"); // Reusing the main endpoint that returns both, or use categories
+      const res = await fetch("/api/kb", {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      });
       const data = await res.json();
       if (data.success && data.categories) {
         setCategories(data.categories);

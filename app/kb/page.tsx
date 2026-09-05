@@ -5,6 +5,10 @@ import NavbarClient from "@/components/NavbarClient";
 
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export const metadata: Metadata = {
   title: "Knowledge Base & Pusat Panduan Driver",
   description: "Pusat informasi resmi, panduan teknis, peraturan komunitas, dan SOP pengiriman Nismara Transport.",
