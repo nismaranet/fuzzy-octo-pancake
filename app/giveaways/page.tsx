@@ -8,8 +8,30 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 export const metadata: Metadata = {
-  title: "Giveaways - Nismara Transport",
-  description: "Event undian berhadiah resmi bagi seluruh pengemudi Nismara Logistics.",
+  title: "Undian Berhadiah & Giveaways",
+  description: "Event undian berhadiah resmi bagi seluruh pengemudi Nismara Logistics. Selesaikan misi atau tukarkan NC untuk memenangkan hadiah spektakuler!",
+  openGraph: {
+    title: "Undian Berhadiah & Giveaways",
+    description: "Event undian berhadiah resmi bagi seluruh pengemudi Nismara Logistics. Selesaikan misi atau tukarkan NC untuk memenangkan hadiah spektakuler!",
+    url: "https://transport.nismara.web.id/giveaways",
+    siteName: "Nismara Transport",
+    locale: "id_ID",
+    type: "website",
+    images: [
+      {
+        url: "https://images.nismara.my.id/227300_188.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Giveaways Nismara Transport",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Undian Berhadiah & Giveaways",
+    description: "Event undian berhadiah resmi bagi seluruh pengemudi Nismara Logistics.",
+    images: ["https://images.nismara.my.id/227300_188.jpg"],
+  },
 };
 
 export default async function GiveawaysPage() {

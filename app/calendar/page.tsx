@@ -4,9 +4,33 @@ import type { CalendarEvent } from "@/components/HomeEventsCalendar";
 import { CalendarDays } from "lucide-react";
 import { slugify } from "@/lib/utils";
 
-export const metadata = {
-  title: "Community Calendar",
-  description: "Kalender event komunitas Nismara Transport",
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Kalender Kegiatan & Event Komunitas",
+  description: "Kalender terpadu jadwal konvoi mabar, event boost NC, rilis kupon, dan agenda komunitas Nismara Transport.",
+  openGraph: {
+    title: "Kalender Kegiatan & Event Komunitas",
+    description: "Kalender terpadu jadwal konvoi mabar, event boost NC, rilis kupon, dan agenda komunitas Nismara Transport.",
+    url: "https://transport.nismara.web.id/calendar",
+    siteName: "Nismara Transport",
+    locale: "id_ID",
+    type: "website",
+    images: [
+      {
+        url: "https://images.nismara.my.id/227300_188.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Kalender Kegiatan Nismara Transport",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Kalender Kegiatan & Event Komunitas",
+    description: "Kalender terpadu jadwal konvoi mabar, event boost NC, rilis kupon, dan agenda komunitas Nismara Transport.",
+    images: ["https://images.nismara.my.id/227300_188.jpg"],
+  },
 };
 
 export const dynamic = "force-dynamic";

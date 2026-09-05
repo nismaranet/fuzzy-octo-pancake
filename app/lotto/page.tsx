@@ -15,8 +15,33 @@ import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 
 import dbConnect from "@/lib/mongoose";
 
-export const metadata = {
-  title: "Lotto",
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Mega Jackpot Lotto",
+  description: "Tebak 4 angka keberuntunganmu dan menangkan total jackpot puluhan ribu NC di pengundian mingguan Nismara Lotto!",
+  openGraph: {
+    title: "Mega Jackpot Lotto",
+    description: "Tebak 4 angka keberuntunganmu dan menangkan total jackpot puluhan ribu NC di pengundian mingguan Nismara Lotto!",
+    url: "https://transport.nismara.web.id/lotto",
+    siteName: "Nismara Transport",
+    locale: "id_ID",
+    type: "website",
+    images: [
+      {
+        url: "https://images.nismara.my.id/227300_188.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Mega Jackpot Lotto Nismara Transport",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Mega Jackpot Lotto",
+    description: "Tebak 4 angka keberuntunganmu dan menangkan total jackpot puluhan ribu NC di pengundian mingguan Nismara Lotto!",
+    images: ["https://images.nismara.my.id/227300_188.jpg"],
+  },
 };
 
 

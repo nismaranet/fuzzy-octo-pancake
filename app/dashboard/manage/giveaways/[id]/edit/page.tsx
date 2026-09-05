@@ -12,7 +12,7 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 export const metadata: Metadata = {
-  title: "Edit Giveaway - Nismara Transport",
+  title: "Edit Giveaway",
 };
 
 export default async function EditGiveawayPage({

@@ -37,9 +37,68 @@ import Link from "next/link";
 import { formatDistanceToNow, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 
-export const metadata = {
-  title: "Profile Detail",
-};
+import type { Metadata } from "next";
+
+export async function generateMetadata(props: {
+  params: Promise<{ truckyId: string }>;
+}): Promise<Metadata> {
+  const { truckyId } = await props.params;
+  
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+    const user = await db.collection("users").findOne({
+      $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
+    });
+
+    if (user) {
+      const name = user.name || "Driver";
+      const title = `Profil ${name} (@${truckyId})`;
+      const roleText = user.role === "manager" || user.role === "admin" 
+        ? "Staff Nismara Transport" 
+        : user.nismaraplus?.status 
+        ? "Driver Nismara+" 
+        : "Driver Nismara Transport";
+      const description = `Lihat profil resmi, statistik pengiriman, pencapaian, dan armada truk ${name} (${roleText}) di Nismara Transport.`;
+      const avatarUrl = user.image || "https://images.nismara.my.id/227300_188.jpg";
+      const profileUrl = `https://transport.nismara.web.id/profile/${truckyId}`;
+
+      return {
+        title,
+        description,
+        openGraph: {
+          title,
+          description,
+          url: profileUrl,
+          siteName: "Nismara Transport",
+          locale: "id_ID",
+          type: "profile",
+          images: [
+            {
+              url: avatarUrl,
+              width: 500,
+              height: 500,
+              alt: name,
+            },
+          ],
+        },
+        twitter: {
+          card: "summary_large_image",
+          title,
+          description,
+          images: [avatarUrl],
+        },
+      };
+    }
+  } catch (error) {
+    console.error("Error generating profile metadata:", error);
+  }
+
+  return {
+    title: `Profil Driver #${truckyId}`,
+    description: `Profil pengemudi virtual trucking di Nismara Transport.`,
+  };
+}
 
 export default async function PublicProfilePage(props: {
   params: Promise<{ truckyId: string }>;

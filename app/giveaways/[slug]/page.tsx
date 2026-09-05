@@ -19,12 +19,39 @@ export async function generateMetadata({
 
   const giveaway = await db.collection("giveaways").findOne({ slug });
   if (!giveaway) {
-    return { title: "Giveaway Not Found - Nismara Transport" };
+    return { title: "Giveaway Tidak Ditemukan" };
   }
 
+  const title = `${giveaway.title}`;
+  const description = giveaway.description || "Event giveaway resmi Nismara Logistics.";
+  const banner = giveaway.bannerUrl || "https://images.nismara.my.id/227300_188.jpg";
+  const pageUrl = `https://transport.nismara.web.id/giveaways/${slug}`;
+
   return {
-    title: `${giveaway.title} - Nismara Transport`,
-    description: giveaway.description || "Event giveaway resmi Nismara Logistics.",
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: pageUrl,
+      siteName: "Nismara Transport",
+      locale: "id_ID",
+      type: "website",
+      images: [
+        {
+          url: banner,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [banner],
+    },
   };
 }
 

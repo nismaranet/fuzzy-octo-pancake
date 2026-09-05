@@ -24,14 +24,36 @@ export async function generateMetadata({ params }: any): Promise<Metadata> {
     const goal = await db.collection("communitygoals").findOne(query);
     if (!goal) return { title: "Goal Tidak Ditemukan" };
     
+    const title = `${goal.title}`;
+    const description = goal.description || "Target dan misi bersama komunitas pengemudi Nismara Transport.";
+    const imageUrl = goal.imageUrl || "https://images.nismara.my.id/227300_188.jpg";
+    const pageUrl = `https://transport.nismara.web.id/community-goals/${resolvedParams.slug}`;
+
     return {
-      title: `${goal.title} - Community Goals`,
-      description: goal.description,
+      title,
+      description,
       openGraph: {
-        title: `${goal.title} - Community Goals`,
-        description: goal.description,
-        images: [goal.imageUrl || "https://images.nismara.my.id/nismara-logo.png"],
-      }
+        title,
+        description,
+        url: pageUrl,
+        siteName: "Nismara Transport",
+        locale: "id_ID",
+        type: "website",
+        images: [
+          {
+            url: imageUrl,
+            width: 1200,
+            height: 630,
+            alt: title,
+          },
+        ],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: [imageUrl],
+      },
     };
   } catch {
     return { title: "Error" };

@@ -199,4 +199,17 @@ In financial mutations (NC, Penalty Points), claims (monthly Nismara+ rewards, s
 - **Rate Limiting Guard:** Precede sensitive mutation handlers with `checkRateLimit(discordId, key, cooldownMs)` from `@/lib/rateLimit` as an immediate UX defense against automated request floods.
 - **Skill Reference:** For detailed implementation examples and templates, refer to `.agents/skills/anti-race-condition/SKILL.md`.
 
+## 15. SEO, OpenGraph & Metadata Standards (Discord Embeds)
+
+Setiap pembuatan halaman publik atau layout baru harus menyertakan metadata SEO, OpenGraph, dan Twitter Card yang lengkap agar embed pratinjau saat dibagikan ke Discord, WhatsApp, atau media sosial terlihat kaya dan menarik.
+
+- **Aturan Template Title (Anti-Duplikasi):** Root layout (`app/layout.tsx`) sudah memiliki template:
+  `title: { template: "%s - Nismara Transport" }`, `openGraph.title: { template: "%s - Nismara Transport" }`, dan `twitter.title: { template: "%s - Nismara Transport" }`.
+  **DILARANG KERAS** menambahkan suffix ` - Nismara Transport` pada child page atau child layout manapun! Menambahkan suffix manual akan menghasilkan string ganda: `"Judul - Nismara Transport - Nismara Transport"`.
+- **Halaman Statis:** Selalu sertakan `title`, `description`, `openGraph` (`title`, `description`, `url`, `siteName: "Nismara Transport"`, `locale: "id_ID"`, `type: "website"`, `images`), dan `twitter` (`card: "summary_large_image"`, `title`, `description`, `images`).
+- **Halaman Dinamis (`generateMetadata`):** Selalu `await params` (Next.js 15+), cari dokumen di database, gunakan cover image/banner spesifik (dengan fallback ke `https://images.nismara.my.id/227300_188.jpg`), dan tangani status not-found dengan judul bersih (misal: `{ title: "Artikel Tidak Ditemukan" }`).
+- **Halaman Dashboard (`app/dashboard/**`):** Menggunakan template `%s - Dashboard Nismara` dan `robots: { index: false, follow: false }`. Jangan tambahkan OpenGraph atau Twitter Card pada halaman dashboard internal.
+- **Skill Reference:** Untuk instruksi dan contoh template lengkap, rujuk `.agents/skills/seo-metadata/SKILL.md`.
+
+
 

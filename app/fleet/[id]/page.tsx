@@ -70,7 +70,17 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
-      images: [image],
+      url: `https://transport.nismara.web.id/fleet/${id}`,
+      siteName: "Nismara Transport",
+      locale: "id_ID",
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
       type: "website",
     },
     twitter: {

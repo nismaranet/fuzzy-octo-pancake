@@ -4,6 +4,18 @@ import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: {
+    template: "%s - Dashboard Nismara",
+    default: "Dashboard Driver - Nismara Transport",
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

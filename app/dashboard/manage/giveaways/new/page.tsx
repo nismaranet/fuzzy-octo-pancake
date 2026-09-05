@@ -10,7 +10,7 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 export const metadata: Metadata = {
-  title: "Buat Giveaway Baru - Nismara Transport",
+  title: "Buat Giveaway Baru",
 };
 
 export default async function NewGiveawayPage() {

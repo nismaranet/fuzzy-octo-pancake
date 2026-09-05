@@ -12,7 +12,7 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 export const metadata: Metadata = {
-  title: "Detail & Undian Giveaway - Nismara Transport",
+  title: "Detail & Undian Giveaway",
 };
 
 export default async function ManageGiveawayDetailPage({

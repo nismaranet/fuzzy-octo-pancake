@@ -11,7 +11,7 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 export const metadata: Metadata = {
-  title: "Manajemen Giveaway - Nismara Transport",
+  title: "Manajemen Giveaway",
 };
 
 export default async function ManageGiveawaysPage() {

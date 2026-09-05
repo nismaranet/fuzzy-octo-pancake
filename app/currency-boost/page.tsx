@@ -1,9 +1,37 @@
 import clientPromise from "@/lib/mongodb";
 import { Calendar, Clock, User, Zap, History, Sparkles } from "lucide-react";
 import Link from "next/link";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: "Event Pengali NC & Currency Boost",
+  description: "Daftar event Currency Boost aktif dan terjadwal di Nismara Transport. Nikmati bonus pengali NC berlimpah saat pengiriman kargo!",
+  openGraph: {
+    title: "Event Pengali NC & Currency Boost",
+    description: "Daftar event Currency Boost aktif dan terjadwal di Nismara Transport. Nikmati bonus pengali NC berlimpah saat pengiriman kargo!",
+    url: "https://transport.nismara.web.id/currency-boost",
+    siteName: "Nismara Transport",
+    locale: "id_ID",
+    type: "website",
+    images: [
+      {
+        url: "https://images.nismara.my.id/227300_188.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Currency Boost Nismara Transport",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Event Pengali NC & Currency Boost",
+    description: "Daftar event Currency Boost aktif dan terjadwal di Nismara Transport.",
+    images: ["https://images.nismara.my.id/227300_188.jpg"],
+  },
+};
 
 export default async function EventsPage() {
   const client = await clientPromise;
