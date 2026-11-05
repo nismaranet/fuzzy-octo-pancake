@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react"; // Tambahkan useEffect
+import Link from "next/link";
 import {
   updateProfile,
   getUserSettings,
@@ -9,7 +10,8 @@ import {
   unlinkTruckersMP,
   submitHaulmpApplication,
   cancelHaulmpApplication,
-} from "./actions"; // Import actions TMP & HaulMP
+  generateTrackerToken,
+} from "./actions"; // Import actions TMP, HaulMP & Tracker
 import {
   User,
   Image as ImageIcon,
@@ -27,6 +29,12 @@ import {
   Send,
   ExternalLink,
   MessageSquare,
+  KeyRound,
+  Copy,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Radio,
 } from "lucide-react";
 import { compressImageToWebP } from "@/lib/imageUtils";
 import { showAlert, showConfirm } from "@/lib/dialog";
@@ -77,6 +85,13 @@ export default function SettingsClient() {
   const [haulmpNotes, setHaulmpNotes] = useState("");
   const [isSubmittingHaulmp, setIsSubmittingHaulmp] = useState(false);
   const [isCancellingHaulmp, setIsCancellingHaulmp] = useState(false);
+
+  // Nismara Tracker Plugin State
+  const [trackerToken, setTrackerToken] = useState<string | null>(null);
+  const [trackerLastSync, setTrackerLastSync] = useState<string | null>(null);
+  const [trackerVersion, setTrackerVersion] = useState<string | null>(null);
+  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [showTrackerToken, setShowTrackerToken] = useState(false);
 
   // State form
   const [name, setName] = useState("");
@@ -129,6 +144,9 @@ export default function SettingsClient() {
         setIsHaulmpDriver(Boolean(data.isHaulmpDriver));
         setHaulmpId(data.haulmpId || null);
         setHaulmpApp(data.haulmpApplication || null);
+        setTrackerToken((data as any).trackerToken || null);
+        setTrackerLastSync((data as any).trackerLastSync || null);
+        setTrackerVersion((data as any).trackerVersion || null);
       }
       setIsInitialLoading(false);
     }
@@ -223,6 +241,43 @@ export default function SettingsClient() {
       await showAlert("Terjadi kesalahan saat membatalkan pengajuan.", "error");
     } finally {
       setIsCancellingHaulmp(false);
+    }
+  };
+
+  const handleGenerateTrackerToken = async () => {
+    if (
+      trackerToken &&
+      !(await showConfirm(
+        "Membuat token baru akan menonaktifkan token lama Anda di plugin NismaraTracker.dll. Lanjutkan?"
+      ))
+    ) {
+      return;
+    }
+    setIsGeneratingToken(true);
+    try {
+      const res = await generateTrackerToken();
+      if (res.success && res.token) {
+        setTrackerToken(res.token);
+        setShowTrackerToken(true);
+        await showAlert(res.message);
+      } else {
+        await showAlert(res.message, "error");
+      }
+    } catch (error) {
+      console.error(error);
+      await showAlert("Gagal membuat token tracker.", "error");
+    } finally {
+      setIsGeneratingToken(false);
+    }
+  };
+
+  const handleCopyTrackerToken = async () => {
+    if (!trackerToken) return;
+    try {
+      await navigator.clipboard.writeText(trackerToken);
+      await showAlert("Tracker Token berhasil disalin ke clipboard!");
+    } catch {
+      await showAlert("Gagal menyalin token.", "error");
     }
   };
 
@@ -830,6 +885,35 @@ export default function SettingsClient() {
                 <p>
                   Integrasi VTC HaulMP khusus diperuntukkan bagi Driver terdaftar Nismara Transport.
                 </p>
+              </div>
+            )}
+
+            {/* NISMARA TRACKER CALLOUT BANNER */}
+            {(isDriver || (session?.user as any)?.isDriver) && (
+              <div className="glass-panel p-6 rounded-[2rem] border-cyan-500/30 bg-gradient-to-r from-cyan-950/30 via-black/40 to-black/40 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                    <Radio className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                      Nismara Tracker & Companion Hub
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        Menu Baru
+                      </span>
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Kelola Driver Token Anda, pantau sinkronisasi in-game, dan unduh Nismara Companion untuk Windows, Linux, & macOS.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/dashboard/tracker"
+                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs flex items-center gap-2 transition-all shadow-lg shadow-cyan-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <span>Buka Tracker Hub</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
               </div>
             )}
           </div>
