@@ -12,7 +12,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Nismara Transport is a web platform for a virtual trucking community (VTC). It integrates with Discord (for authentication and roles) and Trucky (for in-game data, `truckyId`, `truckyRank`). The platform includes features such as a Social Gallery, Market, Fuel Market, Cargo Market, Convoy management, and a Driver directory.
 
-## 2. Technology Stack
+## 2. Technology Stacks
 
 - **Language:** TypeScript (Strict typing, interfaces/types defined inline or in models).
 - **Framework:** Next.js (App Router, Server Components & Server Actions).
