@@ -166,12 +166,10 @@ export default function TrackerClient({
               Nismara Tracker & Companion
             </h1>
             <p className="text-sm md:text-base text-gray-400 max-w-2xl leading-relaxed">
-              In-game telemetry plugin berbasis{" "}
-              <strong className="text-cyan-300">
-                Apple iPhone 16 OS (DirectX 11)
-              </strong>{" "}
-              untuk Euro Truck Simulator 2 & American Truck Simulator, serta
-              aplikasi desktop Companion hub modern.
+              In-game telemetry plugin{" "}
+              <strong className="text-cyan-300">Nismara Transport</strong> untuk
+              Euro Truck Simulator 2 & American Truck Simulator, serta aplikasi
+              desktop Companion hub modern.
             </p>
           </div>
 
@@ -182,15 +180,6 @@ export default function TrackerClient({
             >
               <Download className="w-4 h-4" />
               <span>Unduh Aplikasi</span>
-            </a>
-            <a
-              href={release.htmlUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="px-5 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-bold text-sm flex items-center justify-center gap-2 transition-all hover:border-white/20"
-            >
-              <span>GitHub Release</span>
-              <ExternalLink className="w-4 h-4 text-gray-400" />
             </a>
           </div>
         </div>
