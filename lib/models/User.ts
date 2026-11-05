@@ -18,6 +18,9 @@ const userSchema = new mongoose.Schema(
     isTmpDriver: { type: Boolean, default: false },
     haulmpId: { type: String, required: false },
     isHaulmpDriver: { type: Boolean, default: false },
+    trackerToken: { type: String, required: false, index: true },
+    trackerLastSync: { type: Date, default: null },
+    trackerVersion: { type: String, default: null },
 
     insurance: {
       status: { type: Boolean, default: false },

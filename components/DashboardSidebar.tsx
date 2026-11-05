@@ -20,6 +20,7 @@ import {
   Ticket,
   Trophy,
   Crown,
+  Radio,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ import {
 
 const menuItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Nismara Tracker", href: "/dashboard/tracker", icon: Radio },
   { name: "Nismara Pass", href: "/dashboard/season-pass", icon: Trophy },
   { name: "Driver Guide", href: "/dashboard/driver-guide", icon: BookOpen },
   { name: "Garage", href: "/dashboard/garage", icon: Truck },
