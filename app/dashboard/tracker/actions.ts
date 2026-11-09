@@ -64,7 +64,7 @@ export async function generateTrackerToken() {
       };
     }
 
-    if (!user.isDriver && user.role !== "manager" && user.role !== "admin") {
+    if (!user.isDriver) {
       return {
         success: false,
         message: "Hanya Driver resmi Nismara Transport yang dapat membuat Tracker Token.",

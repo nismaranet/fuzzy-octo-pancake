@@ -92,11 +92,7 @@ export default async function TrackerPage() {
     redirect("/login");
   }
 
-  if (
-    !session.user?.isDriver &&
-    session.user?.role !== "manager" &&
-    session.user?.role !== "admin"
-  ) {
+  if (!session.user?.isDriver || !session.user.driverData) {
     return <DriverAccessBlocker session={session} />;
   }
 
