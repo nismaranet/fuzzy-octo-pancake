@@ -84,6 +84,16 @@ export default function ManageUserUI({
   const paginatedPointHistory = pointHistory.slice((pointPage - 1) * itemsPerPage, pointPage * itemsPerPage);
   const pointTotalPages = Math.ceil(pointHistory.length / itemsPerPage);
 
+  const rankName = memberData?.rank?.name || user?.truckyRank || "Driver";
+  const rankColor = memberData?.rank?.color || user?.truckyRankColor || "#b39ddb";
+  const roleName = memberData?.role?.name || user?.truckyRole || user?.discordRole || "Member";
+  const totalDrivenDistance = memberData?.total_driven_distance_km !== undefined && memberData?.total_driven_distance_km !== null
+    ? `${memberData.total_driven_distance_km.toLocaleString("id-ID")} Km`
+    : `${userStats?.jobs?.totalDistanceKm?.toLocaleString("id-ID") || 0} Km`;
+  const lastJobDays = memberData?.last_job_days !== undefined && memberData?.last_job_days !== null
+    ? `${memberData.last_job_days} Days`
+    : "-";
+
   const formatDate = (dateString: string) => {
     if (!mounted || !dateString) return "";
     return new Date(dateString).toLocaleDateString("id-ID", {
@@ -225,17 +235,17 @@ export default function ManageUserUI({
               <span
                 className="px-3 py-1 rounded-full text-xs font-bold border"
                 style={{
-                  backgroundColor: `${memberData.rank.color}20`,
-                  color: memberData.rank.color,
-                  borderColor: `${memberData.rank.color}50`,
+                  backgroundColor: `${rankColor}20`,
+                  color: rankColor,
+                  borderColor: `${rankColor}50`,
                 }}
               >
-                {memberData.rank.name}
+                {rankName}
               </span>
-              ID: #{user.truckyId}
+              ID: #{user?.truckyId || "-"}
             </p>
             <p className="text-(-primary-foreground)/80 font-bold flex items-center gap-2">
-              {memberData.role.name} Nismara Transport
+              {roleName} Nismara Transport
             </p>
           </div>
         </div>
@@ -286,7 +296,7 @@ export default function ManageUserUI({
             </h4>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <StatCard icon={Route} label="Jarak Tempuh" value={`${memberData.total_driven_distance_km?.toLocaleString("id-ID")} Km`} sub={`Avg: ${userStats.jobs.avgDistanceKm} Km/job`} color="text-blue-400" />
+                <StatCard icon={Route} label="Jarak Tempuh" value={totalDrivenDistance} sub={`Avg: ${userStats?.jobs?.avgDistanceKm || 0} Km/job`} color="text-blue-400" />
                 <StatCard icon={Coins} label="Net Income" value={`${userStats.jobs.netIncome.toLocaleString("id-ID")} NC`} sub={`Earned: ${userStats.jobs.ncEarned.toLocaleString()} NC`} color="text-emerald-400" />
                 <StatCard icon={TriangleAlert} label="Poin Penalty" value={`${currentPoints} / 50`} color={currentPoints >= 25 ? "text-red-400" : "text-orange-400"} />
                 <StatCard icon={ShieldCheck} label="Job Valid" value={userStats.jobs.validatedJobs} sub={`- ${userStats.jobs.validatedPointsDeducted} Poin Penalty`} color="text-indigo-400" />
@@ -425,7 +435,7 @@ export default function ManageUserUI({
         <div className="p-6 border-b border-white/5 bg-white/5 flex items-center gap-2">
           <Briefcase size={16} className="text-accent-lilac" />
           <h3 className="font-black text-(-primary-foreground)/50 uppercase tracking-widest text-xs">
-            Job Records (Last Job : {memberData.last_job_days} Days)
+            Job Records (Last Job : {lastJobDays})
           </h3>
         </div>
         <div className="overflow-x-auto">
