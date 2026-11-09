@@ -53,8 +53,21 @@ export async function GET(request: Request) {
     const db = client.db();
     const now = new Date();
 
-    // Cari garasi yang waktu bayarnya sudah lewat atau sama dengan sekarang
+    // Helper untuk menghitung jatuh tempo berikutnya (mempertahankan basis jam jatuh tempo asal)
+    const calculateNextPaymentDate = (currentDueDate: Date | null): Date => {
+      const base = currentDueDate ? new Date(currentDueDate) : new Date();
+      const next = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000);
+      // Jika server/cron tertunda lama sehingga tanggal berikutnya masih di masa lampau, loncat ke now + 30 hari
+      if (next <= now) {
+        return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
+      return next;
+    };
+
+    // Cari garasi operational yang waktu bayarnya sudah lewat atau sama dengan sekarang
+    // Menghindari infinite loop & spam DM Discord pada garasi yang sudah berstatus suspended
     const dueGarages = await Garage.find({
+      status: "operational",
       next_payment_date: { $lte: now }
     });
 
@@ -64,9 +77,7 @@ export async function GET(request: Request) {
     for (const garage of dueGarages) {
       // Jika cost 0, langsung perpanjang saja 30 hari tanpa potong saldo (misal slot 1 gratis)
       if (garage.operational_cost <= 0) {
-        const nextDate = new Date();
-        nextDate.setDate(nextDate.getDate() + 30);
-        garage.next_payment_date = nextDate;
+        garage.next_payment_date = calculateNextPaymentDate(garage.next_payment_date);
         await garage.save();
         processedCount++;
         continue;
@@ -86,7 +97,7 @@ export async function GET(request: Request) {
         garage.status = "suspended";
         await garage.save();
         
-        // Kirim notifikasi peringatan
+        // Kirim notifikasi peringatan (hanya terkirim 1 kali karena status berubah jadi suspended)
         await sendDiscordDM(
           garage.discordId,
           `🚨 **GARASI DISITA!** 🚨\nSaldo NC Anda tidak mencukupi untuk membayar biaya operasional garasi bulanan sebesar **${garage.operational_cost.toLocaleString('id-ID')} NC**. Seluruh akses ke garasi Anda dan Fuel Tank telah **DIKUNCI**. Silakan buat tiket (Ticket) di Discord Nismara untuk berdiskusi dengan Manajer agar tunggakan Anda dapat diselesaikan (misalnya: dengan menjual aset truk Anda).`
@@ -104,9 +115,7 @@ export async function GET(request: Request) {
         });
 
         // Perpanjang 30 hari ke depan
-        const nextDate = new Date();
-        nextDate.setDate(nextDate.getDate() + 30);
-        garage.next_payment_date = nextDate;
+        garage.next_payment_date = calculateNextPaymentDate(garage.next_payment_date);
         await garage.save();
 
         processedCount++;

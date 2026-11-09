@@ -109,12 +109,15 @@ export async function POST(request: Request) {
       __v: 0,
     });
 
+    const nextPaymentDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     // 3. Tambah Penalty Tickets (Safebox) dengan default schema lengkap jika belum ada dokumen garasi
     await db.collection("garages").updateOne(
       { discordId },
       { 
         $inc: { safeboxStock: MONTHLY_TICKET_REWARD },
         $setOnInsert: {
+          userId: user._id,
+          discordId,
           fleetSlot: 1,
           fleetSlotUsed: 0,
           fleetSlotLevel: 1,
@@ -123,7 +126,16 @@ export async function POST(request: Request) {
           fuelTankLevel: 1,
           fuelStock: 0,
           operational_cost: 0,
-          status: "active",
+          fleet_operational_cost: 0,
+          fuel_operational_cost: 0,
+          safebox_operational_cost: 0,
+          next_payment_date: nextPaymentDate,
+          mechanics: {
+            umum: null,
+            ban: null,
+            mesin: null,
+          },
+          status: "operational",
           createdAt: now,
         }
       },

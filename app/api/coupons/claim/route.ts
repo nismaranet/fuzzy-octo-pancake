@@ -121,9 +121,37 @@ export async function POST(request: Request) {
       });
 
     } else if (coupon.type === "PENALTY_TICKET") {
+      const userDoc = await db.collection("users").findOne({ discordId });
+      const nextPaymentDate = new Date();
+      nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
       await db.collection("garages").updateOne(
         { discordId },
-        { $inc: { safeboxStock: rewardAmount } },
+        { 
+          $inc: { safeboxStock: rewardAmount },
+          $setOnInsert: {
+            userId: userDoc?._id || null,
+            discordId,
+            fleetSlot: 1,
+            fleetSlotUsed: 0,
+            fleetSlotLevel: 1,
+            safeboxLevel: 1,
+            fuelCapacity: 2000,
+            fuelTankLevel: 1,
+            fuelStock: 0,
+            operational_cost: 0,
+            fleet_operational_cost: 0,
+            fuel_operational_cost: 0,
+            safebox_operational_cost: 0,
+            next_payment_date: nextPaymentDate,
+            mechanics: {
+              umum: null,
+              ban: null,
+              mesin: null,
+            },
+            status: "operational",
+            createdAt: new Date(),
+          }
+        },
         { upsert: true }
       );
     }

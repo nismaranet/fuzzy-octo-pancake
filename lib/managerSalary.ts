@@ -542,9 +542,36 @@ export async function claimManagerSalary(managerId: string, month: string) {
 
     // 6. Distribusi Tiket Safebox (Penghapus Penalti)
     if (perf.rewards.penaltyTickets > 0) {
+      const nextPaymentDate = new Date();
+      nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
       await db.collection("garages").updateOne(
         { discordId: String(managerId) },
-        { $inc: { safeboxStock: perf.rewards.penaltyTickets } },
+        { 
+          $inc: { safeboxStock: perf.rewards.penaltyTickets },
+          $setOnInsert: {
+            userId: user._id,
+            discordId: String(managerId),
+            fleetSlot: 1,
+            fleetSlotUsed: 0,
+            fleetSlotLevel: 1,
+            safeboxLevel: 1,
+            fuelCapacity: 2000,
+            fuelTankLevel: 1,
+            fuelStock: 0,
+            operational_cost: 0,
+            fleet_operational_cost: 0,
+            fuel_operational_cost: 0,
+            safebox_operational_cost: 0,
+            next_payment_date: nextPaymentDate,
+            mechanics: {
+              umum: null,
+              ban: null,
+              mesin: null,
+            },
+            status: "operational",
+            createdAt: new Date(),
+          }
+        },
         { upsert: true }
       );
       safeboxCredited = true;

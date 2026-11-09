@@ -551,10 +551,37 @@ export async function exchangeJobForTickets(jobId: string) {
       throw new Error("Job ini sudah pernah divalidasi atau ditukar tiket sebelumnya.");
     }
 
+    const nextPaymentDate = new Date();
+    nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
     // 5. Tambahkan tiket ke Safebox
     await db.collection("garages").updateOne(
       { discordId: userId },
-      { $inc: { safeboxStock: ticketAmount } },
+      { 
+        $inc: { safeboxStock: ticketAmount },
+        $setOnInsert: {
+          userId: user?._id || null,
+          discordId: userId,
+          fleetSlot: 1,
+          fleetSlotUsed: 0,
+          fleetSlotLevel: 1,
+          safeboxLevel: 1,
+          fuelCapacity: 2000,
+          fuelTankLevel: 1,
+          fuelStock: 0,
+          operational_cost: 0,
+          fleet_operational_cost: 0,
+          fuel_operational_cost: 0,
+          safebox_operational_cost: 0,
+          next_payment_date: nextPaymentDate,
+          mechanics: {
+            umum: null,
+            ban: null,
+            mesin: null,
+          },
+          status: "operational",
+          createdAt: new Date(),
+        }
+      },
       { upsert: true }
     );
 

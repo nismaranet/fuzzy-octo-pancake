@@ -131,9 +131,36 @@ export async function submitSurveyAction(data: SubmitSurveyInput) {
 
         rewardMessage = `Berhasil! Jawaban tersimpan & kamu mendapatkan ${rewardAmount} Nismara Coin!`;
       } else if (rewardType === "PENALTY_TICKET") {
+        const nextPaymentDate = new Date();
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
         await db.collection("garages").updateOne(
           { discordId: discordId },
-          { $inc: { safeboxStock: rewardAmount } },
+          { 
+            $inc: { safeboxStock: rewardAmount },
+            $setOnInsert: {
+              userId: userInDb._id,
+              discordId: discordId,
+              fleetSlot: 1,
+              fleetSlotUsed: 0,
+              fleetSlotLevel: 1,
+              safeboxLevel: 1,
+              fuelCapacity: 2000,
+              fuelTankLevel: 1,
+              fuelStock: 0,
+              operational_cost: 0,
+              fleet_operational_cost: 0,
+              fuel_operational_cost: 0,
+              safebox_operational_cost: 0,
+              next_payment_date: nextPaymentDate,
+              mechanics: {
+                umum: null,
+                ban: null,
+                mesin: null,
+              },
+              status: "operational",
+              createdAt: new Date(),
+            }
+          },
           { upsert: true }
         );
         

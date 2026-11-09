@@ -59,6 +59,39 @@ export default async function GarageDashboardPage() {
         mesin: null
       }
     });
+  } else {
+    // Auto-heal missing or invalid fields if garage was created partially
+    let needsHeal = false;
+    if (!garage.userId || garage.userId.toString() !== user._id.toString()) {
+      garage.userId = user._id;
+      needsHeal = true;
+    }
+    const validStatuses = ["operational", "closed", "on_construction", "suspended"];
+    if (!validStatuses.includes(garage.status)) {
+      garage.status = "operational";
+      needsHeal = true;
+    }
+    if (!garage.mechanics) {
+      garage.mechanics = {
+        umum: null,
+        ban: null,
+        mesin: null
+      };
+      needsHeal = true;
+    }
+    if (!garage.next_payment_date) {
+      const nextPaymentDate = new Date();
+      nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
+      garage.next_payment_date = nextPaymentDate;
+      needsHeal = true;
+    }
+    if (needsHeal) {
+      try {
+        await garage.save();
+      } catch (err) {
+        console.error("Auto-heal garage failed:", err);
+      }
+    }
   }
 
   // Calculate fleetSlotUsed based on owner (not driver, since driver can self-assign/unassign)
@@ -66,7 +99,15 @@ export default async function GarageDashboardPage() {
   
   if (garage.fleetSlotUsed !== userFleetsCount) {
     garage.fleetSlotUsed = userFleetsCount;
-    await garage.save();
+    try {
+      await garage.save();
+    } catch (saveErr) {
+      console.error("Failed to save updated fleetSlotUsed:", saveErr);
+      await db.collection("garages").updateOne(
+        { _id: garage._id },
+        { $set: { fleetSlotUsed: userFleetsCount } }
+      );
+    }
   }
 
   // Convert mongoose doc to plain object for client component
