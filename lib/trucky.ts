@@ -1,7 +1,7 @@
 // Fungsi ini hanya akan berjalan di server (aman dari kebocoran key)
 const TRUCKY_BASE_URL = "https://e.truckyapp.com";
 export const TRUCKY_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+  "NismaraTransport/1.0 (https://transport.nismara.web.id)";
 // Catatan: Base URL ini bisa disesuaikan dengan endpoint e.truckyapp.com jika kamu menggunakan spesifik VTC Hub API.
 
 export async function getDriverStats(truckyId: number) {
