@@ -57,6 +57,17 @@ async function handleTrackerAuth(req: Request, bodyData?: any) {
       );
     }
 
+    if (!user.test_participation) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "NOT_A_TESTER",
+          message: "Akun ini belum memiliki akses uji coba (test_participation) Nismara Tracker.",
+        },
+        { status: 403 }
+      );
+    }
+
     // Persiapan masa depan: Validasi Steam ID (opsional, jika header/body mengirimkan steamId dan mode strict diaktifkan)
     const clientSteamId = req.headers.get("x-steam-id") || bodyData?.steamId || null;
     const pluginVersion = req.headers.get("x-plugin-version") || bodyData?.pluginVersion || "1.0.0";

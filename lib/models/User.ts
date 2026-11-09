@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema(
     trackerToken: { type: String, required: false, index: true },
     trackerLastSync: { type: Date, default: null },
     trackerVersion: { type: String, default: null },
+    test_participation: { type: Boolean, default: false },
 
     insurance: {
       status: { type: Boolean, default: false },

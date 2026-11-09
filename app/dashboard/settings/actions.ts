@@ -138,9 +138,12 @@ export async function getUserSettings() {
       haulmpId: user.haulmpId || null,
       isHaulmpDriver: user.isHaulmpDriver || false,
       haulmpApplication: haulmpApp ? JSON.parse(JSON.stringify(haulmpApp)) : null,
-      trackerToken: user.trackerToken || null,
-      trackerLastSync: user.trackerLastSync ? new Date(user.trackerLastSync).toISOString() : null,
-      trackerVersion: user.trackerVersion || null,
+      trackerToken: user.test_participation ? (user.trackerToken || null) : null,
+      trackerLastSync:
+        user.test_participation && user.trackerLastSync
+          ? new Date(user.trackerLastSync).toISOString()
+          : null,
+      trackerVersion: user.test_participation ? (user.trackerVersion || null) : null,
     };
   } catch (error) {
     console.error("Error fetching settings:", error);
@@ -384,6 +387,14 @@ export async function generateTrackerToken() {
     const user = await usersCol.findOne({ email: session.user.email });
     if (!user) {
       return { success: false, message: "User tidak ditemukan.", token: null };
+    }
+
+    if (!user.test_participation) {
+      return {
+        success: false,
+        message: "Fitur Tracker saat ini hanya tersedia untuk peserta uji coba (tester).",
+        token: null,
+      };
     }
 
     if (!user.isDriver) {

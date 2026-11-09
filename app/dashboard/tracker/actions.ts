@@ -20,6 +20,13 @@ export async function getTrackerInfo() {
       return { success: false, message: "Pengguna tidak ditemukan." };
     }
 
+    if (!user.test_participation) {
+      return {
+        success: false,
+        message: "Fitur Tracker saat ini hanya tersedia untuk peserta uji coba (tester).",
+      };
+    }
+
     return {
       success: true,
       trackerToken: user.trackerToken || null,
@@ -47,6 +54,14 @@ export async function generateTrackerToken() {
     const user = await usersCol.findOne({ email: session.user.email });
     if (!user) {
       return { success: false, message: "User tidak ditemukan.", token: null };
+    }
+
+    if (!user.test_participation) {
+      return {
+        success: false,
+        message: "Fitur Tracker saat ini hanya tersedia untuk peserta uji coba (tester).",
+        token: null,
+      };
     }
 
     if (!user.isDriver && user.role !== "manager" && user.role !== "admin") {
@@ -99,8 +114,20 @@ export async function revokeTrackerToken() {
     const db = client.db();
     const usersCol = db.collection("users");
 
+    const user = await usersCol.findOne({ email: session.user.email });
+    if (!user) {
+      return { success: false, message: "User tidak ditemukan." };
+    }
+
+    if (!user.test_participation) {
+      return {
+        success: false,
+        message: "Fitur Tracker saat ini hanya tersedia untuk peserta uji coba (tester).",
+      };
+    }
+
     await usersCol.updateOne(
-      { email: session.user.email },
+      { _id: user._id },
       {
         $set: {
           trackerToken: null,

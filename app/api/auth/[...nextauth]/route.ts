@@ -343,6 +343,7 @@ export const authOptions: NextAuthOptions = {
       session.user.isBooster = isBooster;
       session.user.nismaraplus = nismaraplus;
       session.user.topManager = dbUser?.topManager || { status: false };
+      session.user.test_participation = Boolean(dbUser?.test_participation);
       session.user.xp = dbUser?.xp || 0;
       session.user.level = dbUser?.level || 1;
       session.user.teamId = dbUser?.teamId ? dbUser.teamId.toString() : null;
@@ -359,6 +360,7 @@ export const authOptions: NextAuthOptions = {
           isBooster,
           nismaraplus,
           topManager: session.user.topManager,
+          test_participation: session.user.test_participation,
           xp: session.user.xp,
           level: session.user.level,
           teamId: session.user.teamId,

@@ -110,6 +110,11 @@ export default async function TrackerPage() {
     redirect("/login");
   }
 
+  // Hanya user yang memiliki hak uji coba (test_participation === true) yang dapat mengakses halaman Tracker
+  if (!user.test_participation) {
+    redirect("/dashboard");
+  }
+
   const release = await getLatestRelease();
 
   return (

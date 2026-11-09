@@ -31,6 +31,7 @@ declare module "next-auth" {
         awardedAt?: Date | string | null;
         expiredAt?: Date | string | null;
       } | null;
+      test_participation?: boolean;
     } & DefaultSession["user"];
   }
 

@@ -64,16 +64,22 @@ const managementItems = [
 export default function DashboardSidebar({
   userRole,
   isSeasonPassEnabled = true,
+  isTrackerEnabled = false,
 }: {
   userRole?: string;
   isSeasonPassEnabled?: boolean;
+  isTrackerEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const isManager = userRole === "manager" || userRole === "admin";
 
-  const effectiveMenuItems = isSeasonPassEnabled
+  let effectiveMenuItems = isSeasonPassEnabled
     ? menuItems
     : menuItems.filter((item) => item.href !== "/dashboard/season-pass");
+
+  if (!isTrackerEnabled) {
+    effectiveMenuItems = effectiveMenuItems.filter((item) => item.href !== "/dashboard/tracker");
+  }
 
   // Konfigurasi untuk 4 menu yang tampil di Bottom Bar
   const primaryMobileHrefs = ["/dashboard", "/dashboard/garage", "/dashboard/jobs", "/dashboard/currency"];

@@ -52,6 +52,7 @@ export default async function DashboardLayout({
         <DashboardSidebar
           userRole={session.user?.role}
           isSeasonPassEnabled={featureStatus.isEnabled}
+          isTrackerEnabled={Boolean(session.user?.test_participation)}
         />
 
         {/* Main Content Area */}

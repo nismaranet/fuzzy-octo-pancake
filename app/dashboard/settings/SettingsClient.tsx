@@ -889,7 +889,7 @@ export default function SettingsClient() {
             )}
 
             {/* NISMARA TRACKER CALLOUT BANNER */}
-            {(isDriver || (session?.user as any)?.isDriver) && (
+            {(isDriver || (session?.user as any)?.isDriver) && Boolean((session?.user as any)?.test_participation) && (
               <div className="glass-panel p-6 rounded-[2rem] border-cyan-500/30 bg-gradient-to-r from-cyan-950/30 via-black/40 to-black/40 flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
