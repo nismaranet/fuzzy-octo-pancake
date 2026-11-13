@@ -239,3 +239,29 @@ Standar ISO 8601 **tidak mengizinkan** offset timezone (`+07:00`) ditempelkan la
 3. **Standar Input Form Event & Deadline:**
    - Selalu prioritaskan `<input type="datetime-local">` dibandingkan `<input type="date">` untuk event atau kontrak baru agar staf/manajer dapat menentukan jam dan menit deadline secara eksplisit.
    - Selalu validasi `endDt > startDt` baik di client-side (dengan `showAlert` dari `@/lib/dialog`) maupun di backend Server Action sebelum mutasi database.
+
+## 19. Kompatibilitas BSON & ObjectId (`mongodb` Native Driver vs `mongoose`)
+
+Proyek ini menggunakan dua layer akses MongoDB secara bersamaan: native driver `mongodb` (`^6.21.0` dengan `bson` 6.x) melalui `clientPromise` (`@/lib/mongodb`) dan ODM `mongoose` (`^9.5.0` dengan `bson` 7.x) melalui `@/lib/mongoose`.
+
+### Akar Masalah Bug Laten BSON:
+- **PERINGATAN KERAS:** `ObjectId` dari dokumen hasil query **Mongoose** (`User.findOne`, `Garage.findOne`, `Model.create`, atau `new mongoose.Types.ObjectId()`) bertipe **BSON 7.x**. Jika nilai tersebut dikirim langsung ke query, filter, `$set`, `$setOnInsert`, atau `insertOne` milik **native driver** (`db.collection(...)`), driver `mongodb` 6.x akan menolak dan melempar error runtime:
+  `Unsupported BSON version, bson types must be from bson 6.x.x`
+- Bug ini sangat berbahaya menjadi **bug laten atau gagal diam-diam** apabila terjadi di dalam blok `catch` fallback (yang jarang tereksekusi saat kondisi normal) atau di dalam blok `try/catch` non-fatal (misalnya pencatatan riwayat transaksi), sehingga fitur terlihat sukses padahal sebagian data tidak tersimpan.
+
+### Aturan Wajib Saat Mencampur Mongoose & Native Driver:
+1. **Konversi Eksplisit ke `ObjectId` Native (`"mongodb"`):**
+   Setiap kali ID dari dokumen Mongoose (atau parameter `_id` yang sumbernya tidak dijamin berasal dari native driver) dipakai di `db.collection(...)`, **wajib** dikonversi menggunakan `ObjectId` yang diimpor dari `"mongodb"`:
+   ```ts
+   import { ObjectId } from "mongodb";
+
+   // ✅ BENAR
+   userId: user?._id ? new ObjectId(String(user._id)) : null,
+   await db.collection("garages").updateOne({ _id: new ObjectId(String(garage._id)) }, ...);
+
+   // ❌ DILARANG — melempar "Unsupported BSON version, bson types must be from bson 6.x.x"
+   userId: user?._id || null,
+   await db.collection("garages").updateOne({ _id: garage._id }, ...);
+   ```
+2. **Konsistensi Layer dalam Satu Alur:** Usahakan tetap konsisten menggunakan satu layer (sepenuhnya Mongoose Model atau sepenuhnya `db.collection(...)`) dalam satu endpoint/Server Action. Jika harus membuat helper yang menerima `doc` atau `_id` dari pemanggil luar lalu memanggil `db.collection(...)`, selalu lakukan normalisasi defensif `new ObjectId(String(doc._id))`.
+3. **Jangan Gunakan `Model.collection.*` dengan `ObjectId` Native:** Driver internal Mongoose menggunakan BSON 7.x, sedangkan `mongodb` (`clientPromise`) menggunakan BSON 6.x. Hindari memanggil raw `Model.collection.*`; gunakan metode Mongoose standar (`Model.findOne`, `Model.updateOne`, dll.) atau `db.collection(...)` dengan konversi `ObjectId` dari `"mongodb"`.
