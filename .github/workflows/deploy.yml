@@ -74,9 +74,26 @@ jobs:
             exit 0
           fi
 
+          ARGS=(
+            -sS
+            -w "\n%{http_code}"
+            -X GET
+            "$COOLIFY_WEBHOOK_URL"
+            -H "Accept: application/json"
+            -A "Nismara-Deploy-CI/1.0"
+          )
           if [ -n "$COOLIFY_WEBHOOK_TOKEN" ]; then
-            curl -fsS -X POST "$COOLIFY_WEBHOOK_URL" \
-              -H "Authorization: Bearer $COOLIFY_WEBHOOK_TOKEN"
-          else
-            curl -fsS -X POST "$COOLIFY_WEBHOOK_URL"
+            ARGS+=(-H "Authorization: Bearer $COOLIFY_WEBHOOK_TOKEN")
+          fi
+
+          RESPONSE=$(curl "${ARGS[@]}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Coolify HTTP Status: $HTTP_CODE"
+          echo "$BODY"
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            exit 1
           fi
