@@ -17,8 +17,10 @@ import {
 
 export default function ManageUsersTable({
   initialData,
+  isOwner = false,
 }: {
   initialData: any[];
+  isOwner?: boolean;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -201,6 +203,31 @@ export default function ManageUsersTable({
                             className="group-hover/btn:scale-110 transition-transform"
                           />
                         </Link>
+                        {isOwner && user.discordId && (
+                          <Link
+                            href={`/dashboard/manage/data/migrate-account?oldDiscordId=${encodeURIComponent(user.discordId)}`}
+                            title="Migrasi Akun Discord (Owner Only)"
+                            className="inline-flex items-center justify-center p-3 bg-accent-lilac/10 rounded-xl text-accent-lilac hover:text-black hover:bg-accent-lilac transition-all group/btn"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="group-hover/btn:scale-110 transition-transform"
+                            >
+                              <path d="M8 3 4 7l4 4" />
+                              <path d="M4 7h16" />
+                              <path d="m16 21 4-4-4-4" />
+                              <path d="M20 17H4" />
+                            </svg>
+                          </Link>
+                        )}
                         {user.discordId && (
                           <button
                             onClick={() => setPurgeUserId(user.discordId)}

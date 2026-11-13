@@ -15,6 +15,7 @@ import {
   BookOpen,
   MonitorPlay,
   Truck,
+  ArrowLeftRight,
 } from "lucide-react";
 
 export const metadata = {
@@ -140,17 +141,30 @@ export default async function UserDataHub() {
   ];
 
   if (isOwner) {
-    menu.push({
-      name: "Manage Nismara+",
-      desc: "Kelola data Nismara+ dan status keanggotaan.",
-      icon: Target,
-      href: "/dashboard/manage/data/nismaraplus",
-      color: "text-red-500",
-      bg: "bg-red-500/10",
-      border: "border-red-500/20",
-      hoverBorder: "group-hover:border-red-500/50",
-      glow: "group-hover:bg-red-500/20",
-    });
+    menu.push(
+      {
+        name: "Manage Nismara+",
+        desc: "Kelola data Nismara+ dan status keanggotaan.",
+        icon: Target,
+        href: "/dashboard/manage/data/nismaraplus",
+        color: "text-red-500",
+        bg: "bg-red-500/10",
+        border: "border-red-500/20",
+        hoverBorder: "group-hover:border-red-500/50",
+        glow: "group-hover:bg-red-500/20",
+      },
+      {
+        name: "Migrasi Akun Discord",
+        desc: "Pindahkan seluruh data akun lama yang ter-hack ke akun Discord baru.",
+        icon: ArrowLeftRight,
+        href: "/dashboard/manage/data/migrate-account",
+        color: "text-emerald-400",
+        bg: "bg-emerald-500/10",
+        border: "border-emerald-500/20",
+        hoverBorder: "group-hover:border-emerald-500/50",
+        glow: "group-hover:bg-emerald-500/20",
+      }
+    );
   }
 
   return (

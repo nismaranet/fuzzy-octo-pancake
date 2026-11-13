@@ -390,6 +390,11 @@ export async function DELETE(
     deletePromises.push(db.collection("racingtickets").deleteMany({ discordId }));
     deletePromises.push(db.collection("giveawaytickets").deleteMany({ discordId }));
     deletePromises.push(db.collection("managersalaryrecords").deleteMany({ managerId: discordId }));
+    deletePromises.push(
+      db.collection("accountmigrations").deleteMany({
+        $or: [{ oldDiscordId: discordId }, { newDiscordId: discordId }],
+      })
+    );
 
     // --- Notifikasi Langsung ---
     deletePromises.push(db.collection("notifications").deleteMany({ recipient: discordId }));

@@ -20,6 +20,13 @@ export default async function ManageUsersPage() {
     redirect("/dashboard");
   }
 
+  const ownerId = session.user.discordId ? String(session.user.discordId).trim() : "";
+  const isOwner = Boolean(
+    ownerId &&
+      (ownerId === process.env.OWNER_DISCORD_ID?.trim() ||
+        ownerId === process.env.NISMARA_OWNER_DISCORD_ID?.trim())
+  );
+
   const client = await clientPromise;
   const db = client.db();
   const guildId = process.env.DISCORD_GUILD_ID;
@@ -153,7 +160,7 @@ export default async function ManageUsersPage() {
           </span>
           <div className="h-px bg-white/10 flex-1" />
         </div>
-        <ManageUsersTable initialData={combinedData} />
+        <ManageUsersTable initialData={combinedData} isOwner={isOwner} />
       </div>
     </main>
   );
