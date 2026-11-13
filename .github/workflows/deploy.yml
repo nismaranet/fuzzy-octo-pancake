@@ -77,9 +77,10 @@ jobs:
           ARGS=(
             -sS
             -w "\n%{http_code}"
-            -X GET
+            -X POST
             "$COOLIFY_WEBHOOK_URL"
             -H "Accept: application/json"
+            -H "Content-Type: application/json"
             -A "Nismara-Deploy-CI/1.0"
           )
           if [ -n "$COOLIFY_WEBHOOK_TOKEN" ]; then
