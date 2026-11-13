@@ -6,6 +6,25 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id/
 
 ---
 
+## [1.3.5] - 2026-11-13
+
+### Added
+- **Sistem Migrasi Akun Discord (Owner-Only):** Menambahkan fitur pemindahan menyeluruh data akun Discord lama (termasuk kasus akun ter-hack) ke akun Discord baru di `/dashboard/manage/data/migrate-account`, dilengkapi menu pada `/dashboard/manage/data` dan pintasan cepat per baris di `/dashboard/manage/data/users`.
+  - **Live Preview & Deteksi Konflik (`/api/manage/users/migrate/preview`):** Verifikasi live profil serta status server membership melalui Discord Bot API, ringkasan data database kedua akun, dan pemblokiran otomatis jika akun target sudah tertaut di `driverlinks` ke Trucky ID berbeda.
+  - **Strategi Resolusi Konflik (`override` / `merge`) (`/api/manage/users/migrate`):** Mendukung mode `override` (menimpa data awal/starter akun target) atau `merge` (menggabungkan saldo NC, poin penalti, garasi, armada, tim, Nismara+, progres Season Pass, voucher, serta riwayat).
+  - **Keamanan Auth, Sync Role & Zero-Orphan Purge:** Mencabut seluruh sesi aktif (`sessions`), memindahkan binding NextAuth `accounts` dengan menjaga `users._id` kanonis, membersihkan cache Redis terkait, menyinkronkan role server Discord (Driver, Intern, Nismara+), mencatat audit trail ke `accountmigrations` & Discord `channelLog`, dan mendaftarkan `accountmigrations` ke sistem purge (`/api/manage/users/[discordId]/purge`).
+- **Docker Standalone & CI/CD Coolify:** Menambahkan `Dockerfile` multi-stage berbasis Next.js standalone, `.dockerignore`, serta workflow GitHub Actions (`.github/workflows/deploy.yml`) untuk build & push image ke GHCR (`ghcr.io`) disertai pemicu webhook deploy ke Coolify.
+
+### Changed
+- **Build-Safe Database, Redis & Sitemap:** Memperbarui `lib/mongodb.ts` (lazy Proxy `clientPromise`), `lib/mongoose.ts` (validasi `MONGODB_URI` saat runtime), `lib/redis.ts` (`lazyConnect: true` saat `REDIS_URL` belum diset), dan `app/sitemap.ts` (`force-dynamic`) agar `next build` di Docker/CI berjalan aman tanpa koneksi DB/Redis build-time.
+- **Dokumentasi Aturan Agent (`AGENTS.md`):** Menambahkan panduan pencegahan ketidaksesuaian tipe `ObjectId` antara BSON 6 (`mongodb`) dan BSON 7 (`mongoose`).
+
+### Fixed
+- **Kompatibilitas BSON `ObjectId` Native MongoDB:** Mengonversi `ObjectId` hasil Mongoose (BSON 7) menjadi `ObjectId` native driver `mongodb` (BSON 6) untuk mencegah error *"Unsupported BSON version, bson types must be from bson 6.x.x"* di `lib/managerSalary.ts`, `lib/giveaway.ts`, `app/dashboard/garage/page.tsx`, dan `lib/goalAchievements.ts`.
+- **Workflow Deploy Coolify:** Memperbaiki pengecekan `COOLIFY_WEBHOOK_URL` dan mengembalikan metode request webhook menjadi `POST` pada `.github/workflows/deploy.yml`.
+
+---
+
 ## [1.3.4] - 2026-11-09
 
 ### Added
