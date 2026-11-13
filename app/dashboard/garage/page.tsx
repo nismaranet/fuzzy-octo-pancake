@@ -2,6 +2,7 @@ import React from "react";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 import { redirect } from "next/navigation";
 import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import Garage from "@/lib/models/Garage";
@@ -104,7 +105,7 @@ export default async function GarageDashboardPage() {
     } catch (saveErr) {
       console.error("Failed to save updated fleetSlotUsed:", saveErr);
       await db.collection("garages").updateOne(
-        { _id: garage._id },
+        { _id: new ObjectId(String(garage._id)) },
         { $set: { fleetSlotUsed: userFleetsCount } }
       );
     }

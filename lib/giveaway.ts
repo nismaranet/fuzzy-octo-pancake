@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 import clientPromise from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 import { redis } from "@/lib/redis";
 import Giveaway, { IGiveaway, GiveawayRewardItem, GiveawayWinner } from "@/lib/models/Giveaway";
 import GiveawayTicket from "@/lib/models/GiveawayTicket";
@@ -536,7 +537,8 @@ export async function buyGiveawayTickets(
     await db.collection("transactions").insertOne({
       trxId: `TRX-GW-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`,
       discordId: String(discordId),
-      userId: (user as any)?._id || null,
+      // Konversi ObjectId Mongoose (bson 7) ke ObjectId driver mongodb native (bson 6)
+      userId: (user as any)?._id ? new ObjectId(String((user as any)._id)) : null,
       title: `Beli ${quantity}x Tiket Giveaway: ${giveaway.title}`,
       category: "others",
       amount: totalCost,

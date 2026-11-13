@@ -55,10 +55,11 @@ export async function grantGoalAchievements(goal: any) {
         category: "event",
       });
       // Simpan codeId ke goal agar tidak dibuat ulang
+      const goalObjectId = new ObjectId(String(goal._id));
       if (isTopContrib) {
-        await db.collection("communitygoals").updateOne({ _id: goal._id }, { $set: { "achievementRewards.topContributor.codeId": codeId } });
+        await db.collection("communitygoals").updateOne({ _id: goalObjectId }, { $set: { "achievementRewards.topContributor.codeId": codeId } });
       } else {
-        await db.collection("communitygoals").updateOne({ _id: goal._id }, { $set: { "achievementRewards.participant.codeId": codeId } });
+        await db.collection("communitygoals").updateOne({ _id: goalObjectId }, { $set: { "achievementRewards.participant.codeId": codeId } });
       }
     }
 

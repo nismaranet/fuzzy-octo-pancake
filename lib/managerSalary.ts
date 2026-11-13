@@ -1,4 +1,5 @@
 import clientPromise from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 import dbConnect from "@/lib/mongoose";
 import ManagerSalaryRecord from "@/lib/models/ManagerSalaryRecord";
 import User from "@/lib/models/User";
@@ -549,7 +550,8 @@ export async function claimManagerSalary(managerId: string, month: string) {
         { 
           $inc: { safeboxStock: perf.rewards.penaltyTickets },
           $setOnInsert: {
-            userId: user._id,
+            // Konversi ObjectId Mongoose (bson 7) ke ObjectId driver mongodb native (bson 6)
+            userId: new ObjectId(String(user._id)),
             discordId: String(managerId),
             fleetSlot: 1,
             fleetSlotUsed: 0,
