@@ -1,11 +1,5 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error("Tolong definisikan MONGODB_URI di .env");
-}
-
 let cached = (global as any).mongoose;
 
 if (!cached) {
@@ -13,6 +7,12 @@ if (!cached) {
 }
 
 async function dbConnect() {
+  const MONGODB_URI = process.env.MONGODB_URI;
+
+  if (!MONGODB_URI) {
+    throw new Error("Tolong definisikan MONGODB_URI di .env");
+  }
+
   if (cached.conn) {
     return cached.conn;
   }
@@ -25,7 +25,7 @@ async function dbConnect() {
       socketTimeoutMS: 45000,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
       return mongoose;
     });
   }

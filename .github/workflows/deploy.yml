@@ -1,0 +1,78 @@
+name: Build & Deploy to Coolify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL || 'https://transport.nismara.web.id' }}
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL || 'https://transport.nismara.web.id' }}
+            NEXT_PUBLIC_R2_PUBLIC_URL=${{ vars.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://images.nismara.my.id' }}
+            NEXT_PUBLIC_DISCORD_GUILD_ID=${{ vars.NEXT_PUBLIC_DISCORD_GUILD_ID || '863959415702028318' }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY || secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID || secrets.NEXT_PUBLIC_GA_ID }}
+            NEXT_PUBLIC_HALLOWEEN_THEME=${{ vars.NEXT_PUBLIC_HALLOWEEN_THEME || 'false' }}
+
+      - name: Trigger Coolify deployment
+        if: ${{ secrets.COOLIFY_WEBHOOK_URL != '' }}
+        env:
+          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          COOLIFY_WEBHOOK_TOKEN: ${{ secrets.COOLIFY_WEBHOOK_TOKEN }}
+        run: |
+          if [ -n "$COOLIFY_WEBHOOK_TOKEN" ]; then
+            curl -fsS -X POST "$COOLIFY_WEBHOOK_URL" \
+              -H "Authorization: Bearer $COOLIFY_WEBHOOK_TOKEN"
+          else
+            curl -fsS -X POST "$COOLIFY_WEBHOOK_URL"
+          fi
