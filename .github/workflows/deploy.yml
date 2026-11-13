@@ -65,11 +65,15 @@ jobs:
             NEXT_PUBLIC_HALLOWEEN_THEME=${{ vars.NEXT_PUBLIC_HALLOWEEN_THEME || 'false' }}
 
       - name: Trigger Coolify deployment
-        if: ${{ secrets.COOLIFY_WEBHOOK_URL != '' }}
         env:
           COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
           COOLIFY_WEBHOOK_TOKEN: ${{ secrets.COOLIFY_WEBHOOK_TOKEN }}
         run: |
+          if [ -z "$COOLIFY_WEBHOOK_URL" ]; then
+            echo "COOLIFY_WEBHOOK_URL belum diset, skip trigger deploy."
+            exit 0
+          fi
+
           if [ -n "$COOLIFY_WEBHOOK_TOKEN" ]; then
             curl -fsS -X POST "$COOLIFY_WEBHOOK_URL" \
               -H "Authorization: Bearer $COOLIFY_WEBHOOK_TOKEN"
