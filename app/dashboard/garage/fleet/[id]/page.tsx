@@ -4,6 +4,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 import {
   Truck,
+  Bus,
+  Car,
   Activity,
   AlertCircle,
   History,
@@ -213,6 +215,14 @@ export default async function FleetDetailPage({
     status: { $in: ["pending", "waiting", "in_service"] },
   });
 
+  const rawGame = fleet.modelInfo?.game_id ?? fleet.game_id ?? 1;
+  const isATS =
+    String(rawGame).trim().toLowerCase() === "2" ||
+    String(rawGame).trim().toLowerCase() === "ats";
+  const rawType = String(fleet.modelInfo?.type || "truck")
+    .trim()
+    .toLowerCase();
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-10 pb-10 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -229,9 +239,36 @@ export default async function FleetDetailPage({
             modelName={fleet.modelInfo?.name}
             isOwner={String(fleet.owner) === String(user._id)}
           />
-          <p className="text-foreground/40 font-bold uppercase text-[10px] tracking-[0.2em]">
-            Plat: {fleet.fleet_number} • ID: {fleet.id}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-background border border-border/70 text-foreground">
+              <img
+                src={
+                  isATS
+                    ? "https://images.nismara.my.id/img/american-truck-simulator.png"
+                    : "https://images.nismara.my.id/img/euro-truck-simulator-2.png"
+                }
+                alt={isATS ? "ATS" : "ETS2"}
+                className="h-3.5 w-auto object-contain"
+              />
+              {isATS ? "ATS" : "ETS2"}
+            </span>
+            {rawType === "bus" ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                <Bus size={11} /> Bus / Coach
+              </span>
+            ) : rawType === "car" ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                <Car size={11} /> Car / Scout
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                <Truck size={11} /> Truck
+              </span>
+            )}
+            <span className="text-foreground/40 font-bold uppercase text-[10px] tracking-[0.2em]">
+              • Plat: {fleet.fleet_number} • ID: {fleet.id}
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">

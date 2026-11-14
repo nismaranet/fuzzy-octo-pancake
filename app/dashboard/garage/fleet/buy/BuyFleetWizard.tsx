@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import {
   Truck,
+  Bus,
+  Car,
   ArrowLeft,
   CheckCircle,
   AlertTriangle,
@@ -11,6 +13,9 @@ import {
   CheckCircle2,
   Info,
 } from "lucide-react";
+
+const ETS2_LOGO = "https://images.nismara.my.id/img/euro-truck-simulator-2.png";
+const ATS_LOGO = "https://images.nismara.my.id/img/american-truck-simulator.png";
 import { useRouter } from "next/navigation";
 import VoucherPickerModal, { VoucherTriggerBar } from "@/components/voucher/VoucherPickerModal";
 
@@ -38,6 +43,8 @@ export default function BuyFleetWizard({
   const [step, setStep] = useState(1);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
   const [selectedModel, setSelectedModel] = useState<any>(null);
+  const [gameFilter, setGameFilter] = useState<"ALL" | "1" | "2">("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "truck" | "bus" | "car">("ALL");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
@@ -66,8 +73,28 @@ export default function BuyFleetWizard({
     }
   }, [step]);
 
+  const matchesGameAndType = (s: any) => {
+    const gMatch =
+      gameFilter === "ALL" || String(s.game_id ?? "1") === gameFilter;
+    const tMatch =
+      typeFilter === "ALL" ||
+      String(s.type || "truck").toLowerCase() === typeFilter;
+    return gMatch && tMatch;
+  };
+
+  const filteredBrands = brands.filter((b) => {
+    if (gameFilter === "ALL" && typeFilter === "ALL") return true;
+    return stores.some(
+      (s) =>
+        String(s.brand?._id || s.brand) === String(b._id) &&
+        matchesGameAndType(s)
+    );
+  });
+
   const filteredStores = stores.filter(
-    (s) => s.brand?._id === selectedBrand?._id,
+    (s) =>
+      String(s.brand?._id || s.brand) === String(selectedBrand?._id) &&
+      matchesGameAndType(s)
   );
 
   // Kalkulasi harga (Total diskon gabungan maskimal 40% jika Nismara+ dan Booster)
@@ -222,34 +249,176 @@ export default function BuyFleetWizard({
       </div>
 
       <div className="relative z-10 min-h-[400px]">
+        {(step === 1 || step === 2) && (
+          <div className="mb-6 p-4 bg-background/60 border border-border/60 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mr-1">
+                Filter Game:
+              </span>
+              <button
+                type="button"
+                onClick={() => setGameFilter("ALL")}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${
+                  gameFilter === "ALL"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                }`}
+              >
+                Semua Game
+              </button>
+              <button
+                type="button"
+                onClick={() => setGameFilter("1")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${
+                  gameFilter === "1"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                }`}
+              >
+                <img
+                  src={ETS2_LOGO}
+                  alt="ETS2"
+                  className="h-3.5 w-auto object-contain"
+                />
+                ETS2
+              </button>
+              <button
+                type="button"
+                onClick={() => setGameFilter("2")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${
+                  gameFilter === "2"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                }`}
+              >
+                <img
+                  src={ATS_LOGO}
+                  alt="ATS"
+                  className="h-3.5 w-auto object-contain"
+                />
+                ATS
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mr-1">
+                Jenis Kendaraan:
+              </span>
+              <button
+                type="button"
+                onClick={() => setTypeFilter("ALL")}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${
+                  typeFilter === "ALL"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                }`}
+              >
+                Semua Jenis
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter("truck")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${
+                  typeFilter === "truck"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                }`}
+              >
+                <Truck size={12} /> Truck
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter("bus")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${
+                  typeFilter === "bus"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                }`}
+              >
+                <Bus size={12} /> Bus / Coach
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter("car")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${
+                  typeFilter === "car"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                }`}
+              >
+                <Car size={12} /> Car
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* STEP 1: Pilih Brand */}
         {step === 1 && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            {brands.map((brand) => (
-              <button
-                key={brand._id.toString()}
-                onClick={() => {
-                  setSelectedBrand(brand);
-                  setStep(2);
-                }}
-                className="bg-background border border-border rounded-2xl p-6 flex flex-col items-center gap-4 hover:border-primary/50 hover:bg-primary/5 transition-all group"
-              >
-                <div className="h-16 flex items-center justify-center w-full">
-                  {brand.logo_url ? (
-                    <img
-                      src={brand.logo_url}
-                      alt={brand.name}
-                      className="max-h-full object-contain drop-shadow-md group-hover:scale-110 transition-transform"
-                    />
-                  ) : (
-                    <Truck size={40} className="text-muted-foreground" />
-                  )}
-                </div>
-                <span className="font-black uppercase tracking-widest text-sm text-center">
-                  {brand.name}
-                </span>
-              </button>
-            ))}
+            {filteredBrands.map((brand) => {
+              const brandModels = stores.filter(
+                (s) =>
+                  String(s.brand?._id || s.brand) === String(brand._id) &&
+                  matchesGameAndType(s)
+              );
+              const hasETS2 = brandModels.some(
+                (s) => String(s.game_id ?? "1") !== "2"
+              );
+              const hasATS = brandModels.some(
+                (s) => String(s.game_id ?? "1") === "2"
+              );
+
+              return (
+                <button
+                  key={brand._id.toString()}
+                  onClick={() => {
+                    setSelectedBrand(brand);
+                    setStep(2);
+                  }}
+                  className="bg-background border border-border rounded-2xl p-6 flex flex-col items-center gap-3 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                >
+                  <div className="h-16 flex items-center justify-center w-full">
+                    {brand.logo_url ? (
+                      <img
+                        src={brand.logo_url}
+                        alt={brand.name}
+                        className="max-h-full object-contain drop-shadow-md group-hover:scale-110 transition-transform"
+                      />
+                    ) : (
+                      <Truck size={40} className="text-muted-foreground" />
+                    )}
+                  </div>
+                  <span className="font-black uppercase tracking-widest text-sm text-center">
+                    {brand.name}
+                  </span>
+                  <div className="flex flex-wrap items-center justify-center gap-1.5">
+                    {hasETS2 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-card text-foreground border border-border">
+                        <img
+                          src={ETS2_LOGO}
+                          alt="ETS2"
+                          className="h-3 w-auto object-contain"
+                        />
+                        ETS2
+                      </span>
+                    )}
+                    {hasATS && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-card text-foreground border border-border">
+                        <img
+                          src={ATS_LOGO}
+                          alt="ATS"
+                          className="h-3 w-auto object-contain"
+                        />
+                        ATS
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded text-[9px] font-bold text-muted-foreground bg-muted/50">
+                      {brandModels.length} unit
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -271,75 +440,88 @@ export default function BuyFleetWizard({
 
             {filteredStores.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground italic bg-background/50 rounded-xl border border-border">
-                Belum ada model kendaraan untuk brand ini.
+                Belum ada model kendaraan untuk brand dan filter ini.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredStores.map((model) => (
-                  <div
-                    key={model._id.toString()}
-                    className="bg-background border border-border rounded-2xl overflow-hidden flex flex-col"
-                  >
-                    <div className="aspect-video bg-muted/30 p-6 flex items-center justify-center relative">
-                      {model.photo_url ? (
-                        <img
-                          src={model.photo_url}
-                          alt={model.name}
-                          className="w-full h-full object-contain drop-shadow-xl"
-                        />
-                      ) : (
-                        <Truck size={48} className="text-muted-foreground/30" />
-                      )}
-                      <div className="absolute top-3 left-3 px-2 py-1 bg-background/80 backdrop-blur-sm rounded-md text-[10px] font-black uppercase tracking-widest border border-border">
-                        {model.type}
-                      </div>
-                    </div>
-
-                    <div className="p-5 flex-1 flex flex-col">
-                      <h3 className="font-black text-lg uppercase italic tracking-wide mb-2">
-                        {model.name}
-                      </h3>
-                      <p className="text-2xl font-black text-primary mb-4 tabular-nums">
-                        {model.price.toLocaleString("id-ID")} NC
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-3 mb-6">
-                        <div className="bg-card border border-border/50 rounded-lg p-3">
-                          <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold mb-1">
-                            Maint. Mesin
-                          </p>
-                          <p className="text-xs font-bold">
-                            {model.component_cost_maintenance?.engine?.toLocaleString(
-                              "id-ID",
-                            )}{" "}
-                            NC
-                          </p>
-                        </div>
-                        <div className="bg-card border border-border/50 rounded-lg p-3">
-                          <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold mb-1">
-                            Unfix Mesin
-                          </p>
-                          <p className="text-xs font-bold">
-                            {model.component_cost_unfix_wear?.engine?.toLocaleString(
-                              "id-ID",
-                            )}{" "}
-                            NC
-                          </p>
+                {filteredStores.map((model) => {
+                  const isATSModel = String(model.game_id ?? "1") === "2";
+                  return (
+                    <div
+                      key={model._id.toString()}
+                      className="bg-background border border-border rounded-2xl overflow-hidden flex flex-col"
+                    >
+                      <div className="aspect-video bg-muted/30 p-6 flex items-center justify-center relative">
+                        {model.photo_url ? (
+                          <img
+                            src={model.photo_url}
+                            alt={model.name}
+                            className="w-full h-full object-contain drop-shadow-xl"
+                          />
+                        ) : (
+                          <Truck size={48} className="text-muted-foreground/30" />
+                        )}
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest bg-background/85 text-foreground border border-border backdrop-blur-sm">
+                            <img
+                              src={isATSModel ? ATS_LOGO : ETS2_LOGO}
+                              alt={isATSModel ? "ATS" : "ETS2"}
+                              className="h-3.5 w-auto object-contain"
+                            />
+                            {isATSModel ? "ATS" : "ETS2"}
+                          </span>
+                          <span className="px-2 py-1 bg-background/80 backdrop-blur-sm rounded-md text-[10px] font-black uppercase tracking-widest border border-border">
+                            {model.type}
+                          </span>
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setSelectedModel(model);
-                          setStep(3);
-                        }}
-                        className="mt-auto w-full py-3 bg-primary/10 hover:bg-primary/20 text-primary font-bold uppercase tracking-widest text-sm rounded-xl transition-colors border border-primary/20"
-                      >
-                        Pilih Kendaraan
-                      </button>
+                      <div className="p-5 flex-1 flex flex-col">
+                        <h3 className="font-black text-lg uppercase italic tracking-wide mb-2">
+                          {model.name}
+                        </h3>
+                        <p className="text-2xl font-black text-primary mb-4 tabular-nums">
+                          {model.price.toLocaleString("id-ID")} NC
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                          <div className="bg-card border border-border/50 rounded-lg p-3">
+                            <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold mb-1">
+                              Maint. Mesin
+                            </p>
+                            <p className="text-xs font-bold">
+                              {model.component_cost_maintenance?.engine?.toLocaleString(
+                                "id-ID",
+                              )}{" "}
+                              NC
+                            </p>
+                          </div>
+                          <div className="bg-card border border-border/50 rounded-lg p-3">
+                            <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold mb-1">
+                              Unfix Mesin
+                            </p>
+                            <p className="text-xs font-bold">
+                              {model.component_cost_unfix_wear?.engine?.toLocaleString(
+                                "id-ID",
+                              )}{" "}
+                              NC
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setSelectedModel(model);
+                            setStep(3);
+                          }}
+                          className="mt-auto w-full py-3 bg-primary/10 hover:bg-primary/20 text-primary font-bold uppercase tracking-widest text-sm rounded-xl transition-colors border border-primary/20"
+                        >
+                          Pilih Kendaraan
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -374,8 +556,28 @@ export default function BuyFleetWizard({
                   <h3 className="font-black text-2xl uppercase italic tracking-wide text-center">
                     {selectedModel.name}
                   </h3>
-                  <div className="mt-4 px-3 py-1 bg-background rounded-full text-[10px] font-black uppercase tracking-widest border border-border">
-                    {selectedModel.type}
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-background border border-border">
+                      <img
+                        src={
+                          String(selectedModel.game_id ?? "1") === "2"
+                            ? ATS_LOGO
+                            : ETS2_LOGO
+                        }
+                        alt={
+                          String(selectedModel.game_id ?? "1") === "2"
+                            ? "ATS"
+                            : "ETS2"
+                        }
+                        className="h-3.5 w-auto object-contain"
+                      />
+                      {String(selectedModel.game_id ?? "1") === "2"
+                        ? "ATS"
+                        : "ETS2"}
+                    </span>
+                    <span className="px-3 py-1 bg-background rounded-full text-[10px] font-black uppercase tracking-widest border border-border">
+                      {selectedModel.type}
+                    </span>
                   </div>
                 </div>
 

@@ -2,9 +2,13 @@ import React from "react";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
-import { Truck, Plus, History, Activity, AlertCircle } from "lucide-react";
+import { Truck, Plus, History } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import FleetListClient, {
+  SerializedFleetItem,
+  FleetComponentStatus,
+} from "./FleetListClient";
 
 export const metadata = {
   title: "Fleet",
@@ -28,16 +32,16 @@ export default async function FleetDashboardPage() {
     .findOne({ discordId: session.user.discordId });
   if (!user) redirect("/auth/signin");
 
-  // --- AUTO MIGRATION UNTUK TRUK LAMA ---
-  // Mencari semua truk yang belum punya owner, lalu set owner = driver
-  const fleetsWithoutOwner = await db.collection("fleets").find({ owner: { $exists: false }, driver: { $ne: null } }).toArray();
-  if (fleetsWithoutOwner.length > 0) {
-    for (const f of fleetsWithoutOwner) {
-      await db.collection("fleets").updateOne({ _id: f._id }, { $set: { owner: f.driver } });
-    }
-    console.log(`[Migration] Berhasil mengupdate ${fleetsWithoutOwner.length} truk lama dengan atribut owner.`);
-  }
-  // ---------------------------------------
+  // --- AUTO MIGRATION UNTUK KENDARAAN MILIK USER YANG BELUM PUNYA OWNER ---
+  await db
+    .collection("fleets")
+    .updateMany(
+      {
+        driver: user._id,
+        $or: [{ owner: { $exists: false } }, { owner: null }],
+      },
+      { $set: { owner: user._id } }
+    );
 
   // Get user's fleet
   const userFleet = await db
@@ -65,10 +69,222 @@ export default async function FleetDashboardPage() {
     ])
     .toArray();
 
+  // Fetch active maintenance orders for all of user's fleets in a single query
+  const fleetObjectIds = userFleet.map((f) => f._id);
+  const activeOrders =
+    fleetObjectIds.length > 0
+      ? await db
+          .collection("fleetmaintenanceorders")
+          .find({
+            fleetId: { $in: fleetObjectIds },
+            status: { $in: ["pending", "waiting", "in_service"] },
+          })
+          .toArray()
+      : [];
+
+  const activeOrderMap = new Map<string, any>();
+  for (const order of activeOrders) {
+    activeOrderMap.set(String(order.fleetId), order);
+  }
+
+  const serializedFleets: SerializedFleetItem[] = userFleet.map((fleet) => {
+    const odometer = Number(fleet.odometer || 0);
+    const brandName = fleet.brandInfo?.name || "";
+    const modelName = fleet.modelInfo?.name || "Unknown Model";
+    const displayName =
+      fleet.customName ||
+      `${brandName ? `${brandName} ` : ""}${modelName}`.trim();
+
+    // Determine Game (1 = ETS2, 2 = ATS)
+    const rawGame = fleet.modelInfo?.game_id ?? fleet.game_id ?? 1;
+    const gameStr = String(rawGame).trim().toLowerCase();
+    const game: "ETS2" | "ATS" =
+      gameStr === "2" || gameStr === "ats" ? "ATS" : "ETS2";
+
+    // Determine Vehicle Type ("truck" | "bus" | "car")
+    const rawType = String(fleet.modelInfo?.type || "")
+      .trim()
+      .toLowerCase();
+    let vehicleType: "truck" | "bus" | "car" = "truck";
+    if (rawType === "bus" || rawType === "car" || rawType === "truck") {
+      vehicleType = rawType;
+    } else {
+      const nameCheck = `${modelName} ${fleet.fleet_name || ""}`.toLowerCase();
+      if (/bus|coach|touring|marcopolo|setra|irizar/i.test(nameCheck)) {
+        vehicleType = "bus";
+      } else if (/car|scout|skoda/i.test(nameCheck)) {
+        vehicleType = "car";
+      }
+    }
+
+    // Component thresholds & wear calculation (matches /dashboard/garage/fleet/[id]/page.tsx)
+    const baseIntervals = fleet.modelInfo?.component_cost_unfix_wear || {
+      engine: 45000,
+      tires: 20000,
+      transmission: 80000,
+      brakes: 25000,
+    };
+
+    const maintenanceCost = fleet.modelInfo?.component_cost_maintenance || {
+      engine: 2000,
+      tires: 500,
+      transmission: 1500,
+      brakes: 800,
+    };
+
+    const replaceCost = fleet.modelInfo?.component_cost_unfix_wear || {
+      engine: 40000,
+      tires: 30000,
+      transmission: 60000,
+      brakes: 40000,
+    };
+
+    const thresholds = {
+      engine: Number(fleet.maintenance?.engine || baseIntervals.engine || 45000),
+      tires: Number(fleet.maintenance?.tires || baseIntervals.tires || 20000),
+      transmission: Number(
+        fleet.maintenance?.transmission || baseIntervals.transmission || 80000
+      ),
+      brakes: Number(fleet.maintenance?.brakes || baseIntervals.brakes || 25000),
+    };
+
+    const wear = {
+      unfix_engine: Number(fleet.wear?.unfix_engine || 0),
+      unfix_tires: Number(fleet.wear?.unfix_tires || 0),
+      unfix_transmission: Number(fleet.wear?.unfix_transmission || 0),
+      unfix_brakes: Number(fleet.wear?.unfix_brakes || 0),
+    };
+
+    const componentDefs: {
+      key: "engine" | "tires" | "transmission" | "brakes";
+      label: string;
+      threshold: number;
+      wearVal: number;
+      maintCost: number;
+      repCost: number;
+    }[] = [
+      {
+        key: "engine",
+        label: "Mesin",
+        threshold: thresholds.engine,
+        wearVal: wear.unfix_engine,
+        maintCost: Number(maintenanceCost.engine || 2000),
+        repCost: Number(replaceCost.engine || 40000),
+      },
+      {
+        key: "tires",
+        label: "Ban",
+        threshold: thresholds.tires,
+        wearVal: wear.unfix_tires,
+        maintCost: Number(maintenanceCost.tires || 500),
+        repCost: Number(replaceCost.tires || 30000),
+      },
+      {
+        key: "transmission",
+        label: "Transmisi",
+        threshold: thresholds.transmission,
+        wearVal: wear.unfix_transmission,
+        maintCost: Number(maintenanceCost.transmission || 1500),
+        repCost: Number(replaceCost.transmission || 60000),
+      },
+      {
+        key: "brakes",
+        label: "Rem",
+        threshold: thresholds.brakes,
+        wearVal: wear.unfix_brakes,
+        maintCost: Number(maintenanceCost.brakes || 800),
+        repCost: Number(replaceCost.brakes || 40000),
+      },
+    ];
+
+    const components: FleetComponentStatus[] = componentDefs.map((c) => {
+      const needsMaintenance = odometer >= c.threshold;
+      const needsReplace = c.wearVal >= 100;
+      const kmPct =
+        c.threshold > 0
+          ? Math.min(100, Math.round((odometer / c.threshold) * 100))
+          : 0;
+      const wearPct = Math.min(100, Number(c.wearVal.toFixed(1)));
+
+      return {
+        key: c.key,
+        label: c.label,
+        odometer,
+        threshold: c.threshold,
+        kmPct,
+        wearPct,
+        needsMaintenance,
+        needsReplace,
+      };
+    });
+
+    const isReplaceNeeded = components.some((c) => c.needsReplace);
+    const isMaintenanceNeeded =
+      components.some((c) => c.needsMaintenance) ||
+      fleet.status === "need_maintenance" ||
+      fleet.maintenance_needed === true;
+
+    const activeOrder = activeOrderMap.get(String(fleet._id));
+    const isInService = Boolean(activeOrder) || fleet.status === "onservice";
+
+    let serviceState: SerializedFleetItem["serviceState"] = "healthy";
+    if (isInService) {
+      serviceState = "in_service";
+    } else if (isReplaceNeeded) {
+      serviceState = "needs_replace";
+    } else if (isMaintenanceNeeded) {
+      serviceState = "needs_maintenance";
+    }
+
+    const adminFee = 500;
+    let componentCostSum = 0;
+    if (isReplaceNeeded) {
+      for (const c of componentDefs) {
+        if (c.wearVal >= 100) componentCostSum += c.repCost;
+      }
+    } else if (isMaintenanceNeeded) {
+      for (const c of componentDefs) {
+        if (odometer >= c.threshold) componentCostSum += c.maintCost;
+      }
+    }
+    const estimatedServiceCost =
+      componentCostSum > 0 ? componentCostSum + adminFee : 0;
+
+    const issuesList = components
+      .filter((c) => c.needsReplace || c.needsMaintenance)
+      .map((c) => c.label);
+
+    return {
+      _id: String(fleet._id),
+      id: String(fleet.id),
+      displayName,
+      customName: fleet.customName || null,
+      brandName,
+      brandLogo: fleet.brandInfo?.logo_url || null,
+      modelName,
+      imageUrl: fleet.customImage || fleet.modelInfo?.photo_url || null,
+      fleetNumber: String(fleet.fleet_number || "-"),
+      odometer,
+      wheels: String(fleet.wheels || "4x2"),
+      game,
+      vehicleType,
+      isCurrentlyDriven: String(fleet.driver) === String(user._id),
+      rawStatus: String(fleet.status || "active"),
+      serviceState,
+      activeOrderStatus: activeOrder?.status || null,
+      maintenanceEndAt: activeOrder?.maintenanceEndAt
+        ? new Date(activeOrder.maintenanceEndAt).toISOString()
+        : null,
+      estimatedServiceCost,
+      issuesList,
+      components,
+    };
+  });
+
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-10 pb-10 animate-in fade-in duration-700">
+    <div className="max-w-7xl mx-auto p-6 space-y-8 pb-10 animate-in fade-in duration-700">
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-accent-sky/10 rounded-lg text-accent-sky">
@@ -79,20 +295,20 @@ export default async function FleetDashboardPage() {
             </h1>
           </div>
           <p className="text-foreground/40 font-bold uppercase text-[10px] tracking-[0.2em] ml-11">
-            Nismara Transport Hub • Real-time Asset Tracking
+            Nismara Transport Hub • Real-time Asset &amp; Maintenance Tracking
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <Link
             href="/dashboard/transactions"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border hover:bg-muted text-sm font-bold uppercase tracking-wider transition-all"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border hover:bg-muted text-sm font-bold uppercase tracking-wider transition-all"
           >
             <History size={16} /> Riwayat Pesanan
           </Link>
           <Link
             href="/dashboard/garage/fleet/buy"
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold uppercase tracking-wider transition-all shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold uppercase tracking-wider transition-all shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5"
           >
             <Plus size={18} /> Beli Kendaraan Baru
           </Link>
@@ -100,92 +316,8 @@ export default async function FleetDashboardPage() {
       </div>
 
       {/* MAIN CONTENT */}
-      {userFleet.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {userFleet.map((fleet) => (
-            <Link
-              href={`/dashboard/garage/fleet/${fleet.id}`}
-              key={fleet._id.toString()}
-              className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-lg group hover:border-primary/50 transition-colors block"
-            >
-              <div className="aspect-video relative bg-background/50 flex items-center justify-center p-6 border-b border-border/50">
-                {fleet.customImage || fleet.modelInfo?.photo_url ? (
-                  <img
-                    src={fleet.customImage || fleet.modelInfo?.photo_url}
-                    alt={fleet.customName || fleet.modelInfo?.name || "Truk"}
-                    className="w-full h-full object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-500"
-                  />
-                ) : (
-                  <Truck size={64} className="text-muted-foreground/30" />
-                )}
-
-                <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-                  <span
-                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                      fleet.status === "active"
-                        ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                        : fleet.status === "onservice"
-                          ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                          : "bg-red-500/10 text-red-500 border border-red-500/20"
-                    }`}
-                  >
-                    {fleet.status === "need_maintenance"
-                      ? "Need Maintenance"
-                      : fleet.status === "onservice"
-                        ? "On Service"
-                        : fleet.status}
-                  </span>
-                  
-                  {String(fleet.driver) === String(user._id) ? (
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-500/10">
-                      Aktif Digunakan
-                    </span>
-                  ) : (
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-background/50 text-foreground/50 border border-border/50 backdrop-blur-md">
-                      Terparkir
-                    </span>
-                  )}
-                </div>
-
-                {fleet.brandInfo?.logo_url && (
-                  <div className="absolute bottom-4 left-4 p-2 bg-background/80 backdrop-blur-sm rounded-lg border border-border/50">
-                    <img
-                      src={fleet.brandInfo.logo_url}
-                      alt={fleet.brandInfo.name}
-                      className="h-6 w-auto object-contain"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-1">
-                  <h2 className="text-xl font-black uppercase tracking-wider">
-                    {fleet.customName || `${fleet.brandInfo?.name} ${fleet.modelInfo?.name || "Unknown Model"}`}
-                  </h2>
-                  <span className="text-xs font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                    DETAIL &rarr;
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                  <span>
-                    Plat:{" "}
-                    <strong className="text-foreground">
-                      {fleet.fleet_number}
-                    </strong>
-                  </span>
-                  <span>•</span>
-                  <span>
-                    Odometer:{" "}
-                    <strong className="text-foreground">
-                      {fleet.odometer?.toLocaleString("id-ID")} km
-                    </strong>
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+      {serializedFleets.length > 0 ? (
+        <FleetListClient fleets={serializedFleets} />
       ) : (
         <div className="bg-card/50 border border-border border-dashed rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
           <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20">
