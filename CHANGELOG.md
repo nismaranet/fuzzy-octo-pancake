@@ -6,6 +6,30 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id/
 
 ---
 
+## [1.4.0] - 2026-11-14
+
+### Added
+- **Integrasi ETS2 Coaches DLC (Divisi Bus & Penumpang):**
+  - **Coach Terminal (`/coach-terminal`):** Halaman bursa tarif tiket penumpang *real-time* untuk rute Reguler (`passengers`) dan Pariwisata (`tourist_passengers`) beserta grafik tren harga dan panduan operasional Coach.
+  - **Passenger Manifest & Rute Halte (`/jobs` & `/jobs/[jobId]`):** Filter divisi (`Semua`, `Logistics`, `Coach / Bus`) pada halaman daftar pekerjaan, serta tabel rincian pemberhentian halte (*Stop-by-Stop Passenger Manifest*) di halaman detail job.
+  - **Leaderboard Divisi Coach (`/leaderboard`):** Filter divisi yang secara dinamis mengalihkan kategori peringkat Tonase (`Ton`) menjadi Total Penumpang (`Pax`) saat divisi `Coach / Bus` dipilih.
+  - **Statistik Penumpang & Perjalanan Bus (`/profile/[truckyId]` & `/dashboard`):** Kartu ringkasan perjalanan Coach, total penumpang terangkut (`Pax`), dan pemisahan analitik bulanan antara Divisi Truck Logistics dan Divisi Coach & Bus.
+- **Sistem Pencarian, Filter & Pemantauan Servis Armada (`/dashboard/garage/fleet`):**
+  - Menambahkan filter berbasis **Game** (`ETS2` vs `ATS` dengan logo resmi), **Jenis Kendaraan** (`Truck`, `Bus / Coach`, `Car / Scout`), dan **Status Servis/Penggunaan** (`Perlu Servis`, `Diservis`, `Kondisi Prima`, `Digunakan`, `Terparkir`) beserta fitur pencarian dan pengurutan prioritas servis.
+  - Menampilkan *alert banner* otomatis, estimasi biaya servis, dan indikator kesehatan 4 komponen (`Mesin`, `Ban`, `Transmisi`, `Rem`) langsung pada setiap kartu kendaraan tanpa harus membuka halaman detail satu per satu.
+  - Menambahkan filter Game & Jenis Kendaraan pada wizard pembelian armada baru (`/dashboard/garage/fleet/buy`) serta badge identitas di halaman detail armada (`/dashboard/garage/fleet/[id]`).
+
+### Changed
+- **Optimasi Performa `/api/notifications` & `/dashboard`:**
+  - Mengubah interval polling `NotificationBell` menjadi 5 menit yang hanya aktif saat tab terlihat (*visibility-aware*) dan menambahkan sinkronisasi cache `localStorage` lintas tab.
+  - Menambahkan Redis response caching (`TTL 180s`) dengan invalidasi otomatis pada `NotificationService`, compound index MongoDB `recipient_1_createdAt_-1`, serta operasi tunggal `updateMany` pada fitur *mark all as read*.
+  - Mengoptimalkan halaman `/dashboard` dengan mengganti pemindaian koleksi penuh menjadi `.countDocuments()` paralel (`Promise.all`) dan membatasi auto-migration kepemilikan armada hanya untuk dokumen milik pengguna aktif.
+
+### Fixed
+- **Tooltip & Badge Nismara+ di Leaderboard:** Memperbaiki pemotongan (*clipping*) tooltip badge pada kartu podium & tabel peringkat serta menambahkan proyeksi `nismaraPlusStartedAt` agar tanggal berlangganan tampil akurat.
+
+---
+
 ## [1.3.5] - 2026-11-13
 
 ### Added
