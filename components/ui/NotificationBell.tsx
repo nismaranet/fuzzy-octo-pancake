@@ -15,42 +15,122 @@ interface NotificationData {
   createdAt: string;
 }
 
+const CACHE_KEY = "nismara_notif_cache_v1";
+const CACHE_TTL_MS = 120_000; // 2 menit deduplikasi lintas-tab / navigasi
+const POLL_INTERVAL_MS = 300_000; // 5 menit sekali (hanya saat tab aktif/terlihat)
+
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const lastFetchRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
   const router = useRouter();
 
-  const fetchNotifications = async () => {
+  const applyData = (list: NotificationData[]) => {
+    setNotifications(list);
+    setUnreadCount(list.filter((n: NotificationData) => !n.isRead).length);
+  };
+
+  const fetchNotifications = async (force = false) => {
+    if (typeof window === "undefined") return;
+    if (isFetchingRef.current) return;
+
+    const now = Date.now();
+
+    // 1. Cek cache lintas-tab di localStorage jika bukan force refresh
+    if (!force) {
+      if (now - lastFetchRef.current < CACHE_TTL_MS) {
+        return;
+      }
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.ts && now - parsed.ts < CACHE_TTL_MS && Array.isArray(parsed.data)) {
+            lastFetchRef.current = parsed.ts;
+            applyData(parsed.data);
+            return;
+          }
+        }
+      } catch {
+        // Ignore storage error
+      }
+    }
+
+    isFetchingRef.current = true;
     try {
-      const res = await fetch("/api/notifications", { cache: "no-store" });
+      const res = await fetch("/api/notifications?page=1&limit=10", { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
-          setNotifications(json.data);
-          setUnreadCount(json.data.filter((n: NotificationData) => !n.isRead).length);
+          const ts = Date.now();
+          lastFetchRef.current = ts;
+          applyData(json.data);
+          try {
+            localStorage.setItem(
+              CACHE_KEY,
+              JSON.stringify({ ts, data: json.data })
+            );
+          } catch {
+            // Ignore storage quota error
+          }
         }
       }
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
-  // Initial fetch and event listener
+  // Initial fetch, smart visibility-aware polling, & cross-tab storage sync
   useEffect(() => {
-    fetchNotifications();
-    
-    // Polling every 60 seconds (lightweight)
-    const interval = setInterval(fetchNotifications, 60000);
-    
-    const handleUpdate = () => fetchNotifications();
+    fetchNotifications(false);
+
+    // Hanya polling setiap 5 menit JIKA tab sedang aktif (visible)
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications(false);
+      }
+    }, POLL_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications(false);
+      }
+    };
+
+    const handleUpdate = () => {
+      try {
+        localStorage.removeItem(CACHE_KEY);
+      } catch {}
+      fetchNotifications(true);
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === CACHE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed?.data)) {
+            lastFetchRef.current = parsed.ts || Date.now();
+            applyData(parsed.data);
+          }
+        } catch {}
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("notifications-updated", handleUpdate);
-    
+    window.addEventListener("storage", handleStorage);
+
     return () => {
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("notifications-updated", handleUpdate);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 

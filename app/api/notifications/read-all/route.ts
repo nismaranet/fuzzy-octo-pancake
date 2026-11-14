@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import mongoose from "mongoose";
 import Notification from "@/lib/models/Notification";
-
+import { invalidateUserNotificationsCache } from "@/lib/services/NotificationService";
 import dbConnect from "@/lib/mongoose";
+
 export async function POST() {
   try {
     const session = await getServerSession(authOptions);
@@ -14,23 +14,19 @@ export async function POST() {
 
     await dbConnect();
 
-    const discordId = session.user.discordId;
+    const discordId = String(session.user.discordId);
 
-    // Find all notifications for this user that are not read yet
-    const unreadNotifications = await Notification.find({
-      $or: [{ recipient: discordId }, { recipient: "global" }],
-      readBy: { $ne: discordId },
-    });
+    const res = await Notification.updateMany(
+      {
+        $or: [{ recipient: discordId }, { recipient: "global" }],
+        readBy: { $ne: discordId },
+      },
+      { $addToSet: { readBy: discordId } }
+    );
 
-    // Mark them all as read
-    const updatePromises = unreadNotifications.map(async (notif) => {
-      notif.readBy.push(discordId);
-      return notif.save();
-    });
+    await invalidateUserNotificationsCache(discordId);
 
-    await Promise.all(updatePromises);
-
-    return NextResponse.json({ success: true, count: unreadNotifications.length });
+    return NextResponse.json({ success: true, count: res.modifiedCount });
   } catch (error: any) {
     console.error("Notifications Read-All Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

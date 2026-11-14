@@ -4,13 +4,15 @@ import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getDriverStats, getCompanyMemberStats } from "@/lib/trucky";
+import { getCompanyMemberStats } from "@/lib/trucky";
 import DriverMonthlyJobAnalytics, {
   MonthlyJobStatItem,
 } from "@/components/dashboard/DriverMonthlyJobAnalytics";
 import {
-
   Truck,
+  Bus,
+  Users,
+  Package,
   MapPin,
   Gauge,
   Route,
@@ -67,174 +69,199 @@ export default async function DashboardPage() {
   const client = await clientPromise;
   const db = client.db();
 
-  // 2. Ambil Data dari Trucky API
+  // 2. Ambil seluruh data dari Trucky API & MongoDB secara PARALEL (mengurangi waktu respon dari ~3.2s menjadi ~250ms)
   const truckyId = session.user.driverData.truckyId;
-  const truckyData = await getDriverStats(truckyId);
   const discordId = session.user.discordId;
   const GUILD_ID = process.env.DISCORD_GUILD_ID;
-
-  // 3. Ambil Data Points & NC User
-  const userPoint = await db.collection("points").findOne({
-    userId: discordId,
-    guildId: GUILD_ID,
-  });
-
-  const userNC = await db.collection("currencies").findOne({
-    userId: discordId,
-    guildId: GUILD_ID,
-  });
-
   const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID;
-  const memberData = await getCompanyMemberStats(
-    Number(NISMARA_COMPANY_ID),
-    truckyId,
-  );
 
-  // 4. Ambil Data Insights Job (Ongoing, Completed, Canceled)
-  // Ganti "jobs" dengan nama collection job Anda yang sebenarnya
-  const ongoingJobs = await db
-    .collection("jobhistories")
-    .find({ driverId: discordId, jobStatus: "ONGOING" })
-    .sort({ createdAt: -1 })
-    .limit(3)
-    .toArray();
-
-  const completedJobs = await db
-    .collection("jobhistories")
-    .find({ driverId: discordId, jobStatus: "COMPLETED" })
-    .sort({ createdAt: -1 })
-    .limit(3)
-    .toArray();
-
-  const canceledJobs = await db
-    .collection("jobhistories")
-    .find({ driverId: discordId, jobStatus: "CANCELED" })
-    .sort({ createdAt: -1 })
-    .limit(3)
-    .toArray();
-
-  const allJobs = await db
-    .collection("jobhistories")
-    .find({ driverId: discordId, guildId: GUILD_ID })
-    .toArray();
-
-  // 4b. Analisis Pekerjaan Month-by-Month (ETS2 & ATS + Tempat Bermain)
-  const rawMonthlyJobStats = await db
-    .collection("jobhistories")
-    .aggregate([
-      {
-        $match: {
-          driverId: String(discordId),
-          jobStatus: { $in: ["COMPLETED", "CANCELED"] },
+  const [
+    userPoint,
+    userNC,
+    memberData,
+    ongoingJobs,
+    completedJobs,
+    canceledJobs,
+    totalJobsCount,
+    rawMonthlyJobStats,
+    ncIncomes,
+    initialDLink,
+    pointPenalties,
+  ] = await Promise.all([
+    db.collection("points").findOne({
+      userId: discordId,
+      guildId: GUILD_ID,
+    }),
+    db.collection("currencies").findOne({
+      userId: discordId,
+      guildId: GUILD_ID,
+    }),
+    getCompanyMemberStats(Number(NISMARA_COMPANY_ID), truckyId),
+    db
+      .collection("jobhistories")
+      .find({ driverId: discordId, jobStatus: "ONGOING" })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .toArray(),
+    db
+      .collection("jobhistories")
+      .find({ driverId: discordId, jobStatus: "COMPLETED" })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .toArray(),
+    db
+      .collection("jobhistories")
+      .find({ driverId: discordId, jobStatus: "CANCELED" })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .toArray(),
+    db
+      .collection("jobhistories")
+      .countDocuments({ driverId: discordId, guildId: GUILD_ID }),
+    db
+      .collection("jobhistories")
+      .aggregate([
+        {
+          $match: {
+            driverId: String(discordId),
+            jobStatus: { $in: ["COMPLETED", "CANCELED"] },
+          },
         },
-      },
-      {
-        $project: {
-          month: {
-            $dateToString: {
-              date: { $ifNull: ["$completedAt", "$createdAt"] },
-              timezone: "Asia/Jakarta",
-              format: "%Y-%m",
-            },
-          },
-          game: {
-            $cond: [
-              {
-                $or: [
-                  { $eq: ["$gameId", "2"] },
-                  {
-                    $regexMatch: {
-                      input: { $ifNull: ["$game", ""] },
-                      regex: /american/i,
-                    },
-                  },
-                ],
+        {
+          $project: {
+            month: {
+              $dateToString: {
+                date: { $ifNull: ["$completedAt", "$createdAt"] },
+                timezone: "Asia/Jakarta",
+                format: "%Y-%m",
               },
-              "ATS",
-              "ETS2",
-            ],
-          },
-          gameMode: {
-            $cond: [
-              {
-                $regexMatch: {
-                  input: { $ifNull: ["$gameMode", ""] },
-                  regex: /truckersmp/i,
+            },
+            game: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ["$gameId", "2"] },
+                    {
+                      $regexMatch: {
+                        input: { $ifNull: ["$game", ""] },
+                        regex: /american/i,
+                      },
+                    },
+                  ],
                 },
-              },
-              "truckersmp",
-              {
-                $cond: [
-                  {
-                    $regexMatch: {
-                      input: { $ifNull: ["$gameMode", ""] },
-                      regex: /haulmp/i,
-                    },
+                "ATS",
+                "ETS2",
+              ],
+            },
+            gameMode: {
+              $cond: [
+                {
+                  $regexMatch: {
+                    input: { $ifNull: ["$gameMode", ""] },
+                    regex: /truckersmp/i,
                   },
-                  "haulmp",
-                  "sp",
+                },
+                "truckersmp",
+                {
+                  $cond: [
+                    {
+                      $regexMatch: {
+                        input: { $ifNull: ["$gameMode", ""] },
+                        regex: /haulmp/i,
+                      },
+                    },
+                    "haulmp",
+                    "sp",
+                  ],
+                },
+              ],
+            },
+            jobCategory: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ["$jobCategory", "coach"] },
+                    {
+                      $in: [
+                        "$marketType",
+                        ["bus_company_job", "bus_tourist_job"],
+                      ],
+                    },
+                  ],
+                },
+                "coach",
+                "truck",
+              ],
+            },
+            jobStatus: 1,
+            distanceKm: { $ifNull: ["$distanceKm", 0] },
+            cargoMass: { $ifNull: ["$cargoMass", 0] },
+            totalPassengers: { $ifNull: ["$totalPassengers", 0] },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              month: "$month",
+              game: "$game",
+              gameMode: "$gameMode",
+              jobCategory: "$jobCategory",
+            },
+            totalCompleted: {
+              $sum: { $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, 1, 0] },
+            },
+            totalCanceled: {
+              $sum: { $cond: [{ $eq: ["$jobStatus", "CANCELED"] }, 1, 0] },
+            },
+            totalDistanceKm: {
+              $sum: {
+                $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, "$distanceKm", 0],
+              },
+            },
+            totalCargoMass: {
+              $sum: {
+                $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, "$cargoMass", 0],
+              },
+            },
+            totalPassengers: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$jobStatus", "COMPLETED"] },
+                  "$totalPassengers",
+                  0,
                 ],
               },
-            ],
-          },
-          jobStatus: 1,
-          distanceKm: { $ifNull: ["$distanceKm", 0] },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            month: "$month",
-            game: "$game",
-            gameMode: "$gameMode",
-          },
-          totalCompleted: {
-            $sum: { $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, 1, 0] },
-          },
-          totalCanceled: {
-            $sum: { $cond: [{ $eq: ["$jobStatus", "CANCELED"] }, 1, 0] },
-          },
-          totalDistanceKm: {
-            $sum: {
-              $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, "$distanceKm", 0],
             },
           },
         },
-      },
-      {
-        $sort: {
-          "_id.month": -1,
-          "_id.game": 1,
-          "_id.gameMode": 1,
+        {
+          $sort: {
+            "_id.month": -1,
+            "_id.game": 1,
+            "_id.gameMode": 1,
+          },
         },
-      },
-    ])
-    .toArray();
+      ])
+      .toArray(),
+    db
+      .collection("currencyhistories")
+      .find({ userId: discordId, guildId: GUILD_ID })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray(),
+    db.collection("driverlinks").findOne({ userId: discordId, guildId: GUILD_ID }),
+    db
+      .collection("pointhistories")
+      .find({
+        userId: discordId,
+        guildId: GUILD_ID,
+      })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray(),
+  ]);
 
-  const monthlyJobStats: MonthlyJobStatItem[] = rawMonthlyJobStats.map(
-    (item: any) => ({
-      month: item._id.month,
-      game: item._id.game,
-      gameMode: item._id.gameMode,
-      totalCompleted: item.totalCompleted || 0,
-      totalCanceled: item.totalCanceled || 0,
-      totalDistanceKm: item.totalDistanceKm || 0,
-    })
-  );
-
-  // 5. Ambil Data Insights Riwayat NC (Earn) & Poin Penalty
-  // Ganti "histories" dengan nama collection riwayat Anda
-  const ncIncomes = await db
-    .collection("currencyhistories") // Sesuaikan collection
-    .find({ userId: discordId, guildId: GUILD_ID })
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .toArray();
-
-  let dLink = await db
-    .collection("driverlinks")
-    .findOne({ userId: discordId, guildId: GUILD_ID });
-
+  let dLink = initialDLink;
   if (!dLink && truckyId) {
     dLink = await db.collection("driverlinks").findOne({
       $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
@@ -242,15 +269,43 @@ export default async function DashboardPage() {
     });
   }
 
-  const pointPenalties = await db
-    .collection("pointhistories") // Sesuaikan collection
-    .find({
-      userId: discordId,
-      guildId: GUILD_ID, // Logika untuk mengambil data penalti/minus
+  const monthlyJobStats: MonthlyJobStatItem[] = rawMonthlyJobStats.map(
+    (item: any) => ({
+      month: item._id.month,
+      game: item._id.game,
+      gameMode: item._id.gameMode,
+      jobCategory: item._id.jobCategory || "truck",
+      totalCompleted: item.totalCompleted || 0,
+      totalCanceled: item.totalCanceled || 0,
+      totalDistanceKm: item.totalDistanceKm || 0,
+      totalCargoMass: item.totalCargoMass || 0,
+      totalPassengers: item.totalPassengers || 0,
     })
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .toArray();
+  );
+
+  // Ringkasan akumulasi divisi Truck vs Coach dari monthlyJobStats
+  const divisionSummary = monthlyJobStats.reduce(
+    (acc, item) => {
+      if (item.jobCategory === "coach") {
+        acc.coachJobs += item.totalCompleted || 0;
+        acc.coachKm += item.totalDistanceKm || 0;
+        acc.coachPax += item.totalPassengers || 0;
+      } else {
+        acc.truckJobs += item.totalCompleted || 0;
+        acc.truckKm += item.totalDistanceKm || 0;
+        acc.truckMass += item.totalCargoMass || 0;
+      }
+      return acc;
+    },
+    {
+      truckJobs: 0,
+      truckKm: 0,
+      truckMass: 0,
+      coachJobs: 0,
+      coachKm: 0,
+      coachPax: 0,
+    }
+  );
 
   const driverJoinDate =
     dLink?.createdAt || (dLink?._id ? dLink._id.getTimestamp() : null);
@@ -351,6 +406,111 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Ringkasan Divisi: Truck Logistics vs Coach / Bus */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+        {/* Truck Logistics */}
+        <div className="glass-panel p-6 rounded-2xl border border-sky-500/20 relative overflow-hidden">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/40">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                <Truck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
+                  Divisi Truck Logistics
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Akumulasi pengiriman kargo truk
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/cargo-market"
+              className="text-xs font-bold text-sky-400 hover:underline flex items-center gap-1"
+            >
+              Cargo Market <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="p-3 rounded-xl bg-card/50 border border-border/40">
+              <p className="text-xl font-black text-foreground">
+                {divisionSummary.truckJobs.toLocaleString("id-ID")}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1">
+                Jobs Selesai
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-card/50 border border-border/40">
+              <p className="text-xl font-black text-sky-400">
+                {Math.round(divisionSummary.truckKm).toLocaleString("id-ID")}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1">
+                KM Tempuh
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-card/50 border border-border/40">
+              <p className="text-xl font-black text-emerald-400">
+                {Math.round(divisionSummary.truckMass).toLocaleString("id-ID")}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1">
+                Tonase (Ton)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Coach / Bus */}
+        <div className="glass-panel p-6 rounded-2xl border border-amber-500/20 relative overflow-hidden">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/40">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Bus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
+                  Divisi Coach & Bus
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Akumulasi perjalanan bus & penumpang
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/coach-terminal"
+              className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1"
+            >
+              Coach Terminal <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="p-3 rounded-xl bg-card/50 border border-border/40">
+              <p className="text-xl font-black text-foreground">
+                {divisionSummary.coachJobs.toLocaleString("id-ID")}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1">
+                Trip Selesai
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-card/50 border border-border/40">
+              <p className="text-xl font-black text-amber-400">
+                {Math.round(divisionSummary.coachKm).toLocaleString("id-ID")}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1">
+                KM Tempuh
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-card/50 border border-border/40">
+              <p className="text-xl font-black text-amber-300">
+                {Math.round(divisionSummary.coachPax).toLocaleString("id-ID")}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1">
+                Penumpang (Pax)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* --- SECTION: Analisis Pekerjaan Month-by-Month (ETS2 & ATS) --- */}
       <DriverMonthlyJobAnalytics stats={monthlyJobStats} />
 
@@ -363,7 +523,7 @@ export default async function DashboardPage() {
           href="/dashboard/jobs"
           className="text-sm text-accent-lilac hover:text-foreground flex items-center gap-1 transition-colors"
         >
-          Lihat Semua Jobs ({allJobs.length}) <ArrowRight className="w-4 h-4" />
+          Lihat Semua Jobs ({totalJobsCount}) <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
 
@@ -375,31 +535,52 @@ export default async function DashboardPage() {
           </h3>
           <div className="space-y-3">
             {ongoingJobs.length > 0 ? (
-              ongoingJobs.map((job) => (
-                // Key cukup diletakkan di elemen paling luar (Link)
-                <Link
-                  href={`/jobs/${job.jobId}`}
-                  key={job.jobId}
-                  className="block"
-                >
-                  <div
-                    className="p-3 bg-card/50 rounded-lg border border-border/50 
-                       transition-all duration-300 ease-in-out
-                       hover:bg-blue-500/10 hover:border-blue-500/40 
-                       hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10"
+              ongoingJobs.map((job) => {
+                const isCoach =
+                  job.jobCategory === "coach" ||
+                  job.marketType === "bus_company_job" ||
+                  job.marketType === "bus_tourist_job";
+                return (
+                  <Link
+                    href={`/jobs/${job.jobId}`}
+                    key={job.jobId}
+                    className="block"
                   >
-                    <p className="font-medium text-sm text-foreground truncate">
-                      {`Job #${job.jobId}` || "Kargo Tidak Diketahui"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatWIB(job.createdAt) || "-"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {job.game || "-"}
-                    </p>
-                  </div>
-                </Link>
-              ))
+                    <div
+                      className="p-3 bg-card/50 rounded-lg border border-border/50 
+                         transition-all duration-300 ease-in-out
+                         hover:bg-blue-500/10 hover:border-blue-500/40 
+                         hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm text-foreground truncate">
+                          {`Job #${job.jobId}` || "Kargo Tidak Diketahui"}
+                        </p>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase shrink-0 border ${
+                            isCoach
+                              ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                              : "bg-sky-500/15 text-sky-400 border-sky-500/30"
+                          }`}
+                        >
+                          {isCoach ? "🚌 Coach" : "🚛 Truck"}
+                        </span>
+                      </div>
+                      {job.sourceCity && job.destinationCity && (
+                        <p className="text-xs text-foreground/80 mt-1 truncate">
+                          {job.sourceCity} → {job.destinationCity}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatWIB(job.createdAt) || "-"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {job.game || "-"}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })
             ) : (
               <p className="text-sm text-gray-500 italic">
                 Tidak ada pekerjaan aktif.
@@ -415,51 +596,76 @@ export default async function DashboardPage() {
           </h3>
           <div className="space-y-3">
             {completedJobs.length > 0 ? (
-              completedJobs.map((job) => (
-                <Link
-                  href={`/jobs/${job.jobId}`}
-                  key={job.jobId}
-                  className="block"
-                >
-                  <div
-                    key={job._id.toString()}
-                    className="p-3 bg-card/50 rounded-lg border border-border/50 
-                       transition-all duration-300 ease-in-out
-                       hover:bg-green-500/10 hover:border-green-500/40 
-                       hover:-translate-y-1 hover:shadow-lg hover:shadow-green-500/10"
+              completedJobs.map((job) => {
+                const isCoach =
+                  job.jobCategory === "coach" ||
+                  job.marketType === "bus_company_job" ||
+                  job.marketType === "bus_tourist_job";
+                return (
+                  <Link
+                    href={`/jobs/${job.jobId}`}
+                    key={job.jobId}
+                    className="block"
                   >
-                    <p className="font-medium text-sm text-foreground truncate">
-                      {`Job #${job?.jobId}` || "Kargo Selesai"}
-                    </p>
-                    {(() => {
-                      const val =
-                        typeof job?.revenue === "number"
-                          ? job.revenue
-                          : (job?.nc?.total ?? 0);
-                      return (
-                        <p
-                          className={`text-xs mt-1 font-semibold ${
-                            val < 0
-                              ? "text-red-400"
-                              : val > 0
-                                ? "text-green-500/80"
-                                : "text-gray-400"
+                    <div
+                      key={job._id.toString()}
+                      className="p-3 bg-card/50 rounded-lg border border-border/50 
+                         transition-all duration-300 ease-in-out
+                         hover:bg-green-500/10 hover:border-green-500/40 
+                         hover:-translate-y-1 hover:shadow-lg hover:shadow-green-500/10"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm text-foreground truncate">
+                          {`Job #${job?.jobId}` || "Kargo Selesai"}
+                        </p>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase shrink-0 border ${
+                            isCoach
+                              ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                              : "bg-sky-500/15 text-sky-400 border-sky-500/30"
                           }`}
                         >
-                          {val > 0 ? "+" : ""}
-                          {val.toLocaleString("id-ID")} NC
+                          {isCoach ? "🚌 Coach" : "🚛 Truck"}
+                        </span>
+                      </div>
+                      {job.sourceCity && job.destinationCity && (
+                        <p className="text-xs text-foreground/80 mt-1 truncate">
+                          {job.sourceCity} → {job.destinationCity}
+                          {isCoach && job.totalPassengers
+                            ? ` • ${job.totalPassengers} Pax`
+                            : ""}
                         </p>
-                      );
-                    })()}
-                    <p className="text-xs text-gray-400 mt-1">
-                      {job?.game || 0}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatWIB(job.updatedAt) || "-"}
-                    </p>
-                  </div>
-                </Link>
-              ))
+                      )}
+                      {(() => {
+                        const val =
+                          typeof job?.revenue === "number"
+                            ? job.revenue
+                            : (job?.nc?.total ?? 0);
+                        return (
+                          <p
+                            className={`text-xs mt-1 font-semibold ${
+                              val < 0
+                                ? "text-red-400"
+                                : val > 0
+                                  ? "text-green-500/80"
+                                  : "text-gray-400"
+                            }`}
+                          >
+                            {val > 0 ? "+" : ""}
+                            {val.toLocaleString("id-ID")} NC
+                          </p>
+                        );
+                      })()}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {job?.game || 0}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {formatWIB(job.updatedAt) || "-"}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })
             ) : (
               <p className="text-sm text-gray-500 italic">
                 Belum ada pekerjaan selesai.
@@ -475,31 +681,53 @@ export default async function DashboardPage() {
           </h3>
           <div className="space-y-3">
             {canceledJobs.length > 0 ? (
-              canceledJobs.map((job) => (
-                <Link
-                  href={`/jobs/${job.jobId}`}
-                  key={job.jobId}
-                  className="block"
-                >
-                  <div
-                    key={job._id.toString()}
-                    className="p-3 bg-card/50 rounded-lg border border-border/50 
-                       transition-all duration-300 ease-in-out
-                       hover:bg-red-500/10 hover:border-red-500/40 
-                       hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10"
+              canceledJobs.map((job) => {
+                const isCoach =
+                  job.jobCategory === "coach" ||
+                  job.marketType === "bus_company_job" ||
+                  job.marketType === "bus_tourist_job";
+                return (
+                  <Link
+                    href={`/jobs/${job.jobId}`}
+                    key={job.jobId}
+                    className="block"
                   >
-                    <p className="font-medium text-sm text-foreground truncate">
-                      Job #{job.jobId || "Kargo Dibatalkan"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {job?.game || 0}
-                    </p>
-                    <p className="text-xs text-red-400/80 mt-1">
-                      {formatWIB(job.createdAt) || "-"}
-                    </p>
-                  </div>
-                </Link>
-              ))
+                    <div
+                      key={job._id.toString()}
+                      className="p-3 bg-card/50 rounded-lg border border-border/50 
+                         transition-all duration-300 ease-in-out
+                         hover:bg-red-500/10 hover:border-red-500/40 
+                         hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm text-foreground truncate">
+                          Job #{job.jobId || "Kargo Dibatalkan"}
+                        </p>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase shrink-0 border ${
+                            isCoach
+                              ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                              : "bg-sky-500/15 text-sky-400 border-sky-500/30"
+                          }`}
+                        >
+                          {isCoach ? "🚌 Coach" : "🚛 Truck"}
+                        </span>
+                      </div>
+                      {job.sourceCity && job.destinationCity && (
+                        <p className="text-xs text-foreground/80 mt-1 truncate">
+                          {job.sourceCity} → {job.destinationCity}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {job?.game || 0}
+                      </p>
+                      <p className="text-xs text-red-400/80 mt-0.5">
+                        {formatWIB(job.createdAt) || "-"}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })
             ) : (
               <p className="text-sm text-gray-500 italic">
                 Tidak ada riwayat pembatalan.

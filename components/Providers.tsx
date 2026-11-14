@@ -8,7 +8,7 @@ import { DialogContainer } from "./ui/DialogContainer";
 // WAJIB menggunakan 'export' agar bisa di-import di layout.tsx
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchOnWindowFocus={false} refetchInterval={0}>
       <NotificationProvider>
         <DialogContainer />
         {children}

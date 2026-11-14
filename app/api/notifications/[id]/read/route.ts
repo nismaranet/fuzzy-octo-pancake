@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import mongoose from "mongoose";
 import Notification from "@/lib/models/Notification";
-
+import { invalidateUserNotificationsCache } from "@/lib/services/NotificationService";
 import dbConnect from "@/lib/mongoose";
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -20,18 +20,18 @@ export async function POST(
 
     await dbConnect();
 
-    const discordId = session.user.discordId;
+    const discordId = String(session.user.discordId);
 
-    const notification = await Notification.findById(id);
-    if (!notification) {
+    const res = await Notification.updateOne(
+      { _id: id },
+      { $addToSet: { readBy: discordId } }
+    );
+
+    if (res.matchedCount === 0) {
       return NextResponse.json({ error: "Notification not found" }, { status: 404 });
     }
 
-    // Add user's discordId to readBy if not already there
-    if (!notification.readBy.includes(discordId)) {
-      notification.readBy.push(discordId);
-      await notification.save();
-    }
+    await invalidateUserNotificationsCache(discordId);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

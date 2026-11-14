@@ -25,5 +25,7 @@ const notificationSchema = new mongoose.Schema(
 
 // TTL index to automatically delete expired notifications
 notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Compound index for fast per-user & global notification sorting
+notificationSchema.index({ recipient: 1, createdAt: -1 });
 
 export default mongoose.models.Notification || mongoose.model("Notification", notificationSchema);

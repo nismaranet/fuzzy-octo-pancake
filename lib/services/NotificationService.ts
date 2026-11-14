@@ -1,6 +1,22 @@
 import mongoose from "mongoose";
 import clientPromise from "@/lib/mongodb";
 import Notification from "@/lib/models/Notification";
+import { redis } from "@/lib/redis";
+
+/**
+ * Invalidate cached notifications for a specific user (or global version bump)
+ */
+export async function invalidateUserNotificationsCache(discordId: string) {
+  try {
+    const globalVer = (await redis.get("notifications:global_ver").catch(() => "0")) || "0";
+    await Promise.all([
+      redis.del(`notifications:v1:${discordId}:g${globalVer}:p1:l5`),
+      redis.del(`notifications:v1:${discordId}:g${globalVer}:p1:l10`),
+    ]);
+  } catch (err) {
+    console.error("Failed to invalidate user notifications cache:", err);
+  }
+}
 
 /**
  * Send a notification to a specific user via their Discord ID.
@@ -29,6 +45,8 @@ export async function sendPersonalNotification(
       link,
       expiresAt
     });
+
+    await invalidateUserNotificationsCache(discordId);
 
     return { success: true, data: notification };
   } catch (error: any) {
@@ -63,6 +81,9 @@ export async function sendGlobalNotification(
       link,
       expiresAt
     });
+
+    // Bump global notifications cache version so all users see the new broadcast
+    await redis.incr("notifications:global_ver").catch(() => null);
 
     return { success: true, data: notification };
   } catch (error: any) {
