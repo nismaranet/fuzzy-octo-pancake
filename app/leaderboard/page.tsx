@@ -11,7 +11,7 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 interface PageProps {
-  searchParams: Promise<{ category?: string; period?: string }>;
+  searchParams: Promise<{ category?: string; period?: string; division?: string }>;
 }
 
 export default async function LeaderboardPage(props: PageProps) {
@@ -24,11 +24,13 @@ export default async function LeaderboardPage(props: PageProps) {
   const availableMonths = await getAvailableLeaderboardMonths();
   const defaultPeriod = resolvedParams?.period || availableMonths[0] || "all";
   const defaultCategory = resolvedParams?.category || "distance";
+  const defaultDivision = resolvedParams?.division || "all";
 
   const initialData = await getLeaderboardData(
     defaultCategory,
     defaultPeriod,
-    currentDiscordId
+    currentDiscordId,
+    defaultDivision
   );
 
   return (

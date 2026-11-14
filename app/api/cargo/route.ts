@@ -7,10 +7,14 @@ export async function GET() {
   try {
     const client = await clientPromise;
     const db = client.db();
-    // Mengambil semua cargo, diurutkan berdasarkan Game (ETS2 lalu ATS) lalu Nama
+    // Mengambil semua cargo aktif (bukan coach), diurutkan berdasarkan Game (ETS2 lalu ATS) lalu Nama
     const cargoes = await db
       .collection("cargos")
-      .find({})
+      .find({
+        enabled: { $ne: false },
+        category: { $ne: "coach" },
+        in_game_id: { $nin: ["Passengers", "bus_company_job", "bus_tourist_job"] },
+      })
       .sort({ game_id: 1, name: 1 })
       .toArray();
     return NextResponse.json(cargoes, {

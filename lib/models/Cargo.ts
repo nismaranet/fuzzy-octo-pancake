@@ -22,8 +22,16 @@ const cargoSchema = new mongoose.Schema(
     price_per_km: { type: Number },
     price_per_km_with_market_change: { type: Number },
     is_fragile: { type: Boolean },
+    category: {
+      type: String,
+      enum: ["cargo", "coach"],
+      default: "cargo",
+      index: true,
+    },
   },
   { timestamps: true },
 );
+
+cargoSchema.index({ in_game_id: 1, game_id: 1 });
 
 export default mongoose.models.Cargo || mongoose.model("Cargo", cargoSchema);

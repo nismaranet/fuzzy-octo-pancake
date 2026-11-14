@@ -4,6 +4,9 @@ import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Truck,
+  Bus,
+  Users,
+  Layers,
   CheckCircle2,
   PackageCheck,
   Coins,
@@ -19,6 +22,7 @@ import {
 import UserBadges from "@/components/icons/UserBadges";
 import {
   LeaderboardCategory,
+  LeaderboardDivision,
   LeaderboardResult,
   formatLeaderboardMonthLabel,
 } from "@/types/leaderboard";
@@ -92,25 +96,61 @@ export default function LeaderboardUI({
   const [data, setData] = useState<LeaderboardResult>(initialData);
   const [selectedCategory, setSelectedCategory] =
     useState<LeaderboardCategory>(initialData.category);
+  const [selectedDivision, setSelectedDivision] =
+    useState<LeaderboardDivision>(initialData.division || "all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>(
     initialData.period
   );
   const [isPending, startTransition] = useTransition();
 
-  const currentCategoryConfig = CATEGORY_CONFIG[selectedCategory];
+  const getCategoryConfig = (
+    cat: LeaderboardCategory,
+    div: LeaderboardDivision
+  ) => {
+    if (cat === "mass" && div === "coach") {
+      return {
+        label: "Penumpang Diangkut",
+        shortLabel: "Penumpang (Pax)",
+        unit: "Pax",
+        description:
+          "Akumulasi penumpang bus yang berhasil diantarkan di seluruh pemberhentian",
+        icon: Users,
+        accentColor: "text-amber-500 dark:text-amber-400",
+        badgeBg: "bg-amber-500/10",
+        badgeBorder: "border-amber-500/30",
+      };
+    }
+    if (cat === "jobs" && div === "coach") {
+      return {
+        ...CATEGORY_CONFIG.jobs,
+        label: "Perjalanan Bus Selesai",
+        shortLabel: "Perjalanan Bus",
+        unit: "Trip",
+        description: "Total kuantitas perjalanan bus yang berhasil diselesaikan",
+      };
+    }
+    return CATEGORY_CONFIG[cat];
+  };
 
-  // Fungsi pengubah kategori / bulan
+  const currentCategoryConfig = getCategoryConfig(
+    selectedCategory,
+    selectedDivision
+  );
+
+  // Fungsi pengubah kategori / bulan / divisi
   const handleFilterChange = async (
     newCategory: LeaderboardCategory,
-    newPeriod: string
+    newPeriod: string,
+    newDivision: LeaderboardDivision = selectedDivision
   ) => {
     setSelectedCategory(newCategory);
     setSelectedPeriod(newPeriod);
+    setSelectedDivision(newDivision);
 
     startTransition(async () => {
       try {
         const res = await fetch(
-          `/api/leaderboard?category=${newCategory}&period=${newPeriod}`,
+          `/api/leaderboard?category=${newCategory}&period=${newPeriod}&division=${newDivision}`,
           {
             cache: "no-store",
             headers: {
@@ -138,7 +178,7 @@ export default function LeaderboardUI({
         maximumFractionDigits: 2,
       });
     }
-    if (cat === "distance" || cat === "mass") {
+    if (cat === "distance" || (cat === "mass" && selectedDivision !== "coach")) {
       return val.toLocaleString("id-ID", {
         minimumFractionDigits: 0,
         maximumFractionDigits: 1,
@@ -171,29 +211,82 @@ export default function LeaderboardUI({
           </p>
         </div>
 
-        {/* Month Selector Dropdown */}
-        <div className="flex items-center gap-3 self-start lg:self-auto bg-card p-1.5 rounded-2xl border border-border shadow-sm">
-          <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <span className="hidden sm:inline">Periode:</span>
+        {/* Division & Month Selector Controls */}
+        <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
+          {/* Division Switcher */}
+          <div className="inline-flex items-center p-1.5 rounded-2xl bg-card border border-border shadow-sm gap-1">
+            <button
+              type="button"
+              onClick={() =>
+                handleFilterChange(selectedCategory, selectedPeriod, "all")
+              }
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                selectedDivision === "all"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Semua
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                handleFilterChange(selectedCategory, selectedPeriod, "truck")
+              }
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                selectedDivision === "truck"
+                  ? "bg-sky-500 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Truck className="w-3.5 h-3.5" />
+              Logistics
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                handleFilterChange(selectedCategory, selectedPeriod, "coach")
+              }
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                selectedDivision === "coach"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Bus className="w-3.5 h-3.5" />
+              Coach / Bus
+            </button>
           </div>
 
-          <div className="relative">
-            <select
-              value={selectedPeriod}
-              onChange={(e) =>
-                handleFilterChange(selectedCategory, e.target.value)
-              }
-              className="appearance-none bg-background hover:bg-muted/50 text-foreground text-xs font-bold py-2 pl-3.5 pr-8 rounded-xl border border-border focus:outline-none focus:border-primary transition-colors cursor-pointer"
-            >
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>
-                  {formatLeaderboardMonthLabel(m)}
-                </option>
-              ))}
-              <option value="all">Sepanjang Masa (All-Time)</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Month Selector Dropdown */}
+          <div className="flex items-center gap-3 bg-card p-1.5 rounded-2xl border border-border shadow-sm">
+            <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <span className="hidden sm:inline">Periode:</span>
+            </div>
+
+            <div className="relative">
+              <select
+                value={selectedPeriod}
+                onChange={(e) =>
+                  handleFilterChange(
+                    selectedCategory,
+                    e.target.value,
+                    selectedDivision
+                  )
+                }
+                className="appearance-none bg-background hover:bg-muted/50 text-foreground text-xs font-bold py-2 pl-3.5 pr-8 rounded-xl border border-border focus:outline-none focus:border-primary transition-colors cursor-pointer"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m} value={m}>
+                    {formatLeaderboardMonthLabel(m)}
+                  </option>
+                ))}
+                <option value="all">Sepanjang Masa (All-Time)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>
@@ -203,14 +296,16 @@ export default function LeaderboardUI({
         {(
           Object.keys(CATEGORY_CONFIG) as LeaderboardCategory[]
         ).map((catKey) => {
-          const cfg = CATEGORY_CONFIG[catKey];
+          const cfg = getCategoryConfig(catKey, selectedDivision);
           const Icon = cfg.icon;
           const isActive = selectedCategory === catKey;
 
           return (
             <button
               key={catKey}
-              onClick={() => handleFilterChange(catKey, selectedPeriod)}
+              onClick={() =>
+                handleFilterChange(catKey, selectedPeriod, selectedDivision)
+              }
               className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden group ${
                 isActive
                   ? "bg-card border-primary/50 text-foreground shadow-md ring-1 ring-primary/30"
@@ -339,7 +434,7 @@ export default function LeaderboardUI({
             {/* --- RUNNER UP (#2 - KIRI) --- */}
             {top2 ? (
               <div
-                className={`order-2 md:order-1 rounded-3xl p-6 border transition-all flex flex-col items-center text-center relative overflow-hidden group shadow-md ${
+                className={`order-2 md:order-1 rounded-3xl p-6 border transition-all flex flex-col items-center text-center relative z-10 hover:z-30 group shadow-md ${
                   top2.isCurrentUser
                     ? "bg-card border-slate-400 ring-2 ring-primary/40"
                     : "bg-card border-slate-300 dark:border-slate-700/60 hover:border-slate-400"
@@ -384,6 +479,7 @@ export default function LeaderboardUI({
                     <UserBadges
                       role={top2.role || undefined}
                       isNismaraPlus={top2.isNismaraPlus}
+                      nismaraPlusStartedAt={top2.nismaraPlusStartedAt}
                       truckyRank={top2.truckyRank || undefined}
                       isBooster={top2.isBooster}
                       topManager={top2.topManager}
@@ -413,7 +509,7 @@ export default function LeaderboardUI({
             {/* --- JUARA 1 (#1 - TENGAH / ELEVATED) --- */}
             {top1 ? (
               <div
-                className={`order-1 md:order-2 rounded-3xl p-7 border-2 transition-all flex flex-col items-center text-center relative overflow-hidden group shadow-xl -translate-y-2 md:-translate-y-4 ${
+                className={`order-1 md:order-2 rounded-3xl p-7 border-2 transition-all flex flex-col items-center text-center relative z-20 hover:z-30 group shadow-xl -translate-y-2 md:-translate-y-4 ${
                   top1.isCurrentUser
                     ? "bg-gradient-to-b from-amber-500/15 via-card to-card border-amber-500 ring-2 ring-amber-400/50"
                     : "bg-gradient-to-b from-amber-500/10 via-card to-card border-amber-500/60 hover:border-amber-500"
@@ -462,6 +558,7 @@ export default function LeaderboardUI({
                     <UserBadges
                       role={top1.role || undefined}
                       isNismaraPlus={top1.isNismaraPlus}
+                      nismaraPlusStartedAt={top1.nismaraPlusStartedAt}
                       truckyRank={top1.truckyRank || undefined}
                       isBooster={top1.isBooster}
                       topManager={top1.topManager}
@@ -491,7 +588,7 @@ export default function LeaderboardUI({
             {/* --- JUARA 3 (#3 - KANAN) --- */}
             {top3 ? (
               <div
-                className={`order-3 rounded-3xl p-6 border transition-all flex flex-col items-center text-center relative overflow-hidden group shadow-md ${
+                className={`order-3 rounded-3xl p-6 border transition-all flex flex-col items-center text-center relative z-10 hover:z-30 group shadow-md ${
                   top3.isCurrentUser
                     ? "bg-card border-amber-700/60 ring-2 ring-primary/40"
                     : "bg-card border-amber-700/30 dark:border-amber-700/40 hover:border-amber-600"
@@ -536,6 +633,7 @@ export default function LeaderboardUI({
                     <UserBadges
                       role={top3.role || undefined}
                       isNismaraPlus={top3.isNismaraPlus}
+                      nismaraPlusStartedAt={top3.nismaraPlusStartedAt}
                       truckyRank={top3.truckyRank || undefined}
                       isBooster={top3.isBooster}
                       topManager={top3.topManager}
@@ -571,13 +669,13 @@ export default function LeaderboardUI({
                 <span>Capaian {currentCategoryConfig.shortLabel}</span>
               </div>
 
-              <div className="rounded-3xl bg-card border border-border divide-y divide-border overflow-hidden shadow-md">
+              <div className="rounded-3xl bg-card border border-border divide-y divide-border shadow-md">
                 {restDrivers.map((driver) => {
                   const uniqueKey = `${driver.discordId}-${driver.rank}`;
                   return (
                     <div
                       key={uniqueKey}
-                      className={`flex items-center justify-between p-4 px-6 transition-colors group relative z-10 hover:z-50 ${
+                      className={`flex items-center justify-between p-4 px-6 transition-colors group relative z-10 hover:z-50 first:rounded-t-3xl last:rounded-b-3xl ${
                         driver.isCurrentUser
                           ? "bg-primary/10 hover:bg-primary/15"
                           : "hover:bg-muted/40"
@@ -619,6 +717,7 @@ export default function LeaderboardUI({
                               <UserBadges
                                 role={driver.role || undefined}
                                 isNismaraPlus={driver.isNismaraPlus}
+                                nismaraPlusStartedAt={driver.nismaraPlusStartedAt}
                                 truckyRank={driver.truckyRank || undefined}
                                 isBooster={driver.isBooster}
                                 topManager={driver.topManager}

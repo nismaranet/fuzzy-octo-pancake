@@ -5,6 +5,9 @@ import { fetchJobs } from "./actions";
 import { useRouter } from "next/navigation";
 import {
   Truck,
+  Bus,
+  Users,
+  MapPin,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -33,9 +36,11 @@ function formatWIB(dateInput: string | Date | undefined) {
 export default function JobList({
   initialJobs,
   tab,
+  category = "all",
 }: {
   initialJobs: any[];
   tab: "ongoing" | "completed" | "canceled";
+  category?: "all" | "truck" | "coach";
 }) {
   const [jobs, setJobs] = useState(initialJobs);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +49,7 @@ export default function JobList({
 
   const loadMore = async () => {
     setIsLoading(true);
-    const nextJobs = await fetchJobs(tab, jobs.length, 12);
+    const nextJobs = await fetchJobs(tab, jobs.length, 12, category);
     if (nextJobs.length < 12) setHasMore(false);
     setJobs((prev) => [...prev, ...nextJobs]);
     setIsLoading(false);
@@ -149,21 +154,54 @@ export default function JobList({
                       </td>
 
                       <td className="px-6 py-4">
-                        <span className="text-xs font-medium text-gray-400 bg-card/50 px-2 py-1 rounded border border-border/50">
-                          {job.game?.includes("Euro") ? "ETS2" : "ATS"}
-                        </span>
+                        <div className="flex flex-col items-start gap-1.5">
+                          <span className="text-xs font-medium text-gray-400 bg-card/50 px-2 py-0.5 rounded border border-border/50">
+                            {job.game?.includes("Euro") ? "ETS2" : "ATS"}
+                          </span>
+                          {job.jobCategory === "coach" ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                              <Bus className="w-3 h-3" /> Coach
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-orange-500/10 text-orange-400/90 border border-orange-500/20">
+                              <Truck className="w-3 h-3" /> Truck
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="px-6 py-4">
+                        {(job.sourceCity || job.destinationCity) && (
+                          <div className="text-xs font-bold text-foreground mb-1 truncate max-w-[200px]">
+                            {job.sourceCity || "-"} → {job.destinationCity || "-"}
+                          </div>
+                        )}
                         <div className="text-sm text-gray-300 flex items-center gap-2 mb-1">
                           <Route className="w-4 h-4 text-accent-sky shrink-0" />
                           <span className="truncate max-w-[150px]">
                             {job.distanceKm?.toLocaleString("id-ID") || 0} km
                           </span>
                         </div>
-                        <div className="text-xs text-gray-500 flex items-center gap-2">
-                          <Clock className="w-3 h-3 shrink-0" />{" "}
-                          {formatDuration(job.durationSeconds)}
+                        <div className="text-xs text-gray-500 flex items-center gap-3">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 shrink-0" />{" "}
+                            {formatDuration(job.durationSeconds)}
+                          </span>
+                          {job.jobCategory === "coach" &&
+                            (job.stopsCount > 0 || job.totalPassengers > 0) && (
+                              <span className="inline-flex items-center gap-2 text-[11px] font-bold text-sky-400">
+                                {job.stopsCount > 0 && (
+                                  <span className="flex items-center gap-0.5">
+                                    <MapPin className="w-3 h-3" /> {job.stopsCount} Halte
+                                  </span>
+                                )}
+                                {job.totalPassengers > 0 && (
+                                  <span className="flex items-center gap-0.5 text-emerald-400">
+                                    <Users className="w-3 h-3" /> {job.totalPassengers} Pax
+                                  </span>
+                                )}
+                              </span>
+                            )}
                         </div>
                       </td>
 

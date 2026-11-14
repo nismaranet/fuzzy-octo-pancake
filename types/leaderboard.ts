@@ -1,4 +1,5 @@
 export type LeaderboardCategory = "distance" | "jobs" | "mass" | "nc";
+export type LeaderboardDivision = "all" | "truck" | "coach";
 
 export interface LeaderboardDriver {
   rank: number;
@@ -9,6 +10,7 @@ export interface LeaderboardDriver {
   role?: string | null;
   truckyRank?: string | null;
   isNismaraPlus: boolean;
+  nismaraPlusStartedAt?: string | Date | null;
   score: number;
   isCurrentUser?: boolean;
   isBooster?: boolean;
@@ -29,6 +31,7 @@ export interface MyRankData {
 
 export interface LeaderboardResult {
   category: LeaderboardCategory;
+  division: LeaderboardDivision;
   period: string; // 'all' or 'YYYY-MM'
   periodLabel: string;
   top10: LeaderboardDriver[];

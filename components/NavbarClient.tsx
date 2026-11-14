@@ -45,6 +45,7 @@ import {
   Target,
   Gift,
   Coins,
+  Bus,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,7 @@ export default function NavbarClient({
     { name: "Home", href: "/", icon: Home },
     { name: "Season Pass", href: "/dashboard/season-pass", icon: Trophy },
     { name: "Jobs Details", href: "/jobs", icon: Briefcase },
+    { name: "Coach Terminal", href: "/coach-terminal", icon: Bus },
     { name: "Cargo Market", href: "/cargo-market", icon: Package },
     { name: "Fuel Market", href: "/fuel-market", icon: Fuel },
     { name: "Convoy", href: "/convoy", icon: Truck },
@@ -244,6 +246,27 @@ export default function NavbarClient({
                               <div className="min-w-0">
                                 <p className="text-sm font-bold text-foreground leading-tight">Jobs Details</p>
                                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">Riwayat pekerjaan seluruh driver Nismara Transport</p>
+                              </div>
+                            </NavigationMenuLink>
+                          </li>
+                          <li>
+                            <NavigationMenuLink
+                              render={<Link href="/coach-terminal" />}
+                              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all group/item"
+                            >
+                              <div className="w-9 h-9 shrink-0 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center group-hover/item:bg-emerald-500/20 transition-colors">
+                                <Bus className="w-4 h-4 text-emerald-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-foreground leading-tight">
+                                  Coach Terminal{" "}
+                                  <span className="ml-1 text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">
+                                    New
+                                  </span>
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                  Papan keberangkatan bus, tarif penumpang & riwayat Coaches
+                                </p>
                               </div>
                             </NavigationMenuLink>
                           </li>

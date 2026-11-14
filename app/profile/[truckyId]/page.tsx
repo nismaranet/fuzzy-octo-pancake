@@ -8,6 +8,8 @@ import UserBadges from "@/components/icons/UserBadges";
 import { notFound } from "next/navigation";
 import {
   Truck,
+  Bus,
+  Users,
   MapPin,
   Globe,
   Trophy,
@@ -279,6 +281,30 @@ export default async function PublicProfilePage(props: {
             totalCompleted: {
               $sum: { $cond: [{ $eq: ["$jobStatus", "COMPLETED"] }, 1, 0] },
             },
+            totalCoachCompleted: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ["$jobStatus", "COMPLETED"] },
+                      {
+                        $or: [
+                          { $eq: ["$jobCategory", "coach"] },
+                          {
+                            $in: [
+                              "$marketType",
+                              ["bus_company_job", "bus_tourist_job"],
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
             totalCanceled: {
               $sum: { $cond: [{ $eq: ["$jobStatus", "CANCELED"] }, 1, 0] },
             },
@@ -296,6 +322,15 @@ export default async function PublicProfilePage(props: {
                 $cond: [
                   { $eq: ["$jobStatus", "COMPLETED"] },
                   { $ifNull: ["$cargoMass", 0] },
+                  0,
+                ],
+              },
+            },
+            totalPassengers: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$jobStatus", "COMPLETED"] },
+                  { $ifNull: ["$totalPassengers", 0] },
                   0,
                 ],
               },
@@ -327,11 +362,17 @@ export default async function PublicProfilePage(props: {
 
   const jobStats = jobStatsRaw[0] || {
     totalCompleted: 0,
+    totalCoachCompleted: 0,
     totalCanceled: 0,
     totalDrivenDistanceKm: 0,
     totalCargoMassT: 0,
+    totalPassengers: 0,
     recentDuration: 0,
   };
+  const totalTruckCompleted = Math.max(
+    0,
+    (jobStats.totalCompleted || 0) - (jobStats.totalCoachCompleted || 0)
+  );
   const recentHours = Math.floor(jobStats.recentDuration / 3600);
 
   // Helper formatting
@@ -593,6 +634,18 @@ export default async function PublicProfilePage(props: {
                       </div>
                     </div>
 
+                    {/* Division Breakdown Pills (Truck vs Coach) */}
+                    <div className="flex flex-wrap items-center gap-2 mt-4">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-bold">
+                        <Truck className="w-3.5 h-3.5" />
+                        {formatNum(totalTruckCompleted)} Truck Jobs
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold">
+                        <Bus className="w-3.5 h-3.5" />
+                        {formatNum(jobStats.totalCoachCompleted || 0)} Coach Trips
+                      </span>
+                    </div>
+
                     {/* Recent Driving Info */}
                     {recentHours > 0 && (
                       <div className="mt-4 px-3 py-2 bg-primary/10 border border-primary/20 rounded-lg w-fit shadow-[0_0_10px_rgba(var(--primary-rgb),0.1)]">
@@ -627,7 +680,7 @@ export default async function PublicProfilePage(props: {
               </div>
 
               {/* Overall Stats (Nismara Info) */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors">
                   <Coins className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
                   <p className="text-xl font-black text-foreground">
@@ -647,6 +700,15 @@ export default async function PublicProfilePage(props: {
                   </p>
                 </div>
                 <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors">
+                  <Users className="w-6 h-6 mx-auto mb-2 text-amber-500" />
+                  <p className="text-xl font-black text-foreground">
+                    {formatNum(jobStats.totalPassengers || 0)}
+                  </p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">
+                    Penumpang (Pax)
+                  </p>
+                </div>
+                <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors">
                   <Trophy className="w-6 h-6 mx-auto mb-2 text-primary" />
                   <p className="text-xl font-black text-foreground">
                     {formatNum(userCollectibles.length)}
@@ -655,7 +717,7 @@ export default async function PublicProfilePage(props: {
                     Total Convoy
                   </p>
                 </div>
-                <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors">
+                <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors col-span-2 sm:col-span-1">
                   <TriangleAlert className="w-6 h-6 mx-auto mb-2 text-red-500" />
                   <p className="text-xl font-black text-foreground">
                     {formatNum(points?.totalPoints || 0)}
@@ -677,72 +739,113 @@ export default async function PublicProfilePage(props: {
 
                 {latestJobs.length > 0 ? (
                   <div className="space-y-3">
-                    {latestJobs.map((job: any) => (
-                      <Link
-                        href={`/jobs/${job.jobId || job._id.toString()}`}
-                        key={job.jobId || job._id.toString()}
-                      >
-                        <div className="group flex flex-col sm:flex-row items-center gap-6 bg-background/50 border border-border/30 rounded-xl p-5 hover:border-primary/50 transition-colors relative overflow-hidden mb-3">
-                          <div className="absolute right-0 top-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+                    {latestJobs.map((job: any) => {
+                      const isCoach =
+                        job.jobCategory === "coach" ||
+                        job.marketType === "bus_company_job" ||
+                        job.marketType === "bus_tourist_job";
+                      const stopsCount = Array.isArray(job.stops)
+                        ? job.stops.length
+                        : 0;
+                      const paxCount = job.totalPassengers || 0;
 
-                          <div className="w-16 h-16 rounded-2xl bg-card border border-border/50 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
-                            <Truck className="w-8 h-8 text-primary/70 group-hover:text-primary transition-colors" />
-                          </div>
-                          <div className="flex-1 text-center sm:text-left z-10">
-                            <h4 className="font-bold text-foreground mb-1 text-lg line-clamp-1 group-hover:text-primary transition-colors">
-                              {job.cargoName || "Unknown Cargo"}
-                            </h4>
-                            <p className="text-sm text-muted-foreground flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                              <span className="font-medium text-foreground/80">
-                                {job.sourceCity}
-                              </span>
-                              <span className="hidden sm:inline text-muted-foreground/50">
-                                →
-                              </span>
-                              <span className="inline sm:hidden text-muted-foreground/50">
-                                ↓
-                              </span>
-                              <span className="font-medium text-foreground/80">
-                                {job.destinationCity}
-                              </span>
-                            </p>
-                          </div>
-                          <div className="text-center sm:text-right shrink-0 z-10 border-t sm:border-t-0 sm:border-l border-border/30 pt-4 sm:pt-0 sm:pl-6 mt-2 sm:mt-0 w-full sm:w-auto">
-                            <p className="text-sm text-muted-foreground mb-1">
-                              {job.completedAt
-                                ? formatDistanceToNow(
-                                    new Date(job.completedAt),
-                                    {
-                                      addSuffix: true,
-                                      locale: localeId,
-                                    },
-                                  )
-                                : "Baru saja"}
-                            </p>
-                            {(() => {
-                              const val =
-                                typeof job.revenue === "number"
-                                  ? job.revenue
-                                  : (job.nc?.total ?? 0);
-                              return (
-                                <p
-                                  className={`font-black text-xl ${
-                                    val < 0
-                                      ? "text-red-400"
-                                      : val > 0
-                                        ? "text-primary"
-                                        : "text-muted-foreground"
+                      return (
+                        <Link
+                          href={`/jobs/${job.jobId || job._id.toString()}`}
+                          key={job.jobId || job._id.toString()}
+                        >
+                          <div className="group flex flex-col sm:flex-row items-center gap-6 bg-background/50 border border-border/30 rounded-xl p-5 hover:border-primary/50 transition-colors relative overflow-hidden mb-3">
+                            <div className="absolute right-0 top-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+
+                            <div
+                              className={`w-16 h-16 rounded-2xl bg-card border flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform ${
+                                isCoach
+                                  ? "border-amber-500/40"
+                                  : "border-border/50"
+                              }`}
+                            >
+                              {isCoach ? (
+                                <Bus className="w-8 h-8 text-amber-400 group-hover:text-amber-300 transition-colors" />
+                              ) : (
+                                <Truck className="w-8 h-8 text-primary/70 group-hover:text-primary transition-colors" />
+                              )}
+                            </div>
+                            <div className="flex-1 text-center sm:text-left z-10">
+                              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                                <h4 className="font-bold text-foreground text-lg line-clamp-1 group-hover:text-primary transition-colors">
+                                  {job.cargoName || "Unknown Cargo"}
+                                </h4>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                    isCoach
+                                      ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                      : "bg-sky-500/15 text-sky-400 border-sky-500/30"
                                   }`}
                                 >
-                                  {val > 0 ? "+" : ""}
-                                  {formatNum(val)} NC
-                                </p>
-                              );
-                            })()}
+                                  {isCoach ? "🚌 Coach" : "🚛 Truck"}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                <span className="font-medium text-foreground/80">
+                                  {job.sourceCity}
+                                </span>
+                                <span className="hidden sm:inline text-muted-foreground/50">
+                                  →
+                                </span>
+                                <span className="inline sm:hidden text-muted-foreground/50">
+                                  ↓
+                                </span>
+                                <span className="font-medium text-foreground/80">
+                                  {job.destinationCity}
+                                </span>
+                                {isCoach ? (
+                                  <span className="text-xs text-amber-400/90 font-semibold sm:ml-2">
+                                    • {stopsCount} Halte • {paxCount} Pax
+                                  </span>
+                                ) : job.cargoMass ? (
+                                  <span className="text-xs text-muted-foreground sm:ml-2">
+                                    • {job.cargoMass} Ton
+                                  </span>
+                                ) : null}
+                              </p>
+                            </div>
+                            <div className="text-center sm:text-right shrink-0 z-10 border-t sm:border-t-0 sm:border-l border-border/30 pt-4 sm:pt-0 sm:pl-6 mt-2 sm:mt-0 w-full sm:w-auto">
+                              <p className="text-sm text-muted-foreground mb-1">
+                                {job.completedAt
+                                  ? formatDistanceToNow(
+                                      new Date(job.completedAt),
+                                      {
+                                        addSuffix: true,
+                                        locale: localeId,
+                                      },
+                                    )
+                                  : "Baru saja"}
+                              </p>
+                              {(() => {
+                                const val =
+                                  typeof job.revenue === "number"
+                                    ? job.revenue
+                                    : (job.nc?.total ?? 0);
+                                return (
+                                  <p
+                                    className={`font-black text-xl ${
+                                      val < 0
+                                        ? "text-red-400"
+                                        : val > 0
+                                          ? "text-primary"
+                                          : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {val > 0 ? "+" : ""}
+                                    {formatNum(val)} NC
+                                  </p>
+                                );
+                              })()}
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-10 text-muted-foreground bg-background/30 rounded-xl border border-dashed border-border">

@@ -29,7 +29,13 @@ const jobHistorySchema = new mongoose.Schema(
     game: String, // ETS2 / ATS
     gameMode: String, // truckersmp / sp / haulmp
     statsType: String,
-    marketType: String, // cargo market / freight market
+    marketType: String, // cargo market / freight market / Bus Company Job / Bus Tourist Job
+    jobCategory: {
+      type: String,
+      enum: ["truck", "coach"],
+      default: "truck",
+      index: true,
+    },
 
     // Job info
     sourceCity: String,
@@ -39,6 +45,28 @@ const jobHistorySchema = new mongoose.Schema(
     cargoId: String,
     cargoName: String,
     cargoMass: Number,
+    totalPassengers: { type: Number, default: 0 },
+    stops: {
+      type: [
+        new mongoose.Schema(
+          {
+            progressive: Number,
+            isLastStop: Boolean,
+            inGameId: String,
+            name: String,
+            type: String, // 'city' | 'viewpoints'
+            typeName: String, // 'City' | 'Viewpoints'
+            passengersIn: { type: Number, default: 0 },
+            passengersOut: { type: Number, default: 0 },
+            drivenDistanceKm: { type: Number, default: 0 },
+            inGameTimeEnd: Number,
+            realTimeEnd: Date,
+          },
+          { _id: false },
+        ),
+      ],
+      default: undefined,
+    },
     plannedDistanceKm: Number,
     distanceKm: Number,
     durationSeconds: Number,
@@ -165,6 +193,7 @@ const jobHistorySchema = new mongoose.Schema(
 
 // 🔒 Anti duplikasi
 jobHistorySchema.index({ guildId: 1, jobId: 1 }, { unique: true });
+jobHistorySchema.index({ jobCategory: 1, jobStatus: 1, createdAt: -1 });
 
 module.exports =
   mongoose.models.JobHistory || mongoose.model("JobHistory", jobHistorySchema);

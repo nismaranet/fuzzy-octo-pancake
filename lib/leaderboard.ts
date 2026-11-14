@@ -2,6 +2,7 @@ import clientPromise from "@/lib/mongodb";
 import { redis } from "@/lib/redis";
 import {
   LeaderboardCategory,
+  LeaderboardDivision,
   LeaderboardDriver,
   MyRankData,
   LeaderboardResult,
@@ -10,6 +11,7 @@ import {
 
 export type {
   LeaderboardCategory,
+  LeaderboardDivision,
   LeaderboardDriver,
   MyRankData,
   LeaderboardResult,
@@ -66,12 +68,13 @@ export async function getAvailableLeaderboardMonths(): Promise<string[]> {
 }
 
 /**
- * Mengambil data agregasi leaderboard berdasarkan kategori dan periode
+ * Mengambil data agregasi leaderboard berdasarkan kategori, periode, dan divisi
  */
 export async function getLeaderboardData(
   rawCategory?: string,
   rawPeriod?: string,
-  currentDiscordId?: string
+  currentDiscordId?: string,
+  rawDivision?: string
 ): Promise<LeaderboardResult> {
   const guildId = process.env.DISCORD_GUILD_ID || "863959415702028318";
   const validCategories: LeaderboardCategory[] = ["distance", "jobs", "mass", "nc"];
@@ -81,13 +84,20 @@ export async function getLeaderboardData(
     ? (rawCategory as LeaderboardCategory)
     : "distance";
 
+  const validDivisions: LeaderboardDivision[] = ["all", "truck", "coach"];
+  const division: LeaderboardDivision = validDivisions.includes(
+    rawDivision as LeaderboardDivision
+  )
+    ? (rawDivision as LeaderboardDivision)
+    : "all";
+
   let period = rawPeriod || "";
   if (!period) {
     const availableMonths = await getAvailableLeaderboardMonths();
     period = availableMonths[0] || "all";
   }
 
-  const cacheKey = `leaderboard:v4:data:${guildId}:${period}:${category}`;
+  const cacheKey = `leaderboard:v5:data:${guildId}:${period}:${division}:${category}`;
   let rankedDrivers: any[] = [];
 
   try {
@@ -129,7 +139,7 @@ export async function getLeaderboardData(
       }
     }
 
-    if (category === "nc") {
+    if (category === "nc" && division === "all") {
       // Agregasi dari currencyhistories (tipe: 'earn', guildId spesifik, hanya driver resmi)
       const matchFilter: Record<string, any> = {
         type: "earn",
@@ -200,6 +210,7 @@ export async function getLeaderboardData(
             role: "$user.role",
             truckyRank: "$user.truckyRank",
             isNismaraPlus: { $ifNull: ["$user.nismaraplus.status", false] },
+            nismaraPlusStartedAt: { $ifNull: ["$user.nismaraplus.startedAt", null] },
             topManager: "$user.topManager",
             isBooster: "$user.isBooster",
           },
@@ -214,25 +225,63 @@ export async function getLeaderboardData(
         guildId,
         driverId: { $in: validDiscordIds },
       };
-      if (startWib && endWib) {
-        matchFilter.$or = [
-          { completedAt: { $gte: startWib, $lt: endWib } },
-          {
-            completedAt: { $exists: false },
-            createdAt: { $gte: startWib, $lt: endWib },
-          },
-          {
-            completedAt: null,
-            createdAt: { $gte: startWib, $lt: endWib },
-          },
-        ];
+
+      const andConditions: Record<string, any>[] = [];
+
+      if (division === "coach") {
+        andConditions.push({
+          $or: [
+            { jobCategory: "coach" },
+            { marketType: { $in: ["bus_company_job", "bus_tourist_job"] } },
+          ],
+        });
+      } else if (division === "truck") {
+        andConditions.push({
+          jobCategory: { $ne: "coach" },
+          marketType: { $nin: ["bus_company_job", "bus_tourist_job"] },
+        });
       }
 
-      const sumField =
+      if (startWib && endWib) {
+        andConditions.push({
+          $or: [
+            { completedAt: { $gte: startWib, $lt: endWib } },
+            {
+              completedAt: { $exists: false },
+              createdAt: { $gte: startWib, $lt: endWib },
+            },
+            {
+              completedAt: null,
+              createdAt: { $gte: startWib, $lt: endWib },
+            },
+          ],
+        });
+      }
+
+      if (andConditions.length > 0) {
+        matchFilter.$and = andConditions;
+      }
+
+      const sumField: any =
         category === "distance"
           ? "$distanceKm"
           : category === "mass"
-          ? "$cargoMass"
+          ? division === "coach"
+            ? { $ifNull: ["$totalPassengers", 0] }
+            : { $ifNull: ["$cargoMass", 0] }
+          : category === "nc"
+          ? {
+              $cond: [
+                { $gt: [{ $ifNull: ["$nc.total", 0] }, 0] },
+                {
+                  $subtract: [
+                    { $ifNull: ["$nc.total", 0] },
+                    { $ifNull: ["$ncCost.total", 0] },
+                  ],
+                },
+                0,
+              ],
+            }
           : 1;
 
       const pipeline = [
@@ -295,6 +344,7 @@ export async function getLeaderboardData(
             role: "$user.role",
             truckyRank: "$user.truckyRank",
             isNismaraPlus: { $ifNull: ["$user.nismaraplus.status", false] },
+            nismaraPlusStartedAt: { $ifNull: ["$user.nismaraplus.startedAt", null] },
             topManager: "$user.topManager",
             isBooster: "$user.isBooster",
           },
@@ -323,6 +373,7 @@ export async function getLeaderboardData(
     role: d.role || null,
     truckyRank: d.truckyRank || null,
     isNismaraPlus: Boolean(d.isNismaraPlus),
+    nismaraPlusStartedAt: d.nismaraPlusStartedAt || null,
     score: Number(d.score || 0),
     isBooster: Boolean(d.isBooster),
     topManager: d.topManager || null,
@@ -367,6 +418,7 @@ export async function getLeaderboardData(
 
   return {
     category,
+    division,
     period,
     periodLabel: formatLeaderboardMonthLabel(period),
     top10,

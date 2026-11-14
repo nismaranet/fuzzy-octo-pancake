@@ -8,6 +8,8 @@ import {
   Route,
   TrendingUp,
   Truck,
+  Bus,
+  Package,
   Users,
   User,
   ChevronLeft,
@@ -22,9 +24,12 @@ export interface MonthlyJobStatItem {
   month: string; // Format: "YYYY-MM"
   game: "ETS2" | "ATS";
   gameMode: "truckersmp" | "haulmp" | "sp";
+  jobCategory?: "truck" | "coach";
   totalCompleted: number;
   totalCanceled: number;
   totalDistanceKm: number;
+  totalCargoMass?: number;
+  totalPassengers?: number;
 }
 
 interface DriverMonthlyJobAnalyticsProps {
@@ -95,11 +100,28 @@ export default function DriverMonthlyJobAnalytics({
     let completed = 0;
     let canceled = 0;
     let distance = 0;
+    let cargoMass = 0;
+    let passengers = 0;
+    let truckCompleted = 0;
+    let coachCompleted = 0;
+    let truckDistance = 0;
+    let coachDistance = 0;
 
     filtered.forEach((item) => {
-      completed += item.totalCompleted || 0;
+      const comp = item.totalCompleted || 0;
+      const dist = item.totalDistanceKm || 0;
+      completed += comp;
       canceled += item.totalCanceled || 0;
-      distance += item.totalDistanceKm || 0;
+      distance += dist;
+      cargoMass += item.totalCargoMass || 0;
+      passengers += item.totalPassengers || 0;
+      if (item.jobCategory === "coach") {
+        coachCompleted += comp;
+        coachDistance += dist;
+      } else {
+        truckCompleted += comp;
+        truckDistance += dist;
+      }
     });
 
     const totalJobs = completed + canceled;
@@ -109,6 +131,12 @@ export default function DriverMonthlyJobAnalytics({
       completed,
       canceled,
       distance: Math.round(distance),
+      cargoMass: Math.round(cargoMass),
+      passengers: Math.round(passengers),
+      truckCompleted,
+      coachCompleted,
+      truckDistance: Math.round(truckDistance),
+      coachDistance: Math.round(coachDistance),
       totalJobs,
       completionRate: Math.round(completionRate),
     };
@@ -323,6 +351,61 @@ export default function DriverMonthlyJobAnalytics({
               className="bg-gradient-to-r from-yellow-500 to-green-400 h-1.5 rounded-full transition-all duration-500"
               style={{ width: `${overallMetrics.completionRate}%` }}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Ringkasan Divisi Periode Terpilih (Truck vs Coach) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="glass-panel p-4 rounded-2xl border-sky-500/20 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-400">
+              <Truck className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Truck Logistics ({isAllTime ? "All-Time" : formatMonthLabel(selectedMonth)})
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {overallMetrics.truckCompleted.toLocaleString("id-ID")} Jobs •{" "}
+                {overallMetrics.truckDistance.toLocaleString("id-ID")} Km
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-black text-emerald-400">
+              {overallMetrics.cargoMass.toLocaleString("id-ID")}{" "}
+              <span className="text-xs font-semibold text-muted-foreground">Ton</span>
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Tonase Kargo
+            </p>
+          </div>
+        </div>
+
+        <div className="glass-panel p-4 rounded-2xl border-amber-500/20 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400">
+              <Bus className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Coach & Bus ({isAllTime ? "All-Time" : formatMonthLabel(selectedMonth)})
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {overallMetrics.coachCompleted.toLocaleString("id-ID")} Trip •{" "}
+                {overallMetrics.coachDistance.toLocaleString("id-ID")} Km
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-black text-amber-400">
+              {overallMetrics.passengers.toLocaleString("id-ID")}{" "}
+              <span className="text-xs font-semibold text-muted-foreground">Pax</span>
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Penumpang Diangkut
+            </p>
           </div>
         </div>
       </div>

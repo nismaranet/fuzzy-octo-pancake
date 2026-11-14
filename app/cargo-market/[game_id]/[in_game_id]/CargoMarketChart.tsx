@@ -57,7 +57,7 @@ export default function CargoMarketChart({
           margin={{ top: 20, right: 10, left: -20, bottom: 0 }}
         >
           <defs>
-            <linearGradient id="colorDemand" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`colorDemand-${themeColor}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={colorStr} stopOpacity={0.8} />
               <stop offset="95%" stopColor={colorStr} stopOpacity={0} />
             </linearGradient>
@@ -110,7 +110,7 @@ export default function CargoMarketChart({
             stroke={colorStr}
             strokeWidth={3}
             fillOpacity={1}
-            fill="url(#colorDemand)"
+            fill={`url(#colorDemand-${themeColor})`}
           />
         </AreaChart>
       </ResponsiveContainer>

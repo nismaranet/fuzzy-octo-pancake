@@ -7,6 +7,7 @@ export async function fetchJobs(
   tab: "ongoing" | "completed" | "canceled",
   skip: number,
   limit: number = 12,
+  category: "all" | "truck" | "coach" = "all",
 ) {
   const client = await clientPromise;
   const db = client.db();
@@ -27,6 +28,12 @@ export async function fetchJobs(
       jobStatus: { $ne: "CANCELED" },
       completedAt: { $exists: true },
     };
+  }
+
+  if (category === "coach") {
+    queryFilter.jobCategory = "coach";
+  } else if (category === "truck") {
+    queryFilter.jobCategory = { $ne: "coach" };
   }
 
   const rawJobs = await db
@@ -108,15 +115,30 @@ export async function fetchJobs(
       member?.avatar_url ||
       null;
 
+    const isCoachJob =
+      job.jobCategory === "coach" ||
+      job.cargoId === "Passengers" ||
+      job.cargoId === "bus_company_job" ||
+      job.cargoId === "bus_tourist_job" ||
+      String(job.marketType || "").toLowerCase().startsWith("bus") ||
+      String(job.statsType || "").toLowerCase().startsWith("coaches");
+
     return {
       _id: job._id.toString(),
       jobStatus: job.jobStatus,
       jobId: job.jobId,
       game: job.game,
+      jobCategory: isCoachJob ? "coach" : "truck",
+      marketType: job.marketType || "",
+      sourceCity: job.sourceCity || "",
+      destinationCity: job.destinationCity || "",
+      cargoName: job.cargoName || "",
+      totalPassengers: job.totalPassengers || 0,
+      stopsCount: Array.isArray(job.stops) ? job.stops.length : 0,
       driverName,
       avatarUrl,
       truckyId: job.truckyId,
-      distanceKm: job.distanceKm || 0,
+      distanceKm: job.distanceKm || job.plannedDistanceKm || 0,
       durationSeconds: job.durationSeconds || 0,
       createdAt: job.createdAt, // Untuk tab ongoing
       completedAt: job.completedAt || job.updatedAt,

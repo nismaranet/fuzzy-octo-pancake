@@ -7,6 +7,10 @@ import AppealButton from "./AppealButton";
 import {
   ArrowLeft,
   Truck,
+  Bus,
+  Users,
+  MapPin,
+  Compass,
   Navigation,
   Fuel,
   ShieldAlert,
@@ -96,6 +100,47 @@ export default async function JobDetailPage(props: {
   const isCompleted =
     localJob?.jobStatus === "COMPLETED" || details?.status === "completed";
 
+  const isCoach =
+    localJob?.jobCategory === "coach" ||
+    localJob?.cargoId === "Passengers" ||
+    localJob?.cargoId === "bus_company_job" ||
+    localJob?.cargoId === "bus_tourist_job" ||
+    String(details?.market || "").startsWith("bus_") ||
+    details?.cargo_id === "Passengers" ||
+    String(
+      details?.stats_type || details?.type || localJob?.statsType || "",
+    ).startsWith("coaches");
+
+  const rawStops =
+    Array.isArray(localJob?.stops) && localJob.stops.length > 0
+      ? localJob.stops
+      : Array.isArray(details?.stops)
+        ? details.stops.map((s: any) => ({
+            progressive: Number(s.progressive) || 0,
+            isLastStop: Boolean(s.is_last_stop),
+            inGameId: s.in_game_id || "",
+            name: s.name || "-",
+            type: s.type || "city",
+            typeName: s.type_name || "City",
+            passengersIn: Number(s.passengers_in) || 0,
+            passengersOut: Number(s.passengers_out) || 0,
+            drivenDistanceKm:
+              Number(s.driven_distance_km ?? s.driven_distance) || 0,
+            inGameTimeEnd: Number(s.in_game_time_end) || 0,
+            realTimeEnd: s.real_time_end ? new Date(s.real_time_end) : null,
+          }))
+        : [];
+
+  const stops = [...rawStops].sort(
+    (a: any, b: any) => (a.progressive || 0) - (b.progressive || 0),
+  );
+  const totalPassengers =
+    localJob?.totalPassengers ||
+    stops.reduce(
+      (sum: number, s: any) => sum + (Number(s.passengersIn) || 0),
+      0,
+    );
+
   const gameMode = localJob?.gameMode || "Unknown Lobby";
 
   // Check if there is an assigned trucky vehicle or Nismara fleet
@@ -140,11 +185,15 @@ export default async function JobDetailPage(props: {
     }
   }
 
-  // Kalkulasi Rata-rata Damage (Truk + Trailer + Kargo)
-  const vDamage = details?.vehicle_damage || 0;
-  const tDamage = details?.trailers_damage || 0;
-  const cDamage = details?.cargo_damage || 0;
-  const avgDamage = ((vDamage + tDamage + cDamage) / 3).toFixed(1);
+  // Kalkulasi Rata-rata Damage
+  const vDamage = details?.vehicle_damage ?? localJob?.damage?.vehicle ?? 0;
+  const tDamage = details?.trailers_damage ?? localJob?.damage?.trailer ?? 0;
+  const cDamage = details?.cargo_damage ?? localJob?.damage?.cargo ?? 0;
+  const avgDamage = (
+    isCoach && tDamage === 0
+      ? (vDamage + cDamage) / 2
+      : (vDamage + tDamage + cDamage) / 3
+  ).toFixed(1);
 
   // Prioritas Data Driver
   const truckyId = localJob?.truckyId || details?.user_id;
@@ -241,8 +290,17 @@ export default async function JobDetailPage(props: {
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Kembali ke Daftar Job
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <AppealButton jobId={jobId} driverId={discordId} />
+            {isCoach ? (
+              <div className="px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest bg-sky-500/15 text-sky-400 border-sky-500/30 flex items-center gap-1.5">
+                <Bus className="w-3.5 h-3.5" /> Coach / Bus
+              </div>
+            ) : (
+              <div className="px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest bg-orange-500/10 text-orange-400 border-orange-500/20 flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5" /> Truck Logistics
+              </div>
+            )}
             <div
               className={`px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${statusColor}`}
             >
@@ -338,11 +396,19 @@ export default async function JobDetailPage(props: {
             label={localJob?.statsType || "Distance"}
             value={`${(details?.real_distance || (isCompleted ? localJob?.distanceKm : localJob?.plannedDistanceKm) || 0).toLocaleString()} km`}
           />
-          <StatBox
-            icon={<Weight className="text-orange-500 dark:text-orange-400" />}
-            label="Weight"
-            value={`${localJob?.cargoMass || details?.cargo_weight || 0} T`}
-          />
+          {isCoach ? (
+            <StatBox
+              icon={<Users className="text-sky-500 dark:text-sky-400" />}
+              label="Passengers"
+              value={`${totalPassengers} Pax`}
+            />
+          ) : (
+            <StatBox
+              icon={<Weight className="text-orange-500 dark:text-orange-400" />}
+              label="Weight"
+              value={`${localJob?.cargoMass || details?.cargo_weight || 0} T`}
+            />
+          )}
           <StatBox
             icon={<Clock className="text-yellow-500 dark:text-yellow-400" />}
             label="Duration"
@@ -358,16 +424,141 @@ export default async function JobDetailPage(props: {
             label="Avg Damage"
             value={`${avgDamage}%`}
           />
-          <StatBox
-            icon={<CheckCircle className="text-primary" />}
-            label="Market"
-            value={localJob?.marketType?.split(" ")[0] || "-"}
-          />
+          {isCoach ? (
+            <StatBox
+              icon={<MapPin className="text-emerald-500 dark:text-emerald-400" />}
+              label="Stops / Halte"
+              value={stops.length > 0 ? `${stops.length} Titik` : "Direct"}
+            />
+          ) : (
+            <StatBox
+              icon={<CheckCircle className="text-primary" />}
+              label="Market"
+              value={localJob?.marketType?.split(" ")[0] || "-"}
+            />
+          )}
         </div>
 
         {/* --- MAIN CONTENT GRID --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
+            {/* --- COACH TRANSIT & STOPS TIMELINE --- */}
+            {isCoach && stops.length > 0 && (
+              <div className="glass-panel p-8 rounded-[2.5rem] border-sky-500/30 bg-card relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200 dark:border-white/5">
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground flex items-center gap-3">
+                      <Bus className="text-sky-500 w-5 h-5" /> Rute Transit &
+                      Pemberhentian Penumpang
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                       Urutan halte kota dan titik wisata (viewpoints) yang
+                      disinggahi selama perjalanan bus
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                      {stops.length} Halte
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      {totalPassengers} Total Pax
+                    </span>
+                  </div>
+                </div>
+
+                <div className="relative pl-6 space-y-4 before:absolute before:left-[11px] before:top-3 before:bottom-3 before:w-0.5 before:bg-sky-500/30">
+                  {stops.map((stop: any, idx: number) => {
+                    const isViewpoint =
+                      String(stop.type || "").toLowerCase() === "viewpoints" ||
+                      String(stop.typeName || "").toLowerCase() === "viewpoints";
+                    const isFirst = idx === 0;
+                    const isLast = Boolean(stop.isLastStop) || idx === stops.length - 1;
+
+                    return (
+                      <div
+                        key={`${stop.progressive || idx}-${stop.inGameId || stop.name}`}
+                        className="relative p-4 rounded-2xl border border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        {/* Timeline Dot */}
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 absolute -left-[21px] top-5 ${
+                            isFirst || isLast
+                              ? "bg-sky-500 border-sky-300 shadow-md shadow-sky-500/40"
+                              : isViewpoint
+                                ? "bg-amber-500 border-amber-300"
+                                : "bg-card border-sky-500"
+                          }`}
+                        />
+
+                        <div className="flex items-start gap-3">
+                          <div className="px-2 py-1 rounded-lg bg-sky-500/10 text-sky-400 font-black text-xs border border-sky-500/20 shrink-0">
+                            #{stop.progressive || idx + 1}
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-black text-sm text-foreground">
+                                {stop.name || "-"}
+                              </h4>
+                              <span
+                                className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border inline-flex items-center gap-1 ${
+                                  isViewpoint
+                                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                    : "bg-sky-500/15 text-sky-400 border-sky-500/30"
+                                }`}
+                              >
+                                {isViewpoint ? (
+                                  <Compass className="w-3 h-3" />
+                                ) : (
+                                  <MapPin className="w-3 h-3" />
+                                )}
+                                {stop.typeName || (isViewpoint ? "Viewpoints" : "City")}
+                              </span>
+                              {isFirst && (
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                                  Keberangkatan
+                                </span>
+                              )}
+                              {isLast && !isFirst && (
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                                  Terminal Akhir
+                                </span>
+                              )}
+                            </div>
+
+                            {stop.realTimeEnd && (
+                              <p className="text-[11px] text-slate-500 font-mono mt-1 flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Tiba:{" "}
+                                {formatWIB(stop.realTimeEnd)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          {Number(stop.passengersIn) > 0 && (
+                            <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              +{stop.passengersIn} Naik
+                            </span>
+                          )}
+                          {Number(stop.passengersOut) > 0 && (
+                            <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                              -{stop.passengersOut} Turun
+                            </span>
+                          )}
+                          {Number(stop.passengersIn) === 0 &&
+                            Number(stop.passengersOut) === 0 && (
+                              <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                Kunjungan Wisata
+                              </span>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* --- FINANCIAL & PENALTY BREAKDOWN --- */}
             {isCompleted && (
               <>
@@ -734,7 +925,7 @@ export default async function JobDetailPage(props: {
 
             <div className="glass-panel p-8 rounded-[2.5rem] border-slate-200 dark:border-white/5 bg-card">
               <h3 className="text-lg font-bold text-foreground mb-6">
-                Detail Kendaraan
+                {isCoach ? "Detail Armada Bus" : "Detail Kendaraan"}
               </h3>
               <div className="space-y-4">
                 {internalFleet ? (
@@ -756,7 +947,7 @@ export default async function JobDetailPage(props: {
                 ) : (
                   <DetailItem
                     label="Kendaraan"
-                    value={`${details?.vehicle_brand_name || "-"} ${details?.vehicle_model_name || ""}`}
+                    value={`${details?.vehicle_brand_name || localJob?.vehicle?.brand || "-"} ${details?.vehicle_model_name || localJob?.vehicle?.model || ""}`}
                   />
                 )}
                 <DetailItem
@@ -769,9 +960,25 @@ export default async function JobDetailPage(props: {
                 />
                 <div className="flex flex-col mb-4">
                   <span className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">
-                    Kargo
+                    {isCoach ? "Layanan & Tarif Penumpang" : "Kargo"}
                   </span>
-                  {details?.game_id && details?.cargo_id ? (
+                  {isCoach ? (
+                    <Link
+                      href="/coach-terminal"
+                      className="text-sky-400 hover:underline font-bold text-sm w-fit flex items-center gap-1.5"
+                    >
+                      <Bus className="w-4 h-4" />
+                      {localJob?.marketType ||
+                        (details?.market === "bus_tourist_job"
+                          ? "Bus Tourist Job"
+                          : "Bus Company Job")}{" "}
+                      {localJob?.lockedCargoPrice && (
+                        <span className="text-muted-foreground font-medium">
+                          ({localJob.lockedCargoPrice} NC/km)
+                        </span>
+                      )}
+                    </Link>
+                  ) : details?.game_id && details?.cargo_id ? (
                     <Link
                       href={`/cargo-market/${details.game_id}/${details.cargo_id}`}
                       className="text-primary hover:underline font-medium text-sm w-fit flex items-center gap-1"
@@ -803,7 +1010,7 @@ export default async function JobDetailPage(props: {
                   </h4>
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-600 dark:text-gray-400 font-medium">
-                      Truk Utama
+                      {isCoach ? "Bus Utama" : "Truk Utama"}
                     </span>
                     <span
                       className={`${vDamage > 0 ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"} font-bold`}
@@ -811,19 +1018,21 @@ export default async function JobDetailPage(props: {
                       {vDamage}%
                     </span>
                   </div>
+                  {(!isCoach || tDamage > 0) && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-gray-400 font-medium">
+                        Trailer
+                      </span>
+                      <span
+                        className={`${tDamage > 0 ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"} font-bold`}
+                      >
+                        {tDamage}%
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-600 dark:text-gray-400 font-medium">
-                      Trailer
-                    </span>
-                    <span
-                      className={`${tDamage > 0 ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"} font-bold`}
-                    >
-                      {tDamage}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-600 dark:text-gray-400 font-medium">
-                      Muatan (Cargo)
+                      {isCoach ? "Penumpang (Comfort)" : "Muatan (Cargo)"}
                     </span>
                     <span
                       className={`${cDamage > 0 ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"} font-bold`}

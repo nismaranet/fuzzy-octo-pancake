@@ -16,13 +16,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = (searchParams.get("category") || "distance") as LeaderboardCategory;
     const period = searchParams.get("period") || "";
+    const division = searchParams.get("division") || "all";
 
     const session = await getServerSession(authOptions);
     const currentDiscordId = session?.user?.discordId ? String(session.user.discordId) : undefined;
 
     const [availableMonths, leaderboard] = await Promise.all([
       getAvailableLeaderboardMonths(),
-      getLeaderboardData(category, period, currentDiscordId),
+      getLeaderboardData(category, period, currentDiscordId, division),
     ]);
 
     return NextResponse.json(

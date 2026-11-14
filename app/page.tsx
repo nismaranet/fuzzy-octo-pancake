@@ -16,6 +16,12 @@ import {
   ShieldCheck,
   Trophy,
   Truck,
+  Bus,
+  Users,
+  Coins,
+  Weight,
+  Route,
+  Package,
   Zap,
   Calendar,
   Star,
@@ -48,8 +54,7 @@ export default async function Home() {
   // 1. Fetch Real Data Secara Paralel
   const [
     totalDrivers,
-    completedJobs,
-    kmStats,
+    telemetryBreakdown,
     ncStats,
     activeEvents,
     activeContracts,
@@ -61,16 +66,112 @@ export default async function Home() {
   ] = await Promise.all([
     // All-time Stats
     db.collection("driverlinks").countDocuments({ guildId }),
-    db
-      .collection("jobhistories")
-      .countDocuments({ guildId, jobStatus: "COMPLETED" }),
-    db
-      .collection("jobhistories")
-      .aggregate([
-        { $match: { guildId, jobStatus: "COMPLETED" } },
-        { $group: { _id: null, total: { $sum: "$distanceKm" } } },
-      ])
-      .toArray(),
+    (async () => {
+      const cacheKey = "homepage:telemetry_breakdown_v1";
+      const cached = await redis.get(cacheKey).catch(() => null);
+      if (cached) return JSON.parse(cached);
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const netNcExpr = {
+        $cond: [
+          { $gt: [{ $ifNull: ["$nc.total", 0] }, 0] },
+          {
+            $subtract: [
+              { $ifNull: ["$nc.total", 0] },
+              { $ifNull: ["$ncCost.total", 0] },
+            ],
+          },
+          0,
+        ],
+      };
+
+      const rows = await db
+        .collection("jobhistories")
+        .aggregate([
+          {
+            $match: {
+              ...(guildId ? { guildId } : {}),
+              jobStatus: "COMPLETED",
+            },
+          },
+          {
+            $group: {
+              _id: {
+                cat: {
+                  $cond: [{ $eq: ["$jobCategory", "coach"] }, "coach", "truck"],
+                },
+                game: {
+                  $cond: [
+                    {
+                      $or: [
+                        { $eq: ["$gameId", "2"] },
+                        { $eq: ["$game", "American Truck Simulator"] },
+                      ],
+                    },
+                    "ats",
+                    "ets2",
+                  ],
+                },
+              },
+              allJobs: { $sum: 1 },
+              allKm: { $sum: { $ifNull: ["$distanceKm", 0] } },
+              allMass: { $sum: { $ifNull: ["$cargoMass", 0] } },
+              allPax: { $sum: { $ifNull: ["$totalPassengers", 0] } },
+              allNc: { $sum: netNcExpr },
+              monthJobs: {
+                $sum: {
+                  $cond: [{ $gte: ["$completedAt", startOfMonth] }, 1, 0],
+                },
+              },
+              monthKm: {
+                $sum: {
+                  $cond: [
+                    { $gte: ["$completedAt", startOfMonth] },
+                    { $ifNull: ["$distanceKm", 0] },
+                    0,
+                  ],
+                },
+              },
+              monthMass: {
+                $sum: {
+                  $cond: [
+                    { $gte: ["$completedAt", startOfMonth] },
+                    { $ifNull: ["$cargoMass", 0] },
+                    0,
+                  ],
+                },
+              },
+              monthPax: {
+                $sum: {
+                  $cond: [
+                    { $gte: ["$completedAt", startOfMonth] },
+                    { $ifNull: ["$totalPassengers", 0] },
+                    0,
+                  ],
+                },
+              },
+              monthNc: {
+                $sum: {
+                  $cond: [
+                    { $gte: ["$completedAt", startOfMonth] },
+                    netNcExpr,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ])
+        .toArray();
+
+      await redis
+        .setex(cacheKey, 600, JSON.stringify(rows))
+        .catch(() => null);
+      return rows;
+    })(),
     db
       .collection("currencies")
       .aggregate([
@@ -255,9 +356,82 @@ export default async function Home() {
     })(),
   ]);
 
-  const totalKm = kmStats[0]?.total || 0;
-  const totalNC = ncStats[0]?.total || 0;
+  // Kalkulasi agregat Game (ETS2 vs ATS) & Divisi (Truck Logistics vs Bus/Coach)
+  const gameTelemetry = {
+    ets2: { allJobs: 0, allKm: 0, monthJobs: 0, monthKm: 0 },
+    ats: { allJobs: 0, allKm: 0, monthJobs: 0, monthKm: 0 },
+  };
+  const divisionTelemetry = {
+    truck: {
+      allJobs: 0,
+      allKm: 0,
+      allMass: 0,
+      allNc: 0,
+      monthJobs: 0,
+      monthKm: 0,
+      monthMass: 0,
+      monthNc: 0,
+    },
+    coach: {
+      allJobs: 0,
+      allKm: 0,
+      allPax: 0,
+      allNc: 0,
+      monthJobs: 0,
+      monthKm: 0,
+      monthPax: 0,
+      monthNc: 0,
+    },
+  };
+
+  for (const row of telemetryBreakdown || []) {
+    const g = row._id?.game === "ats" ? "ats" : "ets2";
+    const c = row._id?.cat === "coach" ? "coach" : "truck";
+
+    gameTelemetry[g].allJobs += row.allJobs || 0;
+    gameTelemetry[g].allKm += Math.round(row.allKm || 0);
+    gameTelemetry[g].monthJobs += row.monthJobs || 0;
+    gameTelemetry[g].monthKm += Math.round(row.monthKm || 0);
+
+    if (c === "coach") {
+      divisionTelemetry.coach.allJobs += row.allJobs || 0;
+      divisionTelemetry.coach.allKm += Math.round(row.allKm || 0);
+      divisionTelemetry.coach.allPax += Math.round(row.allPax || 0);
+      divisionTelemetry.coach.allNc += Math.round(row.allNc || 0);
+      divisionTelemetry.coach.monthJobs += row.monthJobs || 0;
+      divisionTelemetry.coach.monthKm += Math.round(row.monthKm || 0);
+      divisionTelemetry.coach.monthPax += Math.round(row.monthPax || 0);
+      divisionTelemetry.coach.monthNc += Math.round(row.monthNc || 0);
+    } else {
+      divisionTelemetry.truck.allJobs += row.allJobs || 0;
+      divisionTelemetry.truck.allKm += Math.round(row.allKm || 0);
+      divisionTelemetry.truck.allMass += Math.round(row.allMass || 0);
+      divisionTelemetry.truck.allNc += Math.round(row.allNc || 0);
+      divisionTelemetry.truck.monthJobs += row.monthJobs || 0;
+      divisionTelemetry.truck.monthKm += Math.round(row.monthKm || 0);
+      divisionTelemetry.truck.monthMass += Math.round(row.monthMass || 0);
+      divisionTelemetry.truck.monthNc += Math.round(row.monthNc || 0);
+    }
+  }
+
+  const completedJobs =
+    divisionTelemetry.truck.allJobs + divisionTelemetry.coach.allJobs;
+  const totalKm =
+    divisionTelemetry.truck.allKm + divisionTelemetry.coach.allKm;
+  const totalNC = Math.round(ncStats[0]?.total || 0);
   const finalTotalDrivers = companyDetails?.members_count ?? totalDrivers;
+
+  // Bulan ini per game (gunakan Trucky API jika tersedia, fallback ke agregasi DB lokal)
+  const ets2MonthJobs =
+    monthlyStats?.ets2?.jobs_completed ?? gameTelemetry.ets2.monthJobs;
+  const ets2MonthKm =
+    (monthlyStats?.ets2?.real_km || 0) + (monthlyStats?.ets2?.race_km || 0) ||
+    gameTelemetry.ets2.monthKm;
+  const atsMonthJobs =
+    monthlyStats?.ats?.jobs_completed ?? gameTelemetry.ats.monthJobs;
+  const atsMonthKm =
+    (monthlyStats?.ats?.real_km || 0) + (monthlyStats?.ats?.race_km || 0) ||
+    gameTelemetry.ats.monthKm;
 
   const hasLiveOps = activeEvents.length > 0 || activeContracts.length > 0;
   const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, "-");
@@ -413,70 +587,72 @@ export default async function Home() {
             <h2 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight">
               Pencapaian Komunitas
             </h2>
+            <p className="text-muted-foreground mt-3 max-w-2xl mx-auto text-sm md:text-base">
+              Rekapitulasi performa pengiriman kargo logistik dan layanan bus penumpang di seluruh jaringan operasional Nismara Transport.
+            </p>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 divide-y lg:divide-y-0 lg:divide-x divide-border/20">
-            {/* Bulan Ini (Trucky API) */}
-            <div className="space-y-10 lg:pr-8">
-              <h3 className="text-xl font-bold text-foreground/80 text-center uppercase tracking-widest border-b border-border/10 pb-4">
-                Bulan Ini{" "}
-                {monthlyStats?.month
-                  ? `(${monthlyStats.month}/${monthlyStats.year})`
-                  : ""}
-              </h3>
+          {/* TIER 1: STATISTIK PER GAME (ETS2 & ATS — BULAN INI VS SEPANJANG WAKTU) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Bulan Ini (Per Game) */}
+            <div className="glass-panel p-8 rounded-3xl border border-border/50 bg-card/60 space-y-8">
+              <div className="flex items-center justify-between border-b border-border/20 pb-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-primary block">
+                    Periode Berjalan
+                  </span>
+                  <h3 className="text-xl font-black text-foreground uppercase tracking-wider">
+                    Statistik Game — Bulan Ini{" "}
+                    {monthlyStats?.month
+                      ? `(${monthlyStats.month}/${monthlyStats.year})`
+                      : ""}
+                  </h3>
+                </div>
+                <Calendar className="w-5 h-5 text-primary" />
+              </div>
 
-              <div className="grid grid-cols-2 gap-8 text-center">
-                {/* ETS2 */}
-                <ScrollReveal delay={0.1} className="space-y-6">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold border border-blue-500/20">
+              <div className="grid grid-cols-2 gap-6 text-center divide-x divide-border/20">
+                {/* ETS2 Bulan Ini */}
+                <ScrollReveal delay={0.1} className="space-y-5 pr-2">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-black border border-blue-500/20">
                     ETS2
                   </div>
                   <div>
-                    <p className="text-4xl font-black text-gradient mb-2">
-                      {monthlyStats?.ets2?.jobs_completed?.toLocaleString(
-                        "id-ID",
-                      ) || 0}
+                    <p className="text-3xl md:text-4xl font-black text-gradient mb-1">
+                      {ets2MonthJobs.toLocaleString("id-ID")}
                     </p>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                      Pengiriman
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                      Pengiriman Selesai
                     </p>
                   </div>
                   <div>
-                    <p className="text-4xl font-black text-gradient mb-2">
-                      {(
-                        (monthlyStats?.ets2?.real_km || 0) +
-                        (monthlyStats?.ets2?.race_km || 0)
-                      ).toLocaleString("id-ID")}
+                    <p className="text-2xl md:text-3xl font-black text-foreground mb-1">
+                      {ets2MonthKm.toLocaleString("id-ID")}
                     </p>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
                       KM Tempuh
                     </p>
                   </div>
                 </ScrollReveal>
 
-                {/* ATS */}
-                <ScrollReveal delay={0.2} className="space-y-6">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 text-red-400 text-xs font-bold border border-red-500/20">
+                {/* ATS Bulan Ini */}
+                <ScrollReveal delay={0.2} className="space-y-5 pl-2">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-red-500/10 text-red-400 text-xs font-black border border-red-500/20">
                     ATS
                   </div>
                   <div>
-                    <p className="text-4xl font-black text-gradient mb-2">
-                      {monthlyStats?.ats?.jobs_completed?.toLocaleString(
-                        "id-ID",
-                      ) || 0}
+                    <p className="text-3xl md:text-4xl font-black text-gradient mb-1">
+                      {atsMonthJobs.toLocaleString("id-ID")}
                     </p>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                      Pengiriman
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                      Pengiriman Selesai
                     </p>
                   </div>
                   <div>
-                    <p className="text-4xl font-black text-gradient mb-2">
-                      {(
-                        (monthlyStats?.ats?.real_km || 0) +
-                        (monthlyStats?.ats?.race_km || 0)
-                      ).toLocaleString("id-ID")}
+                    <p className="text-2xl md:text-3xl font-black text-foreground mb-1">
+                      {atsMonthKm.toLocaleString("id-ID")}
                     </p>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
                       KM Tempuh
                     </p>
                   </div>
@@ -484,47 +660,392 @@ export default async function Home() {
               </div>
             </div>
 
-            {/* Sepanjang Waktu */}
-            <div className="space-y-10 lg:pl-8 pt-12 lg:pt-0">
-              <h3 className="text-xl font-bold text-foreground/80 text-center uppercase tracking-widest border-b border-border/10 pb-4">
-                Sepanjang Waktu
-              </h3>
-              <div className="grid grid-cols-2 gap-8 text-center">
-                <ScrollReveal delay={0.1}>
-                  <p className="text-4xl font-black text-gradient mb-2">
-                    {completedJobs.toLocaleString("id-ID")}
-                  </p>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                    Total Pengiriman
-                  </p>
+            {/* Sepanjang Waktu / All-Time (Per Game) */}
+            <div className="glass-panel p-8 rounded-3xl border border-border/50 bg-card/60 space-y-8">
+              <div className="flex items-center justify-between border-b border-border/20 pb-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-accent-sky block">
+                    Akumulasi Historis
+                  </span>
+                  <h3 className="text-xl font-black text-foreground uppercase tracking-wider">
+                    Statistik Game — All-Time
+                  </h3>
+                </div>
+                <Trophy className="w-5 h-5 text-accent-sky" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 text-center divide-x divide-border/20">
+                {/* ETS2 All-Time */}
+                <ScrollReveal delay={0.15} className="space-y-5 pr-2">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-black border border-blue-500/20">
+                    ETS2
+                  </div>
+                  <div>
+                    <p className="text-3xl md:text-4xl font-black text-gradient mb-1">
+                      {gameTelemetry.ets2.allJobs.toLocaleString("id-ID")}
+                    </p>
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                      Total Pengiriman
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-2xl md:text-3xl font-black text-foreground mb-1">
+                      {gameTelemetry.ets2.allKm.toLocaleString("id-ID")}
+                    </p>
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                      Total KM Tempuh
+                    </p>
+                  </div>
                 </ScrollReveal>
-                <ScrollReveal delay={0.2}>
-                  <p className="text-4xl font-black text-gradient mb-2">
-                    {totalKm.toLocaleString("id-ID")}
-                  </p>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                    Total KM Tempuh
-                  </p>
-                </ScrollReveal>
-                <ScrollReveal delay={0.3}>
-                  <p className="text-4xl font-black text-gradient mb-2">
-                    {finalTotalDrivers}
-                  </p>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                    Total Anggota
-                  </p>
-                </ScrollReveal>
-                <ScrollReveal delay={0.4}>
-                  <p className="text-4xl font-black text-gradient mb-2">
-                    {totalNC.toLocaleString("id-ID")}
-                  </p>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                    NC Beredar
-                  </p>
+
+                {/* ATS All-Time */}
+                <ScrollReveal delay={0.25} className="space-y-5 pl-2">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-red-500/10 text-red-400 text-xs font-black border border-red-500/20">
+                    ATS
+                  </div>
+                  <div>
+                    <p className="text-3xl md:text-4xl font-black text-gradient mb-1">
+                      {gameTelemetry.ats.allJobs.toLocaleString("id-ID")}
+                    </p>
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                      Total Pengiriman
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-2xl md:text-3xl font-black text-foreground mb-1">
+                      {gameTelemetry.ats.allKm.toLocaleString("id-ID")}
+                    </p>
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                      Total KM Tempuh
+                    </p>
+                  </div>
                 </ScrollReveal>
               </div>
             </div>
           </div>
+
+          {/* TIER 2: DIVISI LOGISTICS (TRUCK) VS COACH (BUS) — BULAN INI & ALL-TIME */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Divisi Logistics & Kargo (Truck) */}
+            <ScrollReveal
+              delay={0.1}
+              className="glass-panel p-8 rounded-3xl border border-orange-500/30 bg-gradient-to-br from-orange-500/5 via-card/60 to-card/60 flex flex-col justify-between space-y-6"
+            >
+              <div className="flex items-center justify-between border-b border-border/20 pb-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+                    <Truck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">
+                      Kargo & Kontainer • ETS2 & ATS
+                    </span>
+                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight">
+                      Divisi Truck Logistics
+                    </h3>
+                  </div>
+                </div>
+                <Link
+                  href="/cargo-market"
+                  className="text-xs font-bold text-orange-400 hover:underline flex items-center gap-1"
+                >
+                  Cargo Market <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Pengiriman Selesai */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Package className="w-4 h-4 text-orange-400" /> Pengiriman Selesai
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-orange-400">
+                        {divisionTelemetry.truck.monthJobs.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.truck.allJobs.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Jarak Tempuh */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Route className="w-4 h-4 text-orange-400" /> Jarak Tempuh (KM)
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-orange-400">
+                        {divisionTelemetry.truck.monthKm.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.truck.allKm.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tonase Kargo */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Weight className="w-4 h-4 text-orange-400" /> Total Tonase (Ton)
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-orange-400">
+                        {divisionTelemetry.truck.monthMass.toLocaleString("id-ID")}{" "}
+                        <span className="text-xs font-bold">T</span>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.truck.allMass.toLocaleString("id-ID")}{" "}
+                        <span className="text-xs font-bold text-muted-foreground">
+                          T
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Penghasilan NC */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Coins className="w-4 h-4 text-orange-400" /> Penghasilan (NC)
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-orange-400">
+                        {divisionTelemetry.truck.monthNc.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.truck.allNc.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            {/* Divisi Coach / Bus (Penumpang) */}
+            <ScrollReveal
+              delay={0.2}
+              className="glass-panel p-8 rounded-3xl border border-sky-500/30 bg-gradient-to-br from-sky-500/5 via-card/60 to-card/60 flex flex-col justify-between space-y-6"
+            >
+              <div className="flex items-center justify-between border-b border-border/20 pb-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+                    <Bus className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">
+                      Intercity Transit & Tourist • ETS2 Coaches
+                    </span>
+                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight">
+                      Divisi Coach & Bus
+                    </h3>
+                  </div>
+                </div>
+                <Link
+                  href="/coach-terminal"
+                  className="text-xs font-bold text-sky-400 hover:underline flex items-center gap-1"
+                >
+                  Coach Terminal <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Perjalanan Selesai */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Bus className="w-4 h-4 text-sky-400" /> Perjalanan Selesai
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-sky-400">
+                        {divisionTelemetry.coach.monthJobs.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.coach.allJobs.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Jarak Tempuh */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Route className="w-4 h-4 text-sky-400" /> Jarak Tempuh (KM)
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-sky-400">
+                        {divisionTelemetry.coach.monthKm.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.coach.allKm.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Penumpang (Pax) — menggantikan Tonase */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Users className="w-4 h-4 text-emerald-400" /> Penumpang (Pax)
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-emerald-400">
+                        {divisionTelemetry.coach.monthPax.toLocaleString("id-ID")}{" "}
+                        <span className="text-xs font-bold">Pax</span>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.coach.allPax.toLocaleString("id-ID")}{" "}
+                        <span className="text-xs font-bold text-muted-foreground">
+                          Pax
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Penghasilan NC */}
+                <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    <Coins className="w-4 h-4 text-sky-400" /> Penghasilan (NC)
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        Bulan Ini
+                      </span>
+                      <span className="text-xl font-black text-sky-400">
+                        {divisionTelemetry.coach.monthNc.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                        All-Time
+                      </span>
+                      <span className="text-2xl font-black text-foreground">
+                        {divisionTelemetry.coach.allNc.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+          </div>
+
+          {/* TIER 3: SIRKULASI EKONOMI NISMARA COINS (NC BEREDAR) & TOTAL KOMUNITAS */}
+          <ScrollReveal
+            direction="up"
+            className="glass-panel p-8 md:p-10 rounded-3xl border border-primary/30 bg-gradient-to-r from-primary/10 via-card/80 to-accent-sky/10 shadow-xl"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-center text-center md:text-left divide-y md:divide-y-0 md:divide-x divide-border/30">
+              <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-5 md:pr-6">
+                <div className="w-16 h-16 rounded-2xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary shrink-0 shadow-lg shadow-primary/20">
+                  <Coins className="w-8 h-8" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-primary block mb-1">
+                    Sirkulasi Ekonomi Komunitas
+                  </span>
+                  <p className="text-3xl md:text-5xl font-black text-gradient tracking-tight">
+                    {totalNC.toLocaleString("id-ID")}{" "}
+                    <span className="text-lg font-bold text-foreground/70">
+                      NC
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">
+                    Total Nismara Coins yang saat ini beredar di seluruh dompet pengemudi aktif
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-6 md:pt-0 md:px-6 text-center">
+                <p className="text-3xl font-black text-foreground mb-1">
+                  {completedJobs.toLocaleString("id-ID")}
+                </p>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                  Total Perjalanan Gabungan
+                </p>
+                <p className="text-[11px] text-primary font-semibold mt-1">
+                  {totalKm.toLocaleString("id-ID")} KM Ditempuh
+                </p>
+              </div>
+
+              <div className="pt-6 md:pt-0 md:pl-6 text-center">
+                <p className="text-3xl font-black text-foreground mb-1">
+                  {finalTotalDrivers.toLocaleString("id-ID")}
+                </p>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                  Total Anggota Resmi
+                </p>
+                <p className="text-[11px] text-accent-sky font-semibold mt-1">
+                  Driver Terdaftar VTC
+                </p>
+              </div>
+            </div>
+          </ScrollReveal>
 
           {/* Top 3 Drivers This Month */}
           {top3Drivers && top3Drivers.length > 0 && (

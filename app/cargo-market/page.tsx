@@ -1,6 +1,6 @@
 import React from "react";
 import clientPromise from "@/lib/mongodb";
-import { PackageOpen, Coins, Search, ChevronLeft, ChevronRight, AlertTriangle, ShieldAlert, Diamond, Scale, TrendingUp, TrendingDown, Filter } from "lucide-react";
+import { PackageOpen, Coins, Search, ChevronLeft, ChevronRight, AlertTriangle, ShieldAlert, Diamond, Scale, TrendingUp, TrendingDown, Filter, Bus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -60,8 +60,12 @@ export default async function CargoMarketPage({
   const client = await clientPromise;
   const db = client.db();
 
-  // Build query
-  const query: any = {};
+  // Build query (exclude disabled items & Coach fares)
+  const query: any = {
+    enabled: { $ne: false },
+    category: { $ne: "coach" },
+    in_game_id: { $nin: ["Passengers", "bus_company_job", "bus_tourist_job"] },
+  };
   if (q) {
     query.name = { $regex: q, $options: "i" };
   }
@@ -102,10 +106,25 @@ export default async function CargoMarketPage({
                   Katalog Kargo
                 </h1>
                 <p className="text-muted-foreground font-bold uppercase tracking-widest mt-2 text-xs">
-                  Ensiklopedia Resmi Kargo Nismara
+                  Ensiklopedia Resmi Kargo Nismara • Update Otomatis Setiap 2 Jam
                 </p>
               </div>
             </div>
+
+            <Link
+              href="/coach-terminal"
+              className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 transition-all shadow-lg"
+            >
+              <Bus size={20} />
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest leading-tight">
+                  Coach Terminal
+                </p>
+                <p className="text-[10px] text-muted-foreground font-semibold">
+                  Cek Tarif Penumpang Bus →
+                </p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
