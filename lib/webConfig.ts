@@ -219,7 +219,15 @@ export async function getWebConfig(forceRefresh = false): Promise<WebConfig> {
     return memCache.value;
   }
 
-  if (!forceRefresh) {
+  const hasRedis = Boolean(process.env.REDIS_URL?.trim());
+  const hasMongo = Boolean(process.env.MONGODB_URI?.trim());
+
+  // Build-time (Docker/CI) tanpa koneksi DB/Redis: langsung kembalikan default env dalam 0ms
+  if (!hasRedis && !hasMongo) {
+    return getEnvWebConfigDefaults();
+  }
+
+  if (!forceRefresh && hasRedis) {
     try {
       const cached = await redis.get(REDIS_KEY);
       if (cached) {
@@ -232,6 +240,10 @@ export async function getWebConfig(forceRefresh = false): Promise<WebConfig> {
     }
   }
 
+  if (!hasMongo) {
+    return getEnvWebConfigDefaults();
+  }
+
   try {
     const client = await clientPromise;
     const doc = await client
@@ -241,7 +253,9 @@ export async function getWebConfig(forceRefresh = false): Promise<WebConfig> {
 
     const merged = mergeConfig(doc?.value);
     memCache = { value: merged, expiresAt: now + MEM_TTL_MS };
-    await redis.set(REDIS_KEY, JSON.stringify(merged), "EX", REDIS_TTL_SECONDS).catch(() => null);
+    if (hasRedis) {
+      await redis.set(REDIS_KEY, JSON.stringify(merged), "EX", REDIS_TTL_SECONDS).catch(() => null);
+    }
     return merged;
   } catch {
     return getEnvWebConfigDefaults();
@@ -250,7 +264,9 @@ export async function getWebConfig(forceRefresh = false): Promise<WebConfig> {
 
 export async function invalidateWebConfigCache(): Promise<void> {
   memCache = null;
-  await redis.del(REDIS_KEY).catch(() => null);
+  if (process.env.REDIS_URL?.trim()) {
+    await redis.del(REDIS_KEY).catch(() => null);
+  }
 }
 
 /**
