@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { deleteFileFromR2 } from "@/lib/r2";
 import { revalidatePath } from "next/cache";
+import { getWebConfig } from "@/lib/webConfig";
 
 import dbConnect from "@/lib/mongoose";
 
@@ -164,10 +165,11 @@ export async function PUT(
       try {
         const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
         const GUILD_ID = process.env.DISCORD_GUILD_ID;
+        const webConfig = await getWebConfig();
         const CATEGORY_ID =
-          process.env.DISCORD_TICKET_CATEGORY_ID ||
-          process.env.DISCORD_PLUS_CATEGORY_ID;
-        const MANAGER_ROLE_ID = process.env.DISCORD_MANAGER_ROLE_ID;
+          webConfig.discordChannels.ticketCategoryId ||
+          webConfig.discordChannels.plusCategoryId;
+        const MANAGER_ROLE_ID = webConfig.discordRoles.managerRoleId;
 
         const safeUsername =
           session.user.name?.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() ||

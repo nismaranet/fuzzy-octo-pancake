@@ -1,6 +1,7 @@
+import { getWebConfig } from "@/lib/webConfig";
+
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID || process.env.GUILD_ID || "863959415702028318";
-const MANAGER_ROLE_ID = process.env.DISCORD_MANAGER_ROLE_ID || "863968603681325066";
 
 /**
  * Membuat text channel baru di Discord di bawah kategori tertentu
@@ -10,7 +11,7 @@ export async function createDiscordTicketChannel({
   categoryId,
   channelName,
   userDiscordId,
-  managerRoleId = MANAGER_ROLE_ID,
+  managerRoleId,
 }: {
   guildId?: string;
   categoryId: string;
@@ -22,6 +23,9 @@ export async function createDiscordTicketChannel({
     console.error("DISCORD_BOT_TOKEN is missing in environment variables");
     return null;
   }
+
+  const resolvedManagerRoleId =
+    managerRoleId || (await getWebConfig()).discordRoles.managerRoleId;
 
   try {
     const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
@@ -45,10 +49,10 @@ export async function createDiscordTicketChannel({
             type: 1, // member
             allow: "68608", // VIEW_CHANNEL + SEND_MESSAGES + READ_MESSAGE_HISTORY
           },
-          ...(managerRoleId
+          ...(resolvedManagerRoleId
             ? [
                 {
-                  id: managerRoleId,
+                  id: resolvedManagerRoleId,
                   type: 0, // role
                   allow: "68608",
                 },

@@ -12,6 +12,7 @@ import {
   getSeasonPassFeatureStatus,
 } from "@/lib/seasonPass";
 import { revalidatePath } from "next/cache";
+import { getWebConfig } from "@/lib/webConfig";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -152,9 +153,10 @@ export async function POST(request: Request) {
     const username = session.user.name || "driver";
     const guildId = process.env.DISCORD_GUILD_ID;
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const categoryId = process.env.DISCORD_PLUS_CATEGORY_ID;
-    const owner1 = process.env.OWNER_DISCORD_ID || "338418945620967434";
-    const owner2 = process.env.NISMARA_OWNER_DISCORD_ID || "560419724249530369";
+    const webConfig = await getWebConfig();
+    const categoryId = webConfig.discordChannels.plusCategoryId;
+    const owner1 = webConfig.owners.developerDiscordId;
+    const owner2 = webConfig.owners.nismaraOwnerDiscordId;
 
     let createdChannelId: string | undefined = undefined;
 

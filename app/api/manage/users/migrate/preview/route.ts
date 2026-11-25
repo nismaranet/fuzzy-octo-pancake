@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return jsonNoCache({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!isOwnerDiscordId(session.user.discordId)) {
+    if (!(await isOwnerDiscordId(session.user.discordId))) {
       return jsonNoCache(
         { error: "Forbidden: Fitur Migrasi Akun khusus untuk Owner." },
         { status: 403 },

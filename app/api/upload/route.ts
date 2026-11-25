@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import clientPromise from "@/lib/mongodb";
+import { isWebOwner } from "@/lib/webConfig";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,6 +45,37 @@ export async function POST(request: Request) {
   try {
     // Menggunakan variabel yang sama persis dengan project lamamu
     const { fileName, fileType, folder, fileSize } = await request.json();
+
+    // Validasi khusus folder audio (khusus Owner, mis. musik Rewind MP3/WAV)
+    if (folder === "audio") {
+      const actorId = session.user.discordId || session.user.id;
+      if (!(await isWebOwner(actorId))) {
+        return NextResponse.json(
+          { error: "Akses ditolak: upload audio khusus Owner." },
+          { status: 403, headers: NO_CACHE_HEADERS }
+        );
+      }
+      const allowedAudio = [
+        "audio/mpeg",
+        "audio/mp3",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/wave",
+        "audio/ogg",
+      ];
+      if (!allowedAudio.includes(String(fileType || "").toLowerCase())) {
+        return NextResponse.json(
+          { error: "Format audio harus MP3, WAV, atau OGG." },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+      if (fileSize && fileSize > 15 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: "Ukuran file audio maksimal 15MB." },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+    }
 
     // Validasi khusus folder gallery
     if (folder === "gallery") {

@@ -6,6 +6,7 @@ import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { revalidatePath } from "next/cache";
 import { grantGoalAchievements } from "@/lib/goalAchievements";
+import { getWebConfig } from "@/lib/webConfig";
 
 export async function donateToGoal(goalId: string, amount: number) {
   try {
@@ -77,8 +78,10 @@ export async function donateToGoal(goalId: string, amount: number) {
     // Cek apakah dengan donasi ini goal tercapai
     const updatedGoal = await db.collection("communitygoals").findOne({ _id: new ObjectId(goalId) });
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const driverRoleId = process.env.DISCORD_DRIVER_ROLE_ID;
-    const internRoleId = process.env.DISCORD_INTERN_ROLE_ID;
+    const webConfig = await getWebConfig();
+    const driverRoleId = webConfig.discordRoles.driverRoleId;
+    const internRoleId = webConfig.discordRoles.internRoleId;
+    const managerRoleId = webConfig.discordRoles.managerRoleId;
 
     if (updatedGoal && botToken && updatedGoal.discordChannelId) {
       if (updatedGoal.currentAmount >= updatedGoal.targetAmount) {
@@ -99,7 +102,7 @@ export async function donateToGoal(goalId: string, amount: number) {
             permission_overwrites: [
               { id: guildId, type: 0, deny: "1024" }, 
               { id: updatedGoal.creatorId, type: 1, allow: "1024", deny: "2048" }, 
-              { id: process.env.DISCORD_MANAGER_ROLE_ID, type: 0, allow: "3072" }, // allow VIEW and SEND
+              { id: managerRoleId, type: 0, allow: "3072" }, // allow VIEW and SEND
               { id: driverRoleId, type: 0, allow: "1024", deny: "2048" }, 
               { id: internRoleId, type: 0, allow: "1024", deny: "2048" }
             ]
@@ -133,7 +136,7 @@ export async function donateToGoal(goalId: string, amount: number) {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({ 
-            content: `<@&${driverRoleId}> <@&${process.env.DISCORD_MANAGER_ROLE_ID}>`, 
+            content: `<@&${driverRoleId}> <@&${managerRoleId}>`, 
             embeds: [embed],
             allowed_mentions: process.env.NODE_ENV === "development" ? { parse: [] } : undefined 
           }) 

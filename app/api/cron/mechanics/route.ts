@@ -59,6 +59,13 @@ export async function GET(request: Request) {
     const db = client.db();
     const now = new Date();
 
+    // Ambil daftar user yang sedang dalam masa Hold 90 Hari agar mekanik mereka dibekukan (tidak ditagih/dipecat)
+    const heldUsers = await db
+      .collection("users")
+      .find({ "accountHold.status": true }, { projection: { discordId: 1 } })
+      .toArray();
+    const heldDiscordIds = new Set(heldUsers.map((u: any) => String(u.discordId)));
+
     // Find all garages (we will filter in JS since checking multiple subdocument dates in Mongo query can be complex, 
     // but ideally we should query where any extendAt is <= now. For simplicity, we just fetch operational garages.)
     const garages = await Garage.find({ status: "operational" });
@@ -67,6 +74,9 @@ export async function GET(request: Request) {
     let firedCount = 0;
 
     for (const garage of garages) {
+      if (garage.discordId && heldDiscordIds.has(String(garage.discordId))) {
+        continue;
+      }
       if (!garage.mechanics) continue;
 
       let garageUpdated = false;

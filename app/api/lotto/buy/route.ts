@@ -144,9 +144,11 @@ export async function POST(req: NextRequest) {
     );
 
     // Discord Bot Integration (Grant Lotto Role if not already granted)
+    const { getWebConfig } = await import("@/lib/webConfig");
+    const webConfig = await getWebConfig();
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const guildId = process.env.DISCORD_GUILD_ID || GUILD_ID;
-    const lottoRoleId = process.env.DISCORD_LOTTO_ROLE_ID;
+    const lottoRoleId = webConfig.discordRoles.lottoRoleId;
 
     if (botToken && guildId && lottoRoleId) {
       try {

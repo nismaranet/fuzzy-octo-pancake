@@ -11,6 +11,7 @@ import {
   sendDiscordMessage,
   deleteDiscordChannel,
 } from "@/lib/discord";
+import { getWebConfig } from "@/lib/webConfig";
 
 export async function updateProfile(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -197,7 +198,8 @@ export async function submitHaulmpApplication(notes?: string) {
 
     // 2. Kirim pesan pengantar & embed detail pengajuan ke channel tiket jika berhasil dibuat
     if (ticketChannel?.id) {
-      const managerRoleId = process.env.DISCORD_MANAGER_ROLE_ID || "863968603681325066";
+      const webConfig = await getWebConfig();
+      const managerRoleId = webConfig.discordRoles.managerRoleId || "863968603681325066";
       await sendDiscordMessage(
         ticketChannel.id,
         `<@${user.discordId}> tiket verifikasi VTC HaulMP Anda berhasil dibuat! Mohon tunggu <@&${managerRoleId}> merespon.`,
@@ -319,14 +321,22 @@ export async function syncTruckersMP(tmpId: number) {
       return { success: false, message: "ID TruckersMP ini sudah ditautkan ke akun lain." };
     }
 
+    const exactSteamId =
+      data.response?.steamID64String ||
+      (data.response?.steamID ? String(data.response.steamID) : undefined);
+
+    const updateFields: Record<string, any> = {
+      truckersmpId: tmpId.toString(),
+      isTmpDriver: true,
+    };
+    if (exactSteamId) {
+      updateFields.steamId = exactSteamId;
+    }
+
     const updateResult = await usersCol.updateOne(
       { email: session.user.email },
-      { 
-        $set: { 
-          truckersmpId: tmpId.toString(),
-          steamId: data.response.steamID64.toString(),
-          isTmpDriver: true 
-        } 
+      {
+        $set: updateFields,
       }
     );
 
@@ -356,7 +366,7 @@ export async function unlinkTruckersMP() {
     const updateResult = await usersCol.updateOne(
       { email: session.user.email },
       { 
-        $unset: { truckersmpId: "", steamId: "" },
+        $unset: { truckersmpId: "" },
         $set: { isTmpDriver: false }
       }
     );

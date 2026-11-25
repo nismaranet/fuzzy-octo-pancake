@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 import { redirect } from "next/navigation";
+import { isWebOwner } from "@/lib/webConfig";
 import NismaraPlusManagerClient from "./NismaraPlusManagerClient";
 
 export const metadata = {
@@ -25,9 +26,7 @@ export default async function NismaraPlusManagementPage() {
   if (!session?.user) redirect("/login");
 
   // Verifikasi role manager dan owner
-  const isOwner =
-    session.user.discordId === process.env.OWNER_DISCORD_ID ||
-    session.user.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+  const isOwner = await isWebOwner(session.user.discordId);
 
   if (session.user.role !== "manager" || !isOwner) {
     redirect("/dashboard/manage/data");

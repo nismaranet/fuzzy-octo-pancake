@@ -7,24 +7,17 @@ import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import Transaction from "@/lib/models/Transaction";
 import User from "@/lib/models/User";
 import { getUserSeasonProgress, applySeasonLevelSkip } from "@/lib/seasonPass";
+import { isWebOwner } from "@/lib/webConfig";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-function checkIsOwner(discordId?: string | number | null) {
-  if (!discordId) return false;
-  const dId = String(discordId);
-  const owner1 = process.env.OWNER_DISCORD_ID;
-  const owner2 = process.env.NISMARA_OWNER_DISCORD_ID;
-  return (owner1 && dId === owner1) || (owner2 && dId === owner2);
-}
-
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner = checkIsOwner(session?.user?.discordId);
+    const isOwner = await isWebOwner(session?.user?.discordId);
 
     if (!session?.user?.discordId || !isOwner) {
       return NextResponse.json(
@@ -62,7 +55,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner = checkIsOwner(session?.user?.discordId);
+    const isOwner = await isWebOwner(session?.user?.discordId);
 
     if (!session?.user?.discordId || !isOwner) {
       return NextResponse.json(

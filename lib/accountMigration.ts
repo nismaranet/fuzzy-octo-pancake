@@ -3,6 +3,7 @@ import clientPromise from "@/lib/mongodb";
 import { redis } from "@/lib/redis";
 import { sendDiscordMessage } from "@/lib/discord";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { isWebOwner } from "@/lib/webConfig";
 
 function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
@@ -140,15 +141,10 @@ interface RoleConfig {
 }
 
 /**
- * Validasi akses Owner-only sesuai environment variable sistem.
+ * Validasi akses Owner-only (membaca dari web_config MongoDB + fallback bootstrap .env).
  */
-export function isOwnerDiscordId(discordId?: string | number | null): boolean {
-  if (discordId === undefined || discordId === null) return false;
-  const trimmed = String(discordId).trim();
-  const ownerIds = [process.env.OWNER_DISCORD_ID, process.env.NISMARA_OWNER_DISCORD_ID]
-    .filter((v): v is string => Boolean(v && v.trim()))
-    .map((v) => v.trim());
-  return ownerIds.includes(trimmed);
+export async function isOwnerDiscordId(discordId?: string | number | null): Promise<boolean> {
+  return isWebOwner(discordId);
 }
 
 function buildDiscordAvatarUrl(id: string, avatar?: string | null): string | null {
@@ -277,16 +273,20 @@ export async function fetchDiscordGuildMember(
 }
 
 async function resolveRoleConfig(db: Db, guildId = DEFAULT_GUILD_ID): Promise<RoleConfig> {
-  const setting = await db.collection("guildsettings").findOne({ guildId });
+  const { getWebConfig } = await import("@/lib/webConfig");
+  const [setting, webConfig] = await Promise.all([
+    db.collection("guildsettings").findOne({ guildId }),
+    getWebConfig(),
+  ]);
   return {
     guildId,
     driverRoleId:
-      process.env.DISCORD_DRIVER_ROLE_ID || setting?.roles?.driver || "1405532668472590437",
+      webConfig.discordRoles.driverRoleId || setting?.roles?.driver || "1405532668472590437",
     internRoleId:
-      process.env.DISCORD_INTERN_ROLE_ID || setting?.roles?.magang || "1405533443651272804",
-    nplusRoleId: process.env.DISCORD_NISMARAPLUS_ROLE_ID || null,
+      webConfig.discordRoles.internRoleId || setting?.roles?.magang || "1405533443651272804",
+    nplusRoleId: webConfig.discordRoles.nismaraPlusRoleId || null,
     managerRoleId:
-      process.env.DISCORD_MANAGER_ROLE_ID || setting?.roles?.manager || "1406574228794507354",
+      webConfig.discordRoles.managerRoleId || setting?.roles?.manager || "1406574228794507354",
     channelLog: setting?.channelLog || null,
   };
 }
@@ -909,7 +909,7 @@ export async function executeDiscordAccountMigration({
   const oldDiscordId = rawOldId.trim();
   const newDiscordId = rawNewId.trim();
 
-  if (!isOwnerDiscordId(executedByDiscordId)) {
+  if (!(await isOwnerDiscordId(executedByDiscordId))) {
     throw new Error("Akses ditolak: hanya Owner yang dapat mengeksekusi migrasi akun.");
   }
 

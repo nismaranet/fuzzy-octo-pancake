@@ -12,12 +12,9 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 import dbConnect from "@/lib/mongoose";
+import { getWebConfig } from "@/lib/webConfig";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
-const CATEGORY_ID =
-  process.env.DISCORD_TICKET_CATEGORY_ID ||
-  process.env.DISCORD_PLUS_CATEGORY_ID;
-const MANAGER_ROLE_ID = process.env.DISCORD_MANAGER_ROLE_ID;
 
 export async function GET(request: Request) {
   try {
@@ -224,6 +221,12 @@ export async function POST(request: Request) {
         0,
         100,
       ); // Batasi max 100 karakter untuk Discord
+
+    const webConfig = await getWebConfig();
+    const CATEGORY_ID =
+      webConfig.discordChannels.ticketCategoryId ||
+      webConfig.discordChannels.plusCategoryId;
+    const MANAGER_ROLE_ID = webConfig.discordRoles.managerRoleId;
 
     // 1. Create Discord Channel
     const createChannelRes = await fetch(

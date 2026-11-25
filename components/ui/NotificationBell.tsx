@@ -62,7 +62,7 @@ export default function NotificationBell() {
 
     isFetchingRef.current = true;
     try {
-      const res = await fetch("/api/notifications?page=1&limit=10", { cache: "no-store" });
+      const res = await fetch("/api/notifications?page=1&limit=10&skipCount=1", { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {

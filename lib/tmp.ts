@@ -22,7 +22,17 @@ export async function getDriverStats(tmpId: number) {
       return null;
     }
 
-    const data = await res.json();
+    const rawText = await res.text();
+    const data = JSON.parse(rawText);
+
+    // Ekstrak steamID64 sebagai String langsung dari raw JSON sebelum dibulatkan oleh IEEE-754 Number (> 2^53)
+    const exactSteamIdMatch = rawText.match(/"steamID64"\s*:\s*"?(\d+)"?/);
+    if (data?.response && exactSteamIdMatch?.[1]) {
+      data.response.steamID64String = exactSteamIdMatch[1];
+    } else if (data?.response?.steamID) {
+      data.response.steamID64String = String(data.response.steamID);
+    }
+
     return data;
   } catch (error) {
     console.error("TMP API Error:", error);

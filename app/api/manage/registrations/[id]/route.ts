@@ -95,9 +95,11 @@ export async function PATCH(
       if (!registration)
         return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+      const { getWebConfig } = await import("@/lib/webConfig");
+      const webConfig = await getWebConfig();
       const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
       const GUILD_ID = process.env.DISCORD_GUILD_ID;
-      const INTERN_ROLE_ID = process.env.DISCORD_INTERN_ROLE_ID;
+      const INTERN_ROLE_ID = webConfig.discordRoles.internRoleId;
 
       // Hapus channel pendaftaran
       if (registration.discordChannelId && DISCORD_BOT_TOKEN) {

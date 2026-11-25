@@ -5,6 +5,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { revalidatePath } from "next/cache";
+import { getWebConfig } from "@/lib/webConfig";
 
 export async function updateGoalStatus(goalId: string, newStatus: "active" | "rejected") {
   try {
@@ -31,9 +32,11 @@ export async function updateGoalStatus(goalId: string, newStatus: "active" | "re
 
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const guildId = process.env.DISCORD_GUILD_ID;
-    const driverRoleId = process.env.DISCORD_DRIVER_ROLE_ID;
-    const internRoleId = process.env.DISCORD_INTERN_ROLE_ID;
-    const categoryId = process.env.DISCORD_COMMUNITY_GOALS_CATEGORY_ID;
+    const webConfig = await getWebConfig();
+    const driverRoleId = webConfig.discordRoles.driverRoleId;
+    const internRoleId = webConfig.discordRoles.internRoleId;
+    const managerRoleId = webConfig.discordRoles.managerRoleId;
+    const categoryId = webConfig.discordChannels.communityGoalsCategoryId;
 
     if (goal.discordChannelId && botToken && guildId) {
       if (newStatus === "active") {
@@ -52,7 +55,7 @@ export async function updateGoalStatus(goalId: string, newStatus: "active" | "re
             parent_id: categoryId,
             permission_overwrites: [
               { id: guildId, type: 0, deny: "1024" }, // @everyone deny VIEW_CHANNEL
-              { id: process.env.DISCORD_MANAGER_ROLE_ID, type: 0, allow: "1024" },
+              { id: managerRoleId, type: 0, allow: "1024" },
               { id: driverRoleId, type: 0, allow: "1024" }, // Driver allow
               { id: internRoleId, type: 0, allow: "1024" }  // Intern allow
             ]
@@ -132,7 +135,7 @@ export async function updateGoalStatus(goalId: string, newStatus: "active" | "re
             permission_overwrites: [
               { id: guildId, type: 0, deny: "1024" }, 
               { id: goal.creatorId, type: 1, allow: "1024", deny: "2048" }, // allow VIEW, deny SEND_MESSAGES
-              { id: process.env.DISCORD_MANAGER_ROLE_ID, type: 0, allow: "1024" }
+              { id: managerRoleId, type: 0, allow: "1024" }
             ]
           })
         });

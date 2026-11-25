@@ -23,7 +23,7 @@ export default async function MigrateAccountPage({
   searchParams: Promise<{ oldDiscordId?: string }>;
 }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.discordId || !isOwnerDiscordId(session.user.discordId)) {
+  if (!session?.user?.discordId || !(await isOwnerDiscordId(session.user.discordId))) {
     redirect("/dashboard/manage/data");
   }
 

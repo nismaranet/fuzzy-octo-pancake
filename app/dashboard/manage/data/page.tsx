@@ -16,7 +16,9 @@ import {
   MonitorPlay,
   Truck,
   ArrowLeftRight,
+  Sliders,
 } from "lucide-react";
+import { isWebOwner } from "@/lib/webConfig";
 
 export const metadata = {
   title: "Manage Data",
@@ -24,9 +26,7 @@ export const metadata = {
 
 export default async function UserDataHub() {
   const session = await getServerSession(authOptions);
-  const isOwner =
-    session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-    session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+  const isOwner = await isWebOwner(session?.user?.discordId);
   const menu = [
     {
       name: "User List",
@@ -163,6 +163,17 @@ export default async function UserDataHub() {
         border: "border-emerald-500/20",
         hoverBorder: "group-hover:border-emerald-500/50",
         glow: "group-hover:bg-emerald-500/20",
+      },
+      {
+        name: "Web Configuration",
+        desc: "Atur Discord Channel/Role ID, Owner ID, dan Feature Flags langsung via DB.",
+        icon: Sliders,
+        href: "/dashboard/manage/data/web-config",
+        color: "text-violet-400",
+        bg: "bg-violet-500/10",
+        border: "border-violet-500/20",
+        hoverBorder: "group-hover:border-violet-500/50",
+        glow: "group-hover:bg-violet-500/20",
       }
     );
   }

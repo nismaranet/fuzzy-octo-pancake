@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { getCompanyMemberStats } from "@/lib/trucky";
 import { getUserAggregatedStats } from "@/lib/userStats";
+import { jsonNoCache } from "@/lib/antiCache";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function GET(
   request: Request,
@@ -15,18 +16,17 @@ export async function GET(
     const authHeader = request.headers.get("authorization");
 
     if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return jsonNoCache({ error: "Unauthorized" }, { status: 401 });
     }
 
     const client = await clientPromise;
     const db = client.db();
     const guildId = process.env.DISCORD_GUILD_ID;
-    const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID;
 
     // 1. Ambil data user berdasarkan discordId
     const user = await db.collection("users").findOne({ discordId });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return jsonNoCache({ error: "User not found" }, { status: 404 });
     }
 
     // 2. Buat query yang menyertakan userId milik si target user
@@ -50,6 +50,8 @@ export async function GET(
       userPoint,
       leaveHistory,
       driverLink,
+      jobDistanceSummary,
+      userStats,
     ] = await Promise.all([
       db
         .collection("jobhistories")
@@ -65,19 +67,53 @@ export async function GET(
         .sort({ startDate: -1 })
         .toArray(),
       db.collection("driverlinks").findOne({ ...fullTargetQuery, guildId }),
+      db
+        .collection("jobhistories")
+        .aggregate([
+          {
+            $match: {
+              driverId: String(user.discordId),
+              jobStatus: "COMPLETED",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalKm: { $sum: { $ifNull: ["$distanceKm", 0] } },
+              lastJobAt: { $max: { $ifNull: ["$completedAt", "$createdAt"] } },
+            },
+          },
+        ])
+        .toArray(),
+      getUserAggregatedStats(user.discordId, user._id),
     ]);
 
-    let memberData = null;
-    if (user.truckyId) {
-      memberData = await getCompanyMemberStats(
-        Number(NISMARA_COMPANY_ID),
-        Number(user.truckyId)
-      );
-    }
+    const jobAgg = jobDistanceSummary[0];
+    const lastJobDays = jobAgg?.lastJobAt
+      ? Math.max(
+          0,
+          Math.floor(
+            (Date.now() - new Date(jobAgg.lastJobAt).getTime()) /
+              (24 * 60 * 60 * 1000)
+          )
+        )
+      : null;
 
-    const userStats = await getUserAggregatedStats(user.discordId, user._id);
+    const memberData = user.truckyId
+      ? {
+          rank: {
+            name: user.truckyRank || "Driver",
+            color: user.truckyRankColor || "#b39ddb",
+          },
+          role: {
+            name: user.truckyRole || user.discordRole || "Member",
+          },
+          total_driven_distance_km: Math.round(jobAgg?.totalKm || 0),
+          last_job_days: lastJobDays,
+        }
+      : null;
 
-    return NextResponse.json({
+    return jsonNoCache({
       user,
       userStats,
       jobs: recentJobs,
@@ -89,7 +125,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching user detail API:", error);
-    return NextResponse.json(
+    return jsonNoCache(
       { error: "Internal Server Error" },
       { status: 500 }
     );

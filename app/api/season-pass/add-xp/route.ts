@@ -1,5 +1,9 @@
-import { NextResponse } from "next/server";
 import { addSeasonXp } from "@/lib/seasonPass";
+import { jsonNoCache } from "@/lib/antiCache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function POST(request: Request) {
   try {
@@ -8,12 +12,21 @@ export async function POST(request: Request) {
       request.headers.get("authorization");
     const validSecret = process.env.NISMARA_SECRET_API;
 
+    if (!validSecret) {
+      console.error(
+        "[Season Pass Add XP] NISMARA_SECRET_API is not configured",
+      );
+      return jsonNoCache(
+        { error: "Server Error: Internal auth secret is not configured" },
+        { status: 500 },
+      );
+    }
+
     if (
-      validSecret &&
-      authHeader !== validSecret &&
-      authHeader !== `Bearer ${validSecret}`
+      !authHeader ||
+      (authHeader !== validSecret && authHeader !== `Bearer ${validSecret}`)
     ) {
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "Unauthorized: Invalid Secret" },
         { status: 401 },
       );
@@ -23,7 +36,7 @@ export async function POST(request: Request) {
     const { discordId, xpAmount, reason = "Job Delivery XP" } = body;
 
     if (!discordId || !xpAmount) {
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "discordId dan xpAmount wajib diisi" },
         { status: 400 },
       );
@@ -32,10 +45,10 @@ export async function POST(request: Request) {
     const result = await addSeasonXp(discordId, Number(xpAmount), reason);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      return jsonNoCache({ error: result.error }, { status: 400 });
     }
 
-    return NextResponse.json({
+    return jsonNoCache({
       success: true,
       data: result,
       message: result.capped
@@ -44,7 +57,7 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("Add Season XP API Error:", error);
-    return NextResponse.json(
+    return jsonNoCache(
       { error: error.message || "Internal Server Error" },
       { status: 500 },
     );

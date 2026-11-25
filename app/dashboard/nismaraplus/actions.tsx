@@ -8,6 +8,7 @@ import Transaction from "@/lib/models/Transaction";
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
+import { getWebConfig } from "@/lib/webConfig";
 
 export async function createPurchaseTicket(months: number) {
   try {
@@ -52,8 +53,9 @@ export async function createPurchaseTicket(months: number) {
     const username = session.user.name || "driver";
     const guildId = process.env.DISCORD_GUILD_ID;
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const categoryId = process.env.DISCORD_PLUS_CATEGORY_ID;
-    const managerRoleId = process.env.DISCORD_MANAGER_ROLE_ID;
+    const webConfig = await getWebConfig();
+    const categoryId = webConfig.discordChannels.plusCategoryId;
+    const managerRoleId = webConfig.discordRoles.managerRoleId;
 
     if (!botToken || !guildId) {
       return {
@@ -65,8 +67,8 @@ export async function createPurchaseTicket(months: number) {
     const allowPermissions = (1024 + 2048 + 65536).toString();
     const denyPermissions = (1024).toString();
 
-    const owner1 = process.env.OWNER_DISCORD_ID || "338418945620967434";
-    const owner2 = process.env.NISMARA_OWNER_DISCORD_ID || "560419724249530369";
+    const owner1 = webConfig.owners.developerDiscordId;
+    const owner2 = webConfig.owners.nismaraOwnerDiscordId;
 
     const permissionOverwrites = [
       { id: guildId, type: 0, allow: "0", deny: denyPermissions },

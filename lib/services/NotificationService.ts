@@ -9,10 +9,12 @@ import { redis } from "@/lib/redis";
 export async function invalidateUserNotificationsCache(discordId: string) {
   try {
     const globalVer = (await redis.get("notifications:global_ver").catch(() => "0")) || "0";
-    await Promise.all([
-      redis.del(`notifications:v1:${discordId}:g${globalVer}:p1:l5`),
-      redis.del(`notifications:v1:${discordId}:g${globalVer}:p1:l10`),
-    ]);
+    await redis.del(
+      `notifications:v1:${discordId}:g${globalVer}:p1:l5`,
+      `notifications:v1:${discordId}:g${globalVer}:p1:l10`,
+      `notifications:v1:${discordId}:g${globalVer}:p1:l5:sc`,
+      `notifications:v1:${discordId}:g${globalVer}:p1:l10:sc`,
+    );
   } catch (err) {
     console.error("Failed to invalidate user notifications cache:", err);
   }

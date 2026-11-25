@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import clientPromise from "@/lib/mongodb";
 import { getCompanyMembersMap } from "@/lib/trucky";
+import { isWebOwner } from "@/lib/webConfig";
 import ManageUsersTable from "./ManageUsersTable";
 import { Users, UserCheck, UserMinus, Globe, Shield, User } from "lucide-react";
 
@@ -20,12 +21,7 @@ export default async function ManageUsersPage() {
     redirect("/dashboard");
   }
 
-  const ownerId = session.user.discordId ? String(session.user.discordId).trim() : "";
-  const isOwner = Boolean(
-    ownerId &&
-      (ownerId === process.env.OWNER_DISCORD_ID?.trim() ||
-        ownerId === process.env.NISMARA_OWNER_DISCORD_ID?.trim())
-  );
+  const isOwner = await isWebOwner(session.user.discordId);
 
   const client = await clientPromise;
   const db = client.db();

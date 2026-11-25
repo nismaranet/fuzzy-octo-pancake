@@ -4,10 +4,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 import { revalidatePath } from "next/cache";
+import { getWebConfig } from "@/lib/webConfig";
 
 const GUILD_ID = process.env.DISCORD_GUILD_ID || "863959415702028318";
-const DRIVER_ROLE_ID = process.env.DISCORD_DRIVER_ROLE_ID || "1405532668472590437";
-const INTERN_ROLE_ID = process.env.DISCORD_INTERN_ROLE_ID || "1405533443651272804";
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
 async function assertManager() {
@@ -127,9 +126,10 @@ export async function removeDiscordRoleAction(
       throw new Error("DISCORD_BOT_TOKEN tidak dikonfigurasi.");
     }
 
+    const webConfig = await getWebConfig();
     const rolesToRemove: string[] = [];
-    if (roleType === "driver" || roleType === "both") rolesToRemove.push(DRIVER_ROLE_ID);
-    if (roleType === "intern" || roleType === "both") rolesToRemove.push(INTERN_ROLE_ID);
+    if (roleType === "driver" || roleType === "both") rolesToRemove.push(webConfig.discordRoles.driverRoleId);
+    if (roleType === "intern" || roleType === "both") rolesToRemove.push(webConfig.discordRoles.internRoleId);
 
     for (const roleId of rolesToRemove) {
       const res = await fetch(

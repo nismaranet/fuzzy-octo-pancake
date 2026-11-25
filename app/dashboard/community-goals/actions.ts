@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import CommunityGoal from "@/lib/models/CommunityGoal";
 import { revalidatePath } from "next/cache";
 import { parseWIBDate } from "@/lib/utils";
+import { getWebConfig } from "@/lib/webConfig";
 
 export async function createCommunityGoal(formData: FormData) {
   try {
@@ -82,8 +83,9 @@ export async function createCommunityGoal(formData: FormData) {
     let discordChannelId = null;
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const guildId = process.env.DISCORD_GUILD_ID;
-    const categoryId = process.env.DISCORD_TICKET_CATEGORY_ID;
-    const managerRoleId = process.env.DISCORD_MANAGER_ROLE_ID;
+    const webConfig = await getWebConfig();
+    const categoryId = webConfig.discordChannels.ticketCategoryId;
+    const managerRoleId = webConfig.discordRoles.managerRoleId;
 
     if (botToken && guildId && categoryId && managerRoleId) {
       try {

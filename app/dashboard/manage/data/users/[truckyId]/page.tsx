@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import ManageUserUI from "./ManageUserUI";
-import { getDriverStats, getCompanyMemberStats } from "@/lib/trucky";
 import { getUserAggregatedStats } from "@/lib/userStats";
 
 export const metadata = {
@@ -25,7 +24,6 @@ export default async function AdminUserDetailPage({
   const client = await clientPromise;
   const db = client.db();
   const guildId = process.env.DISCORD_GUILD_ID;
-  const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID;
 
   // Query hanya untuk target user berdasarkan truckyId dari URL
   const targetQuery = {
@@ -55,6 +53,8 @@ export default async function AdminUserDetailPage({
     userPoint,
     leaveHistory,
     driverLink,
+    jobDistanceSummary,
+    userStats,
   ] = await Promise.all([
     db
       .collection("currencyhistories")
@@ -83,14 +83,49 @@ export default async function AdminUserDetailPage({
       .sort({ startDate: -1 })
       .toArray(),
     db.collection("driverlinks").findOne({ ...fullTargetQuery, guildId }),
+    db
+      .collection("jobhistories")
+      .aggregate([
+        {
+          $match: {
+            driverId: String(user.discordId),
+            jobStatus: "COMPLETED",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalKm: { $sum: { $ifNull: ["$distanceKm", 0] } },
+            lastJobAt: { $max: { $ifNull: ["$completedAt", "$createdAt"] } },
+          },
+        },
+      ])
+      .toArray(),
+    getUserAggregatedStats(user.discordId, user._id),
   ]);
 
-  const memberData = await getCompanyMemberStats(
-    Number(NISMARA_COMPANY_ID),
-    Number(truckyId),
-  );
+  const jobAgg = jobDistanceSummary[0];
+  const lastJobDays = jobAgg?.lastJobAt
+    ? Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(jobAgg.lastJobAt).getTime()) /
+            (24 * 60 * 60 * 1000),
+        ),
+      )
+    : null;
 
-  const userStats = await getUserAggregatedStats(user.discordId, user._id);
+  const memberData = {
+    rank: {
+      name: user.truckyRank || "Driver",
+      color: user.truckyRankColor || "#b39ddb",
+    },
+    role: {
+      name: user.truckyRole || user.discordRole || "Member",
+    },
+    total_driven_distance_km: Math.round(jobAgg?.totalKm || 0),
+    last_job_days: lastJobDays,
+  };
 
   const serialize = (data: any) => JSON.parse(JSON.stringify(data));
 

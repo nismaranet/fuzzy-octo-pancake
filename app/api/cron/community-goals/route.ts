@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import mongoose from "mongoose";
 import { grantGoalAchievements } from "@/lib/goalAchievements";
+import { getWebConfig } from "@/lib/webConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,12 @@ export async function GET(request: Request) {
     const client = await clientPromise;
     const db = client.db();
     const now = new Date();
+    const webConfig = await getWebConfig();
     const guildId = process.env.DISCORD_GUILD_ID;
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const driverRoleId = process.env.DISCORD_DRIVER_ROLE_ID;
-    const internRoleId = process.env.DISCORD_INTERN_ROLE_ID;
-    const managerRoleId = process.env.DISCORD_MANAGER_ROLE_ID;
+    const driverRoleId = webConfig.discordRoles.driverRoleId;
+    const internRoleId = webConfig.discordRoles.internRoleId;
+    const managerRoleId = webConfig.discordRoles.managerRoleId;
 
     // 1. Sync KM Goals
     const activeKmGoals = await db.collection("communitygoals").find({ 

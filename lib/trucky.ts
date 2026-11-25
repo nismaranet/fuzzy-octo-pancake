@@ -34,6 +34,89 @@ export async function getDriverStats(truckyId: number) {
   }
 }
 
+/**
+ * Mengeluarkan (kick) member dari Trucky VTC via Drivers' Hub API menggunakan Steam ID 64-bit.
+ * Endpoint: DELETE https://e.truckyapp.com/api/v1/drivershub/members
+ */
+export async function kickTruckyMemberBySteamId(steamId: string): Promise<{
+  success: boolean;
+  status?: number;
+  message?: string;
+}> {
+  if (!steamId) {
+    return { success: false, message: "Missing steamId" };
+  }
+  if (!process.env.TRUCKY_API_KEY) {
+    return { success: false, message: "TRUCKY_API_KEY not configured" };
+  }
+
+  try {
+    const res = await fetch(`${TRUCKY_BASE_URL}/api/v1/drivershub/members`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-access-token": process.env.TRUCKY_API_KEY,
+        "User-Agent": TRUCKY_USER_AGENT,
+        Referer: "https://nismara.web.id",
+        Origin: "https://nismara.web.id",
+      },
+      body: JSON.stringify({ steam_id: String(steamId) }),
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      return { success: true, status: res.status };
+    }
+
+    const errText = await res.text().catch(() => "");
+    console.error(`[Trucky DriversHub Kick] Failed (${res.status}) for steam_id=${steamId}:`, errText);
+    return { success: false, status: res.status, message: errText || `HTTP ${res.status}` };
+  } catch (error: any) {
+    console.error("[Trucky DriversHub Kick] Network error:", error);
+    return { success: false, message: error?.message || "Network error" };
+  }
+}
+
+/**
+ * Menambahkan member ke Trucky VTC via Drivers' Hub API menggunakan Steam ID 64-bit.
+ * Endpoint: POST https://e.truckyapp.com/api/v1/drivershub/members
+ */
+export async function addTruckyMemberBySteamId(steamId: string): Promise<{
+  success: boolean;
+  status?: number;
+  message?: string;
+}> {
+  if (!steamId || !process.env.TRUCKY_API_KEY) {
+    return { success: false, message: "Missing steamId or TRUCKY_API_KEY" };
+  }
+
+  try {
+    const res = await fetch(`${TRUCKY_BASE_URL}/api/v1/drivershub/members`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-access-token": process.env.TRUCKY_API_KEY,
+        "User-Agent": TRUCKY_USER_AGENT,
+        Referer: "https://nismara.web.id",
+        Origin: "https://nismara.web.id",
+      },
+      body: JSON.stringify({ steam_id: String(steamId) }),
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      return { success: true, status: res.status };
+    }
+
+    const errText = await res.text().catch(() => "");
+    return { success: false, status: res.status, message: errText || `HTTP ${res.status}` };
+  } catch (error: any) {
+    return { success: false, message: error?.message || "Network error" };
+  }
+}
+
 export async function getCompanyMemberStats(
   companyId: number,
   truckyId: number,

@@ -13,14 +13,13 @@ import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
 import dbConnect from "@/lib/mongoose";
+import { getWebConfig } from "@/lib/webConfig";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
-const CATEGORY_ID = process.env.DISCORD_FLEET_ORDER_CATEGORY_ID;
-const MANAGER_ROLE_ID = process.env.DISCORD_MANAGER_ROLE_ID;
 
 export async function POST(request: Request) {
   try {
@@ -142,6 +141,10 @@ export async function POST(request: Request) {
 
     // 1. Create Discord Channel
     const channelName = `order-${user.name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`;
+
+    const webConfig = await getWebConfig();
+    const CATEGORY_ID = webConfig.discordChannels.fleetOrderCategoryId;
+    const MANAGER_ROLE_ID = webConfig.discordRoles.managerRoleId;
 
     const createChannelRes = await fetch(
       `https://discord.com/api/v10/guilds/${GUILD_ID}/channels`,

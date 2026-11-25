@@ -56,12 +56,14 @@ export async function POST(
       );
     }
 
+    const { getWebConfig } = await import("@/lib/webConfig");
+    const webConfig = await getWebConfig();
     const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
     const GUILD_ID = process.env.DISCORD_GUILD_ID;
     const CATEGORY_ID =
-      process.env.DISCORD_INTERVIEW_CHANNEL_ID ||
-      process.env.DISCORD_TICKET_CATEGORY_ID;
-    const MANAGER_ROLE_ID = process.env.DISCORD_MANAGER_ROLE_ID;
+      webConfig.discordChannels.interviewChannelId ||
+      webConfig.discordChannels.ticketCategoryId;
+    const MANAGER_ROLE_ID = webConfig.discordRoles.managerRoleId;
 
     if (!DISCORD_BOT_TOKEN || !GUILD_ID || !CATEGORY_ID) {
       return NextResponse.json(

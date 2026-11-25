@@ -8,13 +8,12 @@ import NismaraPlusOrder from "@/lib/models/NismaraPlusOrder";
 import Transaction from "@/lib/models/Transaction";
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongoose";
+import { getWebConfig, isWebOwner } from "@/lib/webConfig";
 
 export async function searchUsers(query: string) {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner =
-      session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-      session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+    const isOwner = await isWebOwner(session?.user?.discordId);
 
     if (!session?.user?.discordId || !isOwner) {
       throw new Error("Unauthorized");
@@ -53,9 +52,7 @@ export async function grantOrExtendNismaraPlus(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner =
-      session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-      session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+    const isOwner = await isWebOwner(session?.user?.discordId);
 
     if (!session?.user?.discordId || !isOwner) {
       throw new Error("Unauthorized");
@@ -101,7 +98,8 @@ export async function grantOrExtendNismaraPlus(
     // Discord Bot Integration (Grant Role)
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const guildId = process.env.DISCORD_GUILD_ID;
-    const plusRoleId = process.env.DISCORD_NISMARAPLUS_ROLE_ID;
+    const webConfig = await getWebConfig();
+    const plusRoleId = webConfig.discordRoles.nismaraPlusRoleId;
 
     if (botToken && guildId && plusRoleId) {
       await fetch(
@@ -132,9 +130,7 @@ export async function grantOrExtendNismaraPlus(
 export async function revokeNismaraPlus(discordId: string) {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner =
-      session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-      session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+    const isOwner = await isWebOwner(session?.user?.discordId);
 
     if (!session?.user?.discordId || !isOwner) {
       throw new Error("Unauthorized");
@@ -158,7 +154,8 @@ export async function revokeNismaraPlus(discordId: string) {
     // Discord Bot Integration (Revoke Role)
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const guildId = process.env.DISCORD_GUILD_ID;
-    const plusRoleId = process.env.DISCORD_NISMARAPLUS_ROLE_ID;
+    const webConfig = await getWebConfig();
+    const plusRoleId = webConfig.discordRoles.nismaraPlusRoleId;
 
     if (botToken && guildId && plusRoleId) {
       await fetch(
@@ -186,9 +183,7 @@ export async function revokeNismaraPlus(discordId: string) {
 export async function fetchPendingOrders() {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner =
-      session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-      session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+    const isOwner = await isWebOwner(session?.user?.discordId);
     if (!session?.user?.discordId || !isOwner) {
       throw new Error("Unauthorized");
     }
@@ -210,9 +205,7 @@ export async function fetchPendingOrders() {
 export async function confirmOrder(orderId: string) {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner =
-      session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-      session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+    const isOwner = await isWebOwner(session?.user?.discordId);
     if (!session?.user?.discordId || !isOwner) {
       throw new Error("Unauthorized");
     }
@@ -274,7 +267,8 @@ export async function confirmOrder(orderId: string) {
     // 4. Discord Bot Integration (Grant Role & Send Message)
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const guildId = process.env.DISCORD_GUILD_ID;
-    const plusRoleId = process.env.DISCORD_NISMARAPLUS_ROLE_ID;
+    const webConfig = await getWebConfig();
+    const plusRoleId = webConfig.discordRoles.nismaraPlusRoleId;
 
     if (botToken && guildId) {
       // a. Grant Role Nismara+ (Cek jika belum punya)
@@ -335,9 +329,7 @@ export async function confirmOrder(orderId: string) {
 export async function rejectOrder(orderId: string) {
   try {
     const session = await getServerSession(authOptions);
-    const isOwner =
-      session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-      session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+    const isOwner = await isWebOwner(session?.user?.discordId);
     if (!session?.user?.discordId || !isOwner) {
       throw new Error("Unauthorized");
     }

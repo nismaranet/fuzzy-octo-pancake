@@ -7,6 +7,7 @@ import QuizAttempt from "@/lib/models/QuizAttempt";
 import clientPromise from "@/lib/mongodb";
 
 import dbConnect from "@/lib/mongoose";
+import { getWebConfig } from "@/lib/webConfig";
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -95,7 +96,8 @@ export async function POST(req: Request) {
 
     // -- POST Hasil Ujian ke Discord Channel Interview --
     const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-    const MANAGER_ROLE_ID = process.env.DISCORD_MANAGER_ROLE_ID;
+    const webConfig = await getWebConfig();
+    const MANAGER_ROLE_ID = webConfig.discordRoles.managerRoleId;
 
     if (DISCORD_BOT_TOKEN && targetChannelId) {
       try {

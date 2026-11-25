@@ -16,10 +16,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const { id } = await params;
     const discordId = id;
+    const { getWebConfig } = await import("@/lib/webConfig");
+    const webConfig = await getWebConfig();
     const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
     const GUILD_ID = process.env.DISCORD_GUILD_ID || "863959415702028318";
-    const DRIVER_ROLE_ID = process.env.DISCORD_DRIVER_ROLE_ID;
-    const INTERN_ROLE_ID = process.env.DISCORD_INTERN_ROLE_ID;
+    const DRIVER_ROLE_ID = webConfig.discordRoles.driverRoleId;
+    const INTERN_ROLE_ID = webConfig.discordRoles.internRoleId;
 
     if (!DISCORD_BOT_TOKEN || !GUILD_ID || !DRIVER_ROLE_ID || !INTERN_ROLE_ID) {
       return NextResponse.json({ error: "Konfigurasi Discord API tidak lengkap" }, { status: 500 });

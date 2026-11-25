@@ -58,6 +58,49 @@ const userSchema = new mongoose.Schema(
       reason: { type: String, default: null },
     },
 
+    accountHold: {
+      status: { type: Boolean, default: false },
+      reason: {
+        type: String,
+        enum: ["LEFT_DISCORD", "LEFT_TRUCKY", "KICKED_TRUCKY", null],
+        default: null,
+      },
+      leftAt: { type: Date, default: null },
+      purgeScheduledAt: { type: Date, default: null },
+      notified7d: { type: Boolean, default: false },
+      notifiedEmailAt: { type: Date, default: null },
+      restoredAt: { type: Date, default: null },
+    },
+
+    drivingScore: {
+      score: { type: Number, default: null },
+      grade: {
+        type: String,
+        enum: ["S", "A", "B", "C", "D", "UNRANKED"],
+        default: "UNRANKED",
+      },
+      status: {
+        type: String,
+        enum: ["active", "inactive", "calibrating"],
+        default: "calibrating",
+      },
+      sampleSize: { type: Number, default: 0 },
+      recent30dJobs: { type: Number, default: 0 },
+      breakdown: {
+        safety: { type: Number, default: 0 },
+        speed: { type: Number, default: 0 },
+        traffic: { type: Number, default: 0 },
+        clean: { type: Number, default: 0 },
+        hardcoreBonus: { type: Number, default: 0 },
+        avgDamageVehicle: { type: Number, default: 0 },
+        avgDamageCargo: { type: Number, default: 0 },
+        realMilesRate: { type: Number, default: 0 },
+        finesPer1000Km: { type: Number, default: 0 },
+        onTimeRate: { type: Number, default: 100 },
+      },
+      updatedAt: { type: Date, default: null },
+    },
+
     social_media: {
       youtube: { type: String, default: null },
       facebook: { type: String, default: null },

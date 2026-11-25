@@ -1,5 +1,9 @@
-import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
+import { jsonNoCache } from "@/lib/antiCache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function GET(request: Request) {
   try {
@@ -9,24 +13,24 @@ export async function GET(request: Request) {
     const client = await clientPromise;
     const db = client.db();
 
-    let query: any = {};
+    const query: Record<string, any> = {};
     if (discordId) {
       query.userId = discordId;
     }
 
     const posts = await db
-      .collection("galleryposts")
+      .collection("gallery_posts")
       .find(query)
       .sort({ createdAt: -1 })
       .limit(50)
       .toArray();
 
-    return NextResponse.json(posts);
+    return jsonNoCache(posts);
   } catch (error) {
     console.error("GET MCP Gallery Error:", error);
-    return NextResponse.json(
+    return jsonNoCache(
       { error: "Gagal mengambil data gallery untuk MCP" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

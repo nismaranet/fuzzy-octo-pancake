@@ -31,6 +31,8 @@ export async function GET(request: Request) {
       const dlcLabel = city.dlc && city.dlc.trim() !== "" ? city.dlc : "Base Game";
       return {
         id: city.id,
+        name: city.real_name,
+        dlc: dlcLabel,
         real_name: `${city.real_name} (${dlcLabel})`,
       };
     });

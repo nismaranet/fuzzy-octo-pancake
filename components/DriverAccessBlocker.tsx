@@ -20,8 +20,9 @@ export default async function DriverAccessBlocker({ session }: { session: Sessio
     isPending = !!registration;
     
     // Jika pending, buat link langsung ke channel tiket Discord mereka
-    discordChannelLink = registration?.discordChannelId 
-      ? `https://discord.com/channels/${process.env.DISCORD_GUILD_ID || "123456789"}/${registration.discordChannelId}`
+    const regChannelId = registration?.discordChannelId || registration?.channelId;
+    discordChannelLink = regChannelId
+      ? `https://discord.com/channels/${process.env.DISCORD_GUILD_ID || "123456789"}/${regChannelId}`
       : "#";
   }
 

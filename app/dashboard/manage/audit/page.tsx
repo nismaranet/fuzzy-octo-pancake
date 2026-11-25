@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import clientPromise from "@/lib/mongodb";
+import { getWebConfig } from "@/lib/webConfig";
 import AuditClient from "./AuditClient";
 
 export const dynamic = "force-dynamic";
@@ -77,8 +78,9 @@ export default async function AuditPage({
   const db = client.db();
 
   const GUILD_ID = process.env.DISCORD_GUILD_ID || "863959415702028318";
-  const DRIVER_ROLE_ID = process.env.DISCORD_DRIVER_ROLE_ID || "1405532668472590437";
-  const INTERN_ROLE_ID = process.env.DISCORD_INTERN_ROLE_ID || "1405533443651272804";
+  const webConfig = await getWebConfig();
+  const DRIVER_ROLE_ID = webConfig.discordRoles.driverRoleId;
+  const INTERN_ROLE_ID = webConfig.discordRoles.internRoleId;
   const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
   // 1. Fetch data dari Discord & MongoDB secara paralel
