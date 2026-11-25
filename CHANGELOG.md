@@ -6,6 +6,16 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id/
 
 ---
 
+## [1.5.1] - 2026-11-26
+
+### Fixed
+- **Docker / GitHub Actions Build Hang (`lib/redis.ts`, `lib/webConfig.ts`, `app/page.tsx`):**
+  - Mencegah `ioredis` melakukan retry koneksi tanpa batas ke `127.0.0.1:6379` saat `REDIS_URL` tidak tersedia di tahap `next build` Docker (`enableOfflineQueue: false`, `maxRetriesPerRequest: 0`, `retryStrategy: () => null`, dan error listener).
+  - Menambahkan guard build-time di `getWebConfig()` agar langsung mengembalikan default env dalam `0ms` bila `REDIS_URL` dan `MONGODB_URI` belum diset.
+  - Menandai `app/page.tsx` dengan `export const dynamic = "force-dynamic"` agar Next.js tidak mencoba static prerender halaman utama saat build Docker.
+
+---
+
 ## [1.5.0] - 2026-11-25
 
 ### Added
