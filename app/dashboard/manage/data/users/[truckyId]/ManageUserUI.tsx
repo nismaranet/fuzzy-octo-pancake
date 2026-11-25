@@ -34,8 +34,12 @@ import {
   ShieldCheck,
   Users,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  KeyRound,
+  Loader2,
 } from "lucide-react";
+import { showAlert, showConfirm } from "@/lib/dialog";
+import { NO_CACHE_FETCH_OPTIONS } from "@/lib/antiCache";
 
 export default function ManageUserUI({
   user,
@@ -60,7 +64,38 @@ export default function ManageUserUI({
 
   const [isBanModalOpen, setIsBanModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isRevokingSessions, setIsRevokingSessions] = useState(false);
   const [resetType, setResetType] = useState<'avatar' | 'banner' | 'background' | 'all'>('all');
+
+  const handleRevokeUserSessions = async () => {
+    if (!user?.discordId) return;
+    const ok = await showConfirm(
+      `Cabut seluruh sesi login aktif milik ${user.name || user.discordId}? User harus login kembali lewat Discord.`,
+      "Konfirmasi Cabut Sesi",
+    );
+    if (!ok) return;
+
+    setIsRevokingSessions(true);
+    try {
+      const res = await fetch(
+        `/api/manage/users/${user.discordId}/revoke-sessions`,
+        {
+          method: "POST",
+          ...NO_CACHE_FETCH_OPTIONS,
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        await showAlert(data.error || "Gagal mencabut sesi user.", "error");
+        return;
+      }
+      await showAlert(data.message || "Seluruh sesi user berhasil dicabut.");
+    } catch {
+      await showAlert("Terjadi kesalahan jaringan saat mencabut sesi.", "error");
+    } finally {
+      setIsRevokingSessions(false);
+    }
+  };
 
   const [banFormData, setBanFormData] = useState({
     status: user?.galleryBan?.status || false,
@@ -277,6 +312,15 @@ export default function ManageUserUI({
               className="bg-accent-lilac hover:bg-accent-lilac/80 text-(-primary-foreground) px-6 py-2.5 rounded-2xl font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2 shadow-xl shadow-accent-lilac/20 text-xs"
             >
               <Calendar size={14} /> Manage Leave
+            </button>
+            <button
+              type="button"
+              onClick={handleRevokeUserSessions}
+              disabled={isRevokingSessions}
+              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 px-6 py-2.5 rounded-2xl font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2 text-xs disabled:opacity-50"
+            >
+              {isRevokingSessions ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+              Cabut Sesi Login
             </button>
           </div>
         </div>

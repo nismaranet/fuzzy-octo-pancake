@@ -6,6 +6,14 @@ import { ObjectId } from "mongodb";
 import { getCompanyMemberStats, getDriverStats } from "@/lib/trucky";
 import { redis } from "@/lib/redis";
 import { getWebConfig } from "@/lib/webConfig";
+import {
+  STAFF_SESSION_MAX_AGE_MS,
+  LAST_ACTIVE_THROTTLE_MS,
+  extractRequestFingerprint,
+  isPrivilegedUser,
+  recordSessionSecurityAlert,
+  notifySessionAnomaly,
+} from "@/lib/sessionSecurity";
 
 const baseAdapter = MongoDBAdapter(clientPromise);
 
@@ -49,7 +57,6 @@ const customAdapter: any = {
         ...(discordId
           ? [{ discordId: String(discordId) }, { id: String(discordId) }]
           : []),
-        ...(data.email ? [{ email: data.email }] : []),
       ],
     });
 
@@ -95,6 +102,242 @@ const customAdapter: any = {
       throw err;
     }
   },
+  async linkAccount(account: any) {
+    // Jangan pernah menyimpan token OAuth Discord (access_token/refresh_token/id_token) ke database
+    const sanitized = { ...account };
+    delete sanitized.access_token;
+    delete sanitized.refresh_token;
+    delete sanitized.id_token;
+    return baseAdapter.linkAccount!(sanitized);
+  },
+  async createSession(session: { sessionToken: string; userId: string; expires: Date }) {
+    const created = await baseAdapter.createSession!(session);
+    try {
+      const client = await clientPromise;
+      const db = client.db();
+      const userFilter = ObjectId.isValid(created.userId)
+        ? { _id: new ObjectId(created.userId) }
+        : ({ _id: created.userId } as any);
+      const dbUser = await db.collection("users").findOne(userFilter);
+
+      const now = new Date();
+      const privileged = await isPrivilegedUser(dbUser);
+      const effectiveExpires = privileged
+        ? new Date(Math.min(created.expires.getTime(), now.getTime() + STAFF_SESSION_MAX_AGE_MS))
+        : created.expires;
+
+      const fp = await extractRequestFingerprint();
+      await db.collection("sessions").updateOne(
+        { sessionToken: created.sessionToken },
+        {
+          $set: {
+            expires: effectiveExpires,
+            ...(fp
+              ? {
+                  securityMeta: {
+                    ...fp,
+                    createdAt: now,
+                    lastActiveAt: now,
+                  },
+                }
+              : {}),
+          },
+        },
+      );
+      return { ...created, expires: effectiveExpires };
+    } catch (err) {
+      console.error("❌ [AUTH] Error binding session fingerprint:", err);
+      return created;
+    }
+  },
+  async updateSession(session: any) {
+    try {
+      if (session?.expires) {
+        const client = await clientPromise;
+        const db = client.db();
+        const sessionDoc = await db
+          .collection("sessions")
+          .findOne({ sessionToken: session.sessionToken });
+        if (sessionDoc?.securityMeta?.createdAt) {
+          const userFilter =
+            sessionDoc.userId instanceof ObjectId || ObjectId.isValid(String(sessionDoc.userId))
+              ? { _id: new ObjectId(String(sessionDoc.userId)) }
+              : ({ _id: sessionDoc.userId } as any);
+          const dbUser = await db.collection("users").findOne(userFilter);
+          if (await isPrivilegedUser(dbUser)) {
+            const hardCap =
+              new Date(sessionDoc.securityMeta.createdAt).getTime() +
+              STAFF_SESSION_MAX_AGE_MS;
+            if (new Date(session.expires).getTime() > hardCap) {
+              session = { ...session, expires: new Date(hardCap) };
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("❌ [AUTH] Error clamping staff session expiry:", err);
+    }
+    return baseAdapter.updateSession!(session);
+  },
+  async getSessionAndUser(sessionToken: string) {
+    const res = await baseAdapter.getSessionAndUser!(sessionToken);
+    if (!res) return null;
+
+    try {
+      const client = await clientPromise;
+      const db = client.db();
+      const userIdStr = String(res.user.id);
+      const userFilter = ObjectId.isValid(userIdStr)
+        ? { _id: new ObjectId(userIdStr) }
+        : ({ _id: userIdStr } as any);
+
+      const [sessionDoc, dbUser] = await Promise.all([
+        db.collection("sessions").findOne({ sessionToken }),
+        db.collection("users").findOne(userFilter),
+      ]);
+
+      const privileged = dbUser ? await isPrivilegedUser(dbUser) : false;
+
+      // 1. Paksa hard cap 48 jam absolut untuk sesi Manager/Admin/Owner
+      if (privileged && sessionDoc?.securityMeta?.createdAt) {
+        const elapsed =
+          Date.now() - new Date(sessionDoc.securityMeta.createdAt).getTime();
+        if (elapsed > STAFF_SESSION_MAX_AGE_MS) {
+          await Promise.resolve(baseAdapter.deleteSession?.(sessionToken)).catch(() => null);
+          if (process.env.REDIS_URL?.trim()) {
+            await redis.del(`session:profile:${userIdStr}`).catch(() => null);
+          }
+          return null;
+        }
+      }
+
+      const fp = await extractRequestFingerprint();
+      if (!fp) return res;
+
+      // 2. Bind-on-first-use untuk sesi lama pre-deploy (mencegah mass logout)
+      if (!sessionDoc?.securityMeta?.uaHash) {
+        await db.collection("sessions").updateOne(
+          { sessionToken },
+          {
+            $set: {
+              securityMeta: {
+                ...fp,
+                createdAt: sessionDoc?.createdAt || new Date(),
+                lastActiveAt: new Date(),
+              },
+            },
+          },
+        );
+        return res;
+      }
+
+      const targetDiscordId = String(dbUser?.discordId || userIdStr);
+      const now = new Date();
+      const storedLang = sessionDoc.securityMeta.primaryLang || null;
+
+      // 3. Cek ketidakcocokan Browser/OS Family atau bahasa utama browser -> AUTO-REVOKE SEKETIKA untuk semua user
+      const uaMismatch = sessionDoc.securityMeta.uaHash !== fp.uaHash;
+      const langMismatch = Boolean(
+        storedLang && fp.primaryLang && storedLang !== fp.primaryLang,
+      );
+      if (uaMismatch || langMismatch) {
+        await Promise.resolve(baseAdapter.deleteSession?.(sessionToken)).catch(() => null);
+        if (process.env.REDIS_URL?.trim()) {
+          await redis.del(`session:profile:${userIdStr}`).catch(() => null);
+        }
+        const detailText = `Cookie sesi dipakai dari perangkat/browser berbeda (${sessionDoc.securityMeta.deviceLabel} [${storedLang || "?"}] -> ${fp.deviceLabel} [${fp.primaryLang || "?"}], ${sessionDoc.securityMeta.country || "?"} -> ${fp.country || "?"}, IP ${fp.ipMasked || "-"}). Sesi diputus otomatis.`;
+        await Promise.allSettled([
+          recordSessionSecurityAlert({
+            db,
+            discordId: targetDiscordId,
+            action: "STOLEN_SESSION_DETECTED",
+            details: detailText,
+          }),
+          notifySessionAnomaly({
+            db,
+            discordId: targetDiscordId,
+            title: "🚨 Peringatan Keamanan: Sesi Ditutup Otomatis",
+            message:
+              `Kami mendeteksi akses mencurigakan pada sesi login Anda dari **${fp.deviceLabel}**` +
+              `${fp.country ? ` (${fp.country})` : ""} yang tidak cocok dengan perangkat awal (**${sessionDoc.securityMeta.deviceLabel}**).\n\n` +
+              `Sesi tersebut telah **diputus otomatis**. Jika bukan Anda, segera periksa keamanan PC/Discord Anda.`,
+            dedupKey: `sec:alert:ua:${targetDiscordId}`,
+          }),
+        ]);
+        return null;
+      }
+
+      // 4. Cek perubahan negara (CF-IPCountry) -> Strict Staff vs Silent Driver Update
+      const storedCountry = sessionDoc.securityMeta.country;
+      if (storedCountry && fp.country && storedCountry !== fp.country) {
+        if (privileged) {
+          // Staff/Manager/Owner: auto-revoke seketika
+          await Promise.resolve(baseAdapter.deleteSession?.(sessionToken)).catch(() => null);
+          if (process.env.REDIS_URL?.trim()) {
+            await redis.del(`session:profile:${userIdStr}`).catch(() => null);
+          }
+          const detailText = `Sesi Staff/Manager/Owner berpindah negara (${storedCountry} -> ${fp.country}, ${fp.deviceLabel}, IP ${fp.ipMasked || "-"}). Sesi diputus otomatis.`;
+          await Promise.allSettled([
+            recordSessionSecurityAlert({
+              db,
+              discordId: targetDiscordId,
+              action: "STOLEN_SESSION_COUNTRY_MISMATCH",
+              details: detailText,
+            }),
+            notifySessionAnomaly({
+              db,
+              discordId: targetDiscordId,
+              title: "🚨 Sesi Staff Diputus: Perubahan Negara Terdeteksi",
+              message:
+                `Sesi akun Staff/Manager Anda berpindah negara dari **${storedCountry}** ke **${fp.country}** (**${fp.deviceLabel}**). ` +
+                `Demi keamanan, sesi tersebut telah diputus otomatis dan silakan login ulang.`,
+              dedupKey: `sec:alert:country:${targetDiscordId}`,
+            }),
+          ]);
+          return null;
+        } else {
+          // Driver reguler: perbarui metadata lokasi secara senyap tanpa alert/DM agar bebas spam VPN/WARP
+          await db.collection("sessions").updateOne(
+            { sessionToken },
+            {
+              $set: {
+                "securityMeta.country": fp.country,
+                "securityMeta.ipMasked": fp.ipMasked,
+                "securityMeta.lastActiveAt": now,
+                ...(!storedLang && fp.primaryLang
+                  ? { "securityMeta.primaryLang": fp.primaryLang }
+                  : {}),
+              },
+            },
+          );
+          return res;
+        }
+      }
+
+      // 5. Perbarui lastActiveAt maksimal sekali tiap 5 menit (atau backfill primaryLang jika belum ada)
+      const lastActive = sessionDoc.securityMeta.lastActiveAt
+        ? new Date(sessionDoc.securityMeta.lastActiveAt).getTime()
+        : 0;
+      const needsLangBackfill = Boolean(!storedLang && fp.primaryLang);
+      if (now.getTime() - lastActive >= LAST_ACTIVE_THROTTLE_MS || needsLangBackfill) {
+        await db.collection("sessions").updateOne(
+          { sessionToken },
+          {
+            $set: {
+              "securityMeta.lastActiveAt": now,
+              ...(fp.ipMasked ? { "securityMeta.ipMasked": fp.ipMasked } : {}),
+              ...(!storedCountry && fp.country ? { "securityMeta.country": fp.country } : {}),
+              ...(needsLangBackfill ? { "securityMeta.primaryLang": fp.primaryLang } : {}),
+            },
+          },
+        );
+      }
+    } catch (err) {
+      console.error("❌ [AUTH] Error validating session fingerprint:", err);
+    }
+
+    return res;
+  },
 };
 
 export const authOptions: NextAuthOptions = {
@@ -134,7 +377,6 @@ export const authOptions: NextAuthOptions = {
           image: imageUrl,
         } as any;
       },
-      allowDangerousEmailAccountLinking: true,
     }),
   ],
   callbacks: {

@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { compressImageToWebP } from "@/lib/imageUtils";
 import { showAlert, showConfirm } from "@/lib/dialog";
+import ActiveSessionsCard from "./ActiveSessionsCard";
 
 
 export default function SettingsClient() {
@@ -49,20 +50,20 @@ export default function SettingsClient() {
     text: string;
   } | null>(null);
 
-  // Tab State: "profile" | "sync"
-  const [activeTab, setActiveTab] = useState<"profile" | "sync">("profile");
+  // Tab State: "profile" | "sync" | "security"
+  const [activeTab, setActiveTab] = useState<"profile" | "sync" | "security">("profile");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam === "sync" || tabParam === "profile") {
+      if (tabParam === "sync" || tabParam === "profile" || tabParam === "security") {
         setActiveTab(tabParam);
       }
     }
   }, []);
 
-  const handleTabChange = (tab: "profile" | "sync") => {
+  const handleTabChange = (tab: "profile" | "sync" | "security") => {
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -459,6 +460,18 @@ export default function SettingsClient() {
             {(truckersmpId || isHaulmpDriver) && (
               <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block ring-2 ring-black" />
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("security")}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+              activeTab === "security"
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                : "text-gray-400 hover:text-foreground hover:bg-white/5"
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>Keamanan &amp; Sesi</span>
           </button>
         </div>
 
@@ -918,6 +931,9 @@ export default function SettingsClient() {
             )}
           </div>
         )}
+
+        {/* TAB 3: KEAMANAN & SESI AKTIF */}
+        {activeTab === "security" && <ActiveSessionsCard />}
       </div>
     </main>
   );

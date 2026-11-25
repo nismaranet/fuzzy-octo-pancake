@@ -39,10 +39,10 @@ export async function updateProfile(formData: FormData) {
     const client = await clientPromise;
     const db = client.db();
 
-    // 1. Ambil data profil lama untuk mengecek URL foto lama
+    // 1. Ambil data profil lama untuk mengecek URL foto lama (berdasarkan discordId kanonis)
     const oldUser = await db
       .collection("users")
-      .findOne({ email: session.user.email });
+      .findOne({ discordId: String(session.user.discordId) });
 
     if (!oldUser) {
       return { success: false, message: "User tidak ditemukan." };
@@ -71,7 +71,7 @@ export async function updateProfile(formData: FormData) {
 
     // 3. Eksekusi Update ke Database[cite: 17]
     const updateResult = await db.collection("users").updateOne(
-      { email: session.user.email },
+      { _id: oldUser._id },
       {
         $set: {
           name: name,
@@ -102,14 +102,14 @@ export async function updateProfile(formData: FormData) {
 export async function getUserSettings() {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.email) return null;
+  if (!session || !session.user?.discordId) return null;
 
   try {
     const client = await clientPromise;
     const db = client.db();
     const user = await db
       .collection("users")
-      .findOne({ email: session.user.email });
+      .findOne({ discordId: String(session.user.discordId) });
 
     if (!user) return null;
 
@@ -154,14 +154,14 @@ export async function getUserSettings() {
 
 export async function submitHaulmpApplication(notes?: string) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
+  if (!session || !session.user?.discordId) {
     return { success: false, message: "Unauthorized. Silakan login kembali." };
   }
 
   try {
     const client = await clientPromise;
     const db = client.db();
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await db.collection("users").findOne({ discordId: String(session.user.discordId) });
 
     if (!user) {
       return { success: false, message: "User tidak ditemukan." };
@@ -251,14 +251,14 @@ export async function submitHaulmpApplication(notes?: string) {
 
 export async function cancelHaulmpApplication() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
+  if (!session || !session.user?.discordId) {
     return { success: false, message: "Unauthorized." };
   }
 
   try {
     const client = await clientPromise;
     const db = client.db();
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await db.collection("users").findOne({ discordId: String(session.user.discordId) });
 
     if (!user) {
       return { success: false, message: "User tidak ditemukan." };
@@ -294,7 +294,7 @@ export async function cancelHaulmpApplication() {
 
 export async function syncTruckersMP(tmpId: number) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
+  if (!session || !session.user?.discordId) {
     return { success: false, message: "Unauthorized." };
   }
 
@@ -315,9 +315,10 @@ export async function syncTruckersMP(tmpId: number) {
     const client = await clientPromise;
     const db = client.db();
     const usersCol = db.collection("users");
+    const myDiscordId = String(session.user.discordId);
 
     const existingUser = await usersCol.findOne({ truckersmpId: tmpId.toString() });
-    if (existingUser && existingUser.email !== session.user.email) {
+    if (existingUser && String(existingUser.discordId) !== myDiscordId) {
       return { success: false, message: "ID TruckersMP ini sudah ditautkan ke akun lain." };
     }
 
@@ -334,7 +335,7 @@ export async function syncTruckersMP(tmpId: number) {
     }
 
     const updateResult = await usersCol.updateOne(
-      { email: session.user.email },
+      { discordId: myDiscordId },
       {
         $set: updateFields,
       }
@@ -354,7 +355,7 @@ export async function syncTruckersMP(tmpId: number) {
 
 export async function unlinkTruckersMP() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
+  if (!session || !session.user?.discordId) {
     return { success: false, message: "Unauthorized." };
   }
 
@@ -364,7 +365,7 @@ export async function unlinkTruckersMP() {
     const usersCol = db.collection("users");
 
     const updateResult = await usersCol.updateOne(
-      { email: session.user.email },
+      { discordId: String(session.user.discordId) },
       { 
         $unset: { truckersmpId: "" },
         $set: { isTmpDriver: false }
@@ -385,7 +386,7 @@ export async function unlinkTruckersMP() {
 
 export async function generateTrackerToken() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
+  if (!session || !session.user?.discordId) {
     return { success: false, message: "Unauthorized. Silakan login kembali.", token: null };
   }
 
@@ -394,7 +395,7 @@ export async function generateTrackerToken() {
     const db = client.db();
     const usersCol = db.collection("users");
 
-    const user = await usersCol.findOne({ email: session.user.email });
+    const user = await usersCol.findOne({ discordId: String(session.user.discordId) });
     if (!user) {
       return { success: false, message: "User tidak ditemukan.", token: null };
     }
