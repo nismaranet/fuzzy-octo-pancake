@@ -6,6 +6,37 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id/
 
 ---
 
+## [1.5.0] - 2026-11-25
+
+### Added
+- **Nismara Community Market (`/community-market` & `/dashboard/manage/community-market`):**
+  - Bursa perdagangan P2P untuk **Voucher** (termasuk badge transparan *Unlimited* / *Maks. Potongan*) dan **Tiket Penghapus Penalti Safebox**, dilengkapi fitur **Sell Listing**, **Buy Order** dengan sistem escrow NC atomik (refund 100% jika dibatalkan/kedaluwarsa), pajak penjual 11%, sistem ulasan reputasi penjual, dan *auto-expiry sweeper*.
+  - Tarif iklan gratis eksklusif untuk **Nismara+ aktif** & **Discord Server Booster**, proteksi kunci non-tradable pada voucher gaji manager (`MANAGER_SALARY_*`), *Safebox downgrade guard*, tombol **Jual 1-Klik** di halaman `/dashboard/vouchers` & `/dashboard/garage`, serta panel konfigurasi + **Live Price Range Simulator** di Dashboard Manage.
+- **Voucher Operasional Garasi (`GARAGE_RENT`) & Owner Manual Voucher Lab (`/dashboard/manage/vouchers`):**
+  - Mengganti kategori `GARAGE_UPGRADE` yang belum terpakai menjadi **`GARAGE_RENT`** dengan pemasangan atomik ke siklus tagihan berikutnya, dukungan perpanjangan **gratis 100%**, dan integrasi penuh pada cron `garage-rent`, Season Pass, Giveaway, dan N+ Weekly Quests.
+  - Menambahkan halaman khusus Owner untuk pembuatan & pencabutan voucher uji coba manual lengkap dengan audit log wajib (`vouchergrantlogs`).
+- **Servis / Replace Lebih Awal & Bundling Komponen Armada (`/dashboard/garage/fleet/[id]`):**
+  - Driver kini dapat melakukan **Servis Rutin Lebih Awal** (`>= 50%` pemakaian interval), **Ganti Baru Lebih Awal** (`wear >= 50%`), serta menggabungkan beberapa komponen dalam 1 tiket servis sekaligus untuk menghemat biaya admin & memaksimalkan Voucher `FLEET_MAINTENANCE` (dengan perhitungan boost mekanik *live* via `lib/fleetMaintenance.ts`).
+- **Nismara Rewind 2026, Tema Holiday, Driving Score & Statistik Publik:**
+  - Halaman interaktif **Nismara Rewind 2026** (`/rewind`) lengkap dengan audio & ekspor kartu ringkasan, dekorasi tema *Holiday* + klaim hadiah musiman, kartu **Driving Score**, halaman **Statistik Publik** (`/statistics`), **Tiered NC Boost Events** (Grade A/S), serta peningkatan Special Contract divisi Truck & Coach.
+- **Web Config Manager & Sistem Account Hold 90 Hari:**
+  - Panel manajemen konfigurasi dinamis (`/dashboard/manage/data/web-config`), sistem pembekuan akun 90 hari (`accountHold`) yang membekukan tagihan garasi/akses sementara, serta sinkronisasi Steam ID Trucky di NextAuth.
+
+### Changed
+- **Rebalance Ekonomi Armada (Paket D1):**
+  - Kenaikan harga beli **+55%** (dibulatkan kelipatan `500 NC`) untuk seluruh `Truck` dan `Car` di `fleetstores`, sementara `Bus / Coaches` tetap **+0%**.
+  - Biaya *Replace* (`component_cost_unfix_wear`) disesuaikan menjadi `10.000 / 14.000 / 22.000 / 28.000 NC` (`74.000 NC` per set) untuk Truck & Bus, serta proporsional `3.500 / 5.000 / 8.000 / 10.000 NC` (`26.500 NC` per set) untuk Car dengan auto-preset di form Admin Fleet Store.
+  - Menampilkan baris **Bagi Hasil Pemilik Armada (`25%` / `20%`)** pada rincian keuangan `/jobs/[jobId]`.
+- **Navigasi Navbar:** Menu **Market** kini memayungi **Mod Workshop**, **Community Market**, dan **Fuel Market**.
+- **Form Pembuatan Voucher Manage:** Menambahkan pengaturan `Maks. Potongan (NC)` dan `Masa Berlaku (Hari)` serta menyembunyikan input durasi jam untuk voucher non-booster di Season Pass, Giveaway, dan N+ Weekly Quests.
+
+### Fixed
+- **Bug Kritis Threshold Pembelian Armada (`order/[id]/complete`):** Memperbaiki kesalahan yang sebelumnya menyalin harga `component_cost_unfix_wear` ke threshold kilometer `fleet.maintenance` saat pembelian armada baru.
+- **Validasi Server `wear >= 100%` & Cron Perawatan:** Memaksa mode `replace` di server bila komponen mencapai wear 100%, mendukung reset wear selektif per komponen (`replaceComponents`), menyinkronkan durasi Transmisi & default interval (`45k / 20k / 60k / 35k`), serta memicu `need_maintenance` saat wear mencapai 100%.
+- **Resilience Auth NextAuth:** Menangani race condition `E11000` saat pembuatan akun paralel serta memperbaiki fallback `baseIntervals` pada halaman detail & daftar fleet.
+
+---
+
 ## [1.4.0] - 2026-11-14
 
 ### Added
