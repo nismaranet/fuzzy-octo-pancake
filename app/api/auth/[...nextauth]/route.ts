@@ -3,8 +3,9 @@ import DiscordProvider from "next-auth/providers/discord";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { getCompanyMemberStats } from "@/lib/trucky";
+import { getCompanyMemberStats, getDriverStats } from "@/lib/trucky";
 import { redis } from "@/lib/redis";
+import { getWebConfig } from "@/lib/webConfig";
 
 const baseAdapter = MongoDBAdapter(clientPromise);
 
@@ -73,7 +74,26 @@ const customAdapter: any = {
       };
     }
 
-    return baseAdapter.createUser!(data);
+    try {
+      return await baseAdapter.createUser!(data);
+    } catch (err: any) {
+      // Resilience terhadap race condition unique index discordId_unique (E11000)
+      if (err?.code === 11000 && discordId) {
+        const dup = await db.collection("users").findOne({
+          discordId: String(discordId),
+        });
+        if (dup) {
+          return {
+            id: dup._id.toString(),
+            name: dup.name || data.name,
+            email: data.email || dup.email || "",
+            image: data.image || dup.image || null,
+            emailVerified: dup.emailVerified || null,
+          };
+        }
+      }
+      throw err;
+    }
   },
 };
 
@@ -93,6 +113,26 @@ export const authOptions: NextAuthOptions = {
         params: {
           scope: "email identify",
         },
+      },
+      profile(profile) {
+        let imageUrl: string;
+        if (profile.avatar === null) {
+          const defaultAvatarNumber =
+            profile.discriminator === "0"
+              ? Number(BigInt(profile.id) >> BigInt(22)) % 6
+              : parseInt(profile.discriminator, 10) % 5;
+          imageUrl = `https://cdn.discordapp.com/embed/avatars/${defaultAvatarNumber}.png`;
+        } else {
+          const format = profile.avatar.startsWith("a_") ? "gif" : "png";
+          imageUrl = `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.${format}`;
+        }
+        return {
+          id: profile.id,
+          discordId: profile.id,
+          name: profile.global_name ?? profile.username,
+          email: profile.email,
+          image: imageUrl,
+        } as any;
       },
       allowDangerousEmailAccountLinking: true,
     }),
@@ -127,7 +167,6 @@ export const authOptions: NextAuthOptions = {
       let isBooster = false;
       let nismaraplus: any = null;
       const guildId = process.env.DISCORD_GUILD_ID || "863959415702028318";
-      const managerRoleId = "1406574228794507354";
 
       // 1. Ambil data User dari DB terlebih dahulu
       const dbUser = await db
@@ -161,8 +200,10 @@ export const authOptions: NextAuthOptions = {
             if (response.ok) {
               isInDiscordGuild = true;
               const memberData = await response.json();
+              const webConfig = await getWebConfig();
+              const managerRoleId = webConfig.discordRoles.managerRoleId;
 
-              if (memberData.roles.includes(managerRoleId))
+              if (managerRoleId && memberData.roles.includes(managerRoleId))
                 userRole = "manager";
               else
                 userRole = "user";
@@ -268,7 +309,9 @@ export const authOptions: NextAuthOptions = {
           guildId,
         });
 
-        if (driverLink && isInDiscordGuild !== false) {
+        const isOnAccountHold = dbUser?.accountHold?.status === true;
+
+        if (driverLink && isInDiscordGuild !== false && !isOnAccountHold) {
           isDriver = true;
           driverData = {
             truckyId: driverLink.truckyId,
@@ -281,26 +324,32 @@ export const authOptions: NextAuthOptions = {
             updateData.createdAt = driverLink.createdAt;
           }
 
-          // --- SYNC TRUCKY RANK (12 Hour Throttle) ---
+          // --- SYNC TRUCKY RANK & STEAM ID (12 Hour Throttle, atau segera jika steamId kosong) ---
           const lastTruckySync = dbUser?.lastTruckySync
             ? new Date(dbUser.lastTruckySync).getTime()
             : 0;
-            
-          const twelveHours = 12 * 60 * 60 * 1000;
 
-          if (now - lastTruckySync > twelveHours) {
+          const twelveHours = 12 * 60 * 60 * 1000;
+          const missingSteamId = !dbUser?.steamId;
+
+          if (now - lastTruckySync > twelveHours || missingSteamId) {
             try {
               const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID || "35643";
-              const truckyStats = await getCompanyMemberStats(Number(NISMARA_COMPANY_ID), driverLink.truckyId);
-              
+              const [truckyStats, driverProfile] = await Promise.all([
+                getCompanyMemberStats(Number(NISMARA_COMPANY_ID), driverLink.truckyId),
+                getDriverStats(Number(driverLink.truckyId)),
+              ]);
+
               // Simpan Role (jabatan)
-              if (truckyStats?.role) {
-                updateData.truckyRole = typeof truckyStats.role === "object" ? truckyStats.role.name : truckyStats.role;
-                if (typeof truckyStats.role === "object" && truckyStats.role.color) {
-                  updateData.truckyRoleColor = truckyStats.role.color;
+              const roleObj = truckyStats?.role || driverProfile?.role;
+              if (roleObj) {
+                updateData.truckyRole = typeof roleObj === "object" ? roleObj.name : roleObj;
+                if (typeof roleObj === "object") {
+                  if (roleObj.id) updateData.truckyRoleId = Number(roleObj.id);
+                  if (roleObj.color) updateData.truckyRoleColor = roleObj.color;
                 }
               }
-              
+
               // Simpan Rank (tingkatan/level)
               if (truckyStats?.rank) {
                 updateData.truckyRank = typeof truckyStats.rank === "object" ? truckyStats.rank.name : truckyStats.rank;
@@ -308,6 +357,15 @@ export const authOptions: NextAuthOptions = {
                   updateData.truckyRankColor = truckyStats.rank.color;
                 }
               }
+
+              // Simpan Steam ID (String presisi 64-bit dari Trucky API v2)
+              if (driverProfile?.steam_profile?.steam_id) {
+                updateData.steamId = String(driverProfile.steam_profile.steam_id);
+              }
+              if (driverProfile?.steam_profile?.steam_username) {
+                updateData.steamUsername = String(driverProfile.steam_profile.steam_username);
+              }
+
               updateData.lastTruckySync = new Date();
             } catch (err) {
               console.error("❌ [FETCH] Gagal menghubungi Trucky API:", err);
