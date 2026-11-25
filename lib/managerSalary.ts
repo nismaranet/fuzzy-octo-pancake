@@ -11,7 +11,7 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID || "863959415702028318";
 
 export interface VoucherRewardTemplate {
   title: string;
-  category: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_UPGRADE" | "NC_BOOSTER";
+  category: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_RENT" | "GARAGE_UPGRADE" | "NC_BOOSTER";
   discountType: "percentage" | "fixed";
   discountValue: number;
   durationHours?: number;
@@ -284,7 +284,7 @@ export async function calculateManagerPerformance(managerId: string, month: stri
 
   // 4. Penyelenggaraan Konvoi (Base 2 Poin + 1 Poin per Peserta Terdaftar Luar)
   const convoys = await db
-    .collection("convoylobbies")
+    .collection("convoylobby")
     .find({
       setBy: String(managerId),
       startDate: { $gte: startOfMonth, $lt: endOfMonth },
@@ -592,6 +592,7 @@ export async function claimManagerSalary(managerId: string, month: string) {
         discountValue: vTemplate.discountValue,
         durationHours: vTemplate.durationHours || 0,
         source: `MANAGER_SALARY_${month}`,
+        tradable: false,
         expiresInDays: 60, // Masa berlaku voucher 60 hari
       });
 

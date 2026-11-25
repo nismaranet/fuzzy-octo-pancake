@@ -46,11 +46,31 @@ export async function POST(request: Request) {
     const newCapacity = 10 + (newLevel - 1) * 5;
     const currentStock = userGarage.safeboxStock || 0;
 
-    // Pastikan tiket tidak melebih kapasitas baru
-    if (currentStock > newCapacity) {
-      return NextResponse.json({ 
-        error: `Downgrade gagal. Kapasitas baru (${newCapacity} tiket) lebih kecil dari jumlah tiket saat ini (${currentStock}). Silakan gunakan atau buang tiket Anda terlebih dahulu.` 
-      }, { status: 400 });
+    // Hitung juga tiket yang sedang tayang di Community Market agar tidak overflow saat dibatalkan
+    const listedAgg = await db
+      .collection("communitymarketlistings")
+      .aggregate([
+        {
+          $match: {
+            sellerDiscordId: String(discordId),
+            itemType: "PENALTY_TICKET",
+            status: "active",
+          },
+        },
+        { $group: { _id: null, total: { $sum: "$remainingQuantity" } } },
+      ])
+      .toArray();
+    const listedTickets = listedAgg[0]?.total || 0;
+    const totalOwnedTickets = currentStock + listedTickets;
+
+    // Pastikan tiket (tersedia + sedang dijual di Community Market) tidak melebihi kapasitas baru
+    if (totalOwnedTickets > newCapacity) {
+      return NextResponse.json(
+        {
+          error: `Downgrade gagal. Kapasitas baru (${newCapacity} tiket) lebih kecil dari total tiket Anda saat ini (${currentStock} di Safebox${listedTickets > 0 ? ` + ${listedTickets} sedang dijual di Community Market` : ""}).`,
+        },
+        { status: 400 }
+      );
     }
 
     // Formula total Op Cost untuk suatu level secara akumulatif:
