@@ -118,6 +118,8 @@ export async function PUT(
     revalidatePath(`/dashboard/manage/giveaways/${id}`);
     revalidatePath("/giveaways");
     revalidatePath(`/giveaways/${updated.slug}`);
+    revalidatePath("/calendar");
+    revalidatePath("/");
 
     return NextResponse.json(
       { success: true, message: "Giveaway berhasil diperbarui.", giveaway: updated },
@@ -148,6 +150,8 @@ export async function DELETE(
 
     revalidatePath("/dashboard/manage/giveaways");
     revalidatePath("/giveaways");
+    revalidatePath("/calendar");
+    revalidatePath("/");
 
     return NextResponse.json(
       { success: true, message: "Giveaway berhasil dihapus." },

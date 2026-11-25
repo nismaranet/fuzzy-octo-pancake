@@ -358,7 +358,9 @@ export interface UserQuestProgressItem {
     voucherCategory?: string;
     voucherDiscountType?: string;
     voucherDiscountValue?: number;
+    voucherMaxDiscount?: number;
     voucherDurationHours?: number;
+    voucherExpireDays?: number;
     description?: string;
   };
 }
@@ -712,9 +714,13 @@ export async function claimWeeklyQuestReward(discordId: string, questId: string)
         category: reward.voucherCategory,
         discountType: reward.voucherDiscountType || "percentage",
         discountValue: reward.voucherDiscountValue || 0,
-        durationHours: reward.voucherDurationHours || 0,
+        maxDiscount: reward.voucherCategory === "NC_BOOSTER" ? 0 : reward.voucherMaxDiscount || 0,
+        durationHours: reward.voucherCategory === "NC_BOOSTER" ? reward.voucherDurationHours || 2 : 0,
         source: `NPLUS_WEEKLY_QUEST_${weekInfo.weekKey}`,
-        expiresInDays: 30,
+        expiresInDays:
+          reward.voucherExpireDays && reward.voucherExpireDays > 0
+            ? reward.voucherExpireDays
+            : 30,
       });
 
       grantedVoucherId = voucher._id;

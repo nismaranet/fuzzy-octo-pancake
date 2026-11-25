@@ -769,8 +769,14 @@ export async function executeGiveawayDraw(
                 voucherTitle = `Diskon Mod Market ${discountVal}%`;
               } else if (reward.voucherCategory === "FLEET_BUY") {
                 voucherTitle = `Diskon Pembelian Fleet ${discountVal}%`;
-              } else if (reward.voucherCategory === "GARAGE_UPGRADE") {
-                voucherTitle = `Diskon Upgrade Garasi ${discountVal}%`;
+              } else if (
+                reward.voucherCategory === "GARAGE_RENT" ||
+                reward.voucherCategory === "GARAGE_UPGRADE"
+              ) {
+                voucherTitle =
+                  discountVal === 100
+                    ? "Bebas Biaya Operasional Garasi (100%)"
+                    : `Diskon Operasional Garasi ${discountVal}%`;
               } else {
                 voucherTitle = `Voucher ${tier.tierTitle}`;
               }
@@ -786,8 +792,8 @@ export async function executeGiveawayDraw(
               category: reward.voucherCategory,
               discountType: reward.voucherDiscountType || "percentage",
               discountValue: discountVal,
-              durationHours: durationHrs,
-              maxDiscount: 0,
+              durationHours: reward.voucherCategory === "NC_BOOSTER" ? durationHrs : 0,
+              maxDiscount: reward.voucherCategory === "NC_BOOSTER" ? 0 : Number(reward.voucherMaxDiscount || 0),
               minSpend: 0,
               status: "ACTIVE",
               source: `GIVEAWAY_${lockedGiveaway.slug.toUpperCase()}`,

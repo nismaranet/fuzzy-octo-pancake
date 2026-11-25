@@ -10,7 +10,7 @@ const userVoucherSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     category: {
       type: String,
-      enum: ["FLEET_MAINTENANCE", "FLEET_BUY", "MARKET_MOD", "GARAGE_UPGRADE", "NC_BOOSTER"],
+      enum: ["FLEET_MAINTENANCE", "FLEET_BUY", "MARKET_MOD", "GARAGE_RENT", "GARAGE_UPGRADE", "NC_BOOSTER"],
       required: true,
       index: true,
     },
@@ -26,11 +26,12 @@ const userVoucherSchema = new mongoose.Schema(
     minSpend: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: ["ACTIVE", "USED", "EXPIRED"],
+      enum: ["ACTIVE", "LISTED", "USED", "EXPIRED"],
       default: "ACTIVE",
       index: true,
     },
-    source: { type: String, default: "SEASONAL_PASS" }, // e.g. SEASONAL_PASS_S1, EVENT, ADMIN_GRANT
+    tradable: { type: Boolean, default: true, index: true },
+    source: { type: String, default: "SEASONAL_PASS" }, // e.g. SEASONAL_PASS_S1, EVENT, ADMIN_GRANT, MANAGER_SALARY_YYYY-MM
     expiresAt: { type: Date, default: null },
     usedAt: { type: Date, default: null },
     usedOrderId: { type: mongoose.Schema.Types.ObjectId, default: null },

@@ -17,14 +17,17 @@ import HireMechanicModal from "./HireMechanicModal";
 import { MechanicSpecialty } from "@/lib/constants/mechanics";
 import { Modal } from "@/components/ui/Modal";
 import { showAlert, showConfirm } from "@/lib/dialog";
+import { NO_CACHE_FETCH_OPTIONS } from "@/lib/antiCache";
 import { Input } from "@/components/ui/input";
+import CreateListingModal from "@/components/community-market/CreateListingModal";
 
 
 interface GarageClientProps {
   garage: any;
+  rentVouchers?: any[];
 }
 
-export default function GarageClient({ garage }: GarageClientProps) {
+export default function GarageClient({ garage, rentVouchers = [] }: GarageClientProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSpecialty, setSelectedSpecialty] =
     useState<MechanicSpecialty>("umum");
@@ -38,6 +41,67 @@ export default function GarageClient({ garage }: GarageClientProps) {
   const [safeboxUpgradeModalOpen, setSafeboxUpgradeModalOpen] = useState(false);
   const [safeboxDowngradeModalOpen, setSafeboxDowngradeModalOpen] = useState(false);
   const [safeboxMultiplier, setSafeboxMultiplier] = useState(1);
+  const [sellSafeboxModalOpen, setSellSafeboxModalOpen] = useState(false);
+  const [rentVoucherModalOpen, setRentVoucherModalOpen] = useState(false);
+  const [applyingRentVoucherId, setApplyingRentVoucherId] = useState<string | null>(null);
+
+  const computeRentDiscount = (opCost: number, voucher: any) => {
+    if (!voucher || opCost <= 0) return 0;
+    let d = 0;
+    if (voucher.discountType === "fixed") {
+      d = Math.min(opCost, Number(voucher.discountValue || 0));
+    } else {
+      d = Math.round(opCost * (Number(voucher.discountValue || 0) / 100));
+      if (voucher.maxDiscount && Number(voucher.maxDiscount) > 0) {
+        d = Math.min(d, Number(voucher.maxDiscount));
+      }
+    }
+    return Math.max(0, Math.min(opCost, d));
+  };
+
+  const pendingRentVoucher = garage.pendingRentVoucher?.voucherId
+    ? garage.pendingRentVoucher
+    : null;
+  const pendingRentDiscount = computeRentDiscount(
+    Number(garage.operational_cost || 0),
+    pendingRentVoucher
+  );
+  const estimatedNextBill = Math.max(
+    0,
+    Number(garage.operational_cost || 0) - pendingRentDiscount
+  );
+
+  const handleApplyRentVoucher = async (voucher: any) => {
+    const disc = computeRentDiscount(Number(garage.operational_cost || 0), voucher);
+    const est = Math.max(0, Number(garage.operational_cost || 0) - disc);
+    const ok = await showConfirm(
+      `Pasang voucher "${voucher.title}" ke tagihan operasional garasi berikutnya? Estimasi tagihan turun dari ${Number(garage.operational_cost || 0).toLocaleString("id-ID")} NC menjadi ${est.toLocaleString("id-ID")} NC.`
+    );
+    if (!ok) return;
+
+    setApplyingRentVoucherId(voucher._id);
+    try {
+      const res = await fetch("/api/garage/apply-rent-voucher", {
+        method: "POST",
+        ...NO_CACHE_FETCH_OPTIONS,
+        headers: {
+          ...NO_CACHE_FETCH_OPTIONS.headers,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ voucherId: voucher._id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Gagal memasang voucher operasional garasi.");
+      }
+      await showAlert(data.message || "Voucher operasional garasi berhasil dipasang!");
+      window.location.reload();
+    } catch (err: any) {
+      await showAlert(err.message || "Gagal memasang voucher.");
+    } finally {
+      setApplyingRentVoucherId(null);
+    }
+  };
 
   const [loadingAction, setLoadingAction] = useState(false);
   
@@ -426,12 +490,34 @@ export default function GarageClient({ garage }: GarageClientProps) {
               Biaya Operasional (Bulan)
             </p>
             <div className="flex flex-col mb-3">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-red-400">
-                  {garage.operational_cost.toLocaleString("id-ID")}
-                </span>
-                <span className="text-muted-foreground font-bold">NC</span>
-              </div>
+              {pendingRentVoucher ? (
+                <div className="space-y-1">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-muted-foreground line-through">
+                      {garage.operational_cost.toLocaleString("id-ID")} NC
+                    </span>
+                    <span className="text-3xl font-black text-emerald-400">
+                      {estimatedNextBill === 0
+                        ? "GRATIS"
+                        : estimatedNextBill.toLocaleString("id-ID")}
+                    </span>
+                    {estimatedNextBill > 0 && (
+                      <span className="text-emerald-400/80 font-bold">NC</span>
+                    )}
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-black text-emerald-400">
+                    <Ticket size={11} />
+                    Voucher Terpasang: {pendingRentVoucher.title || pendingRentVoucher.code} (-{pendingRentDiscount.toLocaleString("id-ID")} NC)
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-red-400">
+                    {garage.operational_cost.toLocaleString("id-ID")}
+                  </span>
+                  <span className="text-muted-foreground font-bold">NC</span>
+                </div>
+              )}
               <div className="flex flex-col gap-0.5 mt-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 <div className="flex justify-between items-center border-b border-border/30 pb-0.5">
                   <span>Fleet</span>
@@ -447,17 +533,33 @@ export default function GarageClient({ garage }: GarageClientProps) {
                 </div>
               </div>
             </div>
-            {garage.next_payment_date ? (
-              <p className="text-[10px] text-muted-foreground uppercase font-medium flex items-center gap-1">
-                <AlertTriangle size={10} className="text-amber-500" />
-                Jatuh Tempo:{" "}
-                {new Date(garage.next_payment_date).toLocaleDateString("id-ID")}
-              </p>
-            ) : (
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">
-                Tidak ada tagihan
-              </p>
-            )}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+              {garage.next_payment_date ? (
+                <p className="text-[10px] text-muted-foreground uppercase font-medium flex items-center gap-1">
+                  <AlertTriangle size={10} className="text-amber-500" />
+                  Jatuh Tempo:{" "}
+                  {new Date(garage.next_payment_date).toLocaleDateString("id-ID", {
+                    timeZone: "Asia/Jakarta",
+                  })}
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground uppercase font-medium">
+                  Tidak ada tagihan
+                </p>
+              )}
+
+              {!pendingRentVoucher &&
+                garage.operational_cost > 0 &&
+                rentVouchers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setRentVoucherModalOpen(true)}
+                    className="text-[10px] font-black uppercase tracking-wider bg-sky-500/15 text-sky-400 border border-sky-500/30 px-2.5 py-1 rounded-lg hover:bg-sky-500/25 transition-colors shrink-0"
+                  >
+                    Pakai Voucher ({rentVouchers.length})
+                  </button>
+                )}
+            </div>
           </div>
         </div>
 
@@ -524,7 +626,7 @@ export default function GarageClient({ garage }: GarageClientProps) {
             </p>
             <div className="flex items-baseline gap-2 mb-2">
               <span className="text-3xl font-black text-red-500">
-                {garage.safeboxStock || 0}
+                {(garage.safeboxStock || 0) + (garage.safeboxListed || 0)}
               </span>
               <span className="text-muted-foreground font-bold">
                 / {10 + ((garage.safeboxLevel || 1) - 1) * 5} Tiket
@@ -533,19 +635,36 @@ export default function GarageClient({ garage }: GarageClientProps) {
             
             <div className="flex flex-col gap-1 text-[10px] uppercase font-bold text-muted-foreground">
                <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-red-500" /> Tersedia: {garage.safeboxStock || 0} Tiket</div>
+               {(garage.safeboxListed || 0) > 0 && (
+                 <div className="flex items-center gap-1.5">
+                   <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                   <Link href="/community-market?tab=my" className="hover:underline text-amber-400">
+                     Di Market: {garage.safeboxListed} Tiket
+                   </Link>
+                 </div>
+               )}
             </div>
             
             <div className="flex flex-col mt-3 pt-3 border-t border-border/50 space-y-3">
               <p className="text-[10px] text-muted-foreground uppercase font-medium">
                 Safebox Level {garage.safeboxLevel || 1}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Link
                   href="/dashboard/points"
                   className="flex-1 text-center text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-500 px-2 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors"
                 >
                   Tukar Job
                 </Link>
+                {(garage.safeboxStock || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSellSafeboxModalOpen(true)}
+                    className="flex-1 text-center text-[10px] font-bold uppercase tracking-widest bg-sky-500/10 text-sky-400 px-2 py-1.5 rounded-lg hover:bg-sky-500/20 transition-colors"
+                  >
+                    Jual Tiket
+                  </button>
+                )}
                 {canDowngradeSafebox && (
                   <button
                     onClick={() => setSafeboxDowngradeModalOpen(true)}
@@ -1108,6 +1227,63 @@ export default function GarageClient({ garage }: GarageClientProps) {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        isOpen={rentVoucherModalOpen}
+        onClose={() => setRentVoucherModalOpen(false)}
+        title="Pilih Voucher Operasional Garasi"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Voucher yang dipasang akan otomatis memotong tagihan operasional garasi Anda (saat ini{" "}
+            <strong className="text-foreground">
+              {Number(garage.operational_cost || 0).toLocaleString("id-ID")} NC
+            </strong>
+            ) ketika jatuh tempo. Maksimal 1 voucher per siklus tagihan.
+          </p>
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {rentVouchers.map((v: any) => {
+              const disc = computeRentDiscount(Number(garage.operational_cost || 0), v);
+              const est = Math.max(0, Number(garage.operational_cost || 0) - disc);
+              return (
+                <div
+                  key={v._id}
+                  className="p-3.5 rounded-xl bg-muted/40 border border-border flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-foreground truncate">{v.title}</p>
+                    <p className="text-xs text-emerald-400 font-bold mt-0.5">
+                      Hemat {disc.toLocaleString("id-ID")} NC → Estimasi bayar{" "}
+                      {est.toLocaleString("id-ID")} NC
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Kode: {v.code}
+                      {v.expiresAt
+                        ? ` · Exp: ${new Date(v.expiresAt).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" })}`
+                        : " · Permanen"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={applyingRentVoucherId === v._id}
+                    onClick={() => handleApplyRentVoucher(v)}
+                    className="px-3.5 py-2 rounded-xl bg-sky-500 text-white text-xs font-black hover:bg-sky-600 disabled:opacity-50 shrink-0"
+                  >
+                    {applyingRentVoucherId === v._id ? "Memasang..." : "Pasang"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
+
+      <CreateListingModal
+        open={sellSafeboxModalOpen}
+        initialItemType="PENALTY_TICKET"
+        onClose={() => setSellSafeboxModalOpen(false)}
+        onSuccess={() => window.location.reload()}
+      />
     </div>
   );
 }

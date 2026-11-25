@@ -5,10 +5,12 @@ export interface IQuestReward {
   title: string;
   amount?: number;
   // Khusus Voucher
-  voucherCategory?: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_UPGRADE" | "NC_BOOSTER";
+  voucherCategory?: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_RENT" | "GARAGE_UPGRADE" | "NC_BOOSTER";
   voucherDiscountType?: "percentage" | "fixed";
   voucherDiscountValue?: number;
+  voucherMaxDiscount?: number;
   voucherDurationHours?: number;
+  voucherExpireDays?: number;
   description?: string;
 }
 
@@ -39,7 +41,7 @@ const questRewardSchema = new mongoose.Schema(
     amount: { type: Number, default: 0 },
     voucherCategory: {
       type: String,
-      enum: ["FLEET_MAINTENANCE", "FLEET_BUY", "MARKET_MOD", "GARAGE_UPGRADE", "NC_BOOSTER"],
+      enum: ["FLEET_MAINTENANCE", "FLEET_BUY", "MARKET_MOD", "GARAGE_RENT", "GARAGE_UPGRADE", "NC_BOOSTER"],
     },
     voucherDiscountType: {
       type: String,
@@ -47,7 +49,9 @@ const questRewardSchema = new mongoose.Schema(
       default: "percentage",
     },
     voucherDiscountValue: { type: Number, default: 0 },
+    voucherMaxDiscount: { type: Number, default: 0 },
     voucherDurationHours: { type: Number, default: 0 },
+    voucherExpireDays: { type: Number, default: 30 },
     description: { type: String, default: "" },
   },
   { _id: false }

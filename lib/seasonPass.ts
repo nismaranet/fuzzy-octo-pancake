@@ -977,9 +977,10 @@ export async function claimLevelReward(
           category: r.voucherCategory,
           discountType: r.voucherDiscountType || "percentage",
           discountValue: r.voucherDiscountValue || 0,
-          durationHours: r.voucherDurationHours || 0,
+          maxDiscount: r.voucherCategory === "NC_BOOSTER" ? 0 : r.voucherMaxDiscount || 0,
+          durationHours: r.voucherCategory === "NC_BOOSTER" ? r.voucherDurationHours || 2 : 0,
           source: `SEASONAL_PASS_S${seasonNumber}`,
-          expiresInDays: 90,
+          expiresInDays: r.voucherExpireDays && r.voucherExpireDays > 0 ? r.voucherExpireDays : 90,
         });
         if (createdVoucher?._id) {
           createdVoucherIds.push(createdVoucher._id);
@@ -1018,9 +1019,11 @@ export async function claimLevelReward(
         nplusUpdated = true;
 
         // Berikan Role Discord Nismara+ jika bot token dan role ID tersedia (non-fatal)
+        const { getWebConfig } = await import("@/lib/webConfig");
+        const webConfig = await getWebConfig();
         const botToken = process.env.DISCORD_BOT_TOKEN;
         const guildId = process.env.DISCORD_GUILD_ID;
-        const plusRoleId = process.env.DISCORD_NISMARAPLUS_ROLE_ID;
+        const plusRoleId = webConfig.discordRoles.nismaraPlusRoleId;
         if (botToken && guildId && plusRoleId) {
           try {
             await fetch(

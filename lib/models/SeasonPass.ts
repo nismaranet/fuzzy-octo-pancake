@@ -5,10 +5,12 @@ export interface RewardItem {
   title: string;
   description?: string;
   amount?: number; // For NC, Fuel, Safebox Ticket, or NPlus Trial Days
-  voucherCategory?: "FLEET_MAINTENANCE" | "FLEET_BUY" | "NC_BOOSTER" | "MARKET_MOD" | "GARAGE_UPGRADE";
+  voucherCategory?: "FLEET_MAINTENANCE" | "FLEET_BUY" | "NC_BOOSTER" | "MARKET_MOD" | "GARAGE_RENT" | "GARAGE_UPGRADE";
   voucherDiscountType?: "percentage" | "fixed";
   voucherDiscountValue?: number; // e.g. 25, 50, 100
+  voucherMaxDiscount?: number; // 0 = Unlimited
   voucherDurationHours?: number; // For NC Booster (e.g. 2, 6, 12, 24)
+  voucherExpireDays?: number; // Default 90 hari
   badgeId?: string; // e.g. "s1_bronze", "s1_silver", "s1_master", "s1_champion"
   badgeName?: string;
   iconName?: string;
@@ -49,7 +51,9 @@ const rewardItemSchema = new mongoose.Schema(
     voucherCategory: { type: String, default: null },
     voucherDiscountType: { type: String, default: null },
     voucherDiscountValue: { type: Number, default: 0 },
+    voucherMaxDiscount: { type: Number, default: 0 },
     voucherDurationHours: { type: Number, default: 0 },
+    voucherExpireDays: { type: Number, default: 90 },
     badgeId: { type: String, default: null },
     badgeName: { type: String, default: null },
     iconName: { type: String, default: null },

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { showAlert } from "@/lib/dialog";
 import { getAutoQuestDescription, resolveQuestDescription } from "@/lib/giveawayUtils";
+import { buildAutoVoucherTitle } from "@/lib/communityMarketShared";
 
 interface GiveawayFormClientProps {
   initialData?: any;
@@ -1032,14 +1033,10 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
                     {/* Baris 2 KHUSUS TIPE VOUCHER: Konfigurasi Kategori, Persen Diskon, Durasi Jam, dan Masa Berlaku Hari */}
                     {r.type === "VOUCHER" && (
                       <div className="p-3.5 rounded-xl bg-black/40 border border-border/60 space-y-3">
-                        <div
-                          className={`grid grid-cols-1 sm:grid-cols-2 ${
-                            r.voucherCategory === "NC_BOOSTER" ? "lg:grid-cols-4" : "lg:grid-cols-3"
-                          } gap-3`}
-                        >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <div>
                             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                              Kategori Voucher
+                              Jenis Voucher
                             </label>
                             <select
                               value={r.voucherCategory || "NC_BOOSTER"}
@@ -1049,55 +1046,62 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
                                 const item = updated[tIdx].rewards[rIdx];
                                 item.voucherCategory = cat;
                                 item.voucherExpireDays = item.voucherExpireDays ?? 30;
+                                item.voucherMaxDiscount = 0;
                                 if (cat === "FLEET_MAINTENANCE") {
                                   item.voucherDiscountValue = 100;
-                                  item.title = "Voucher Bebas Servis Armada (100%)";
+                                  item.voucherDurationHours = 0;
                                 } else if (cat === "NC_BOOSTER") {
                                   item.voucherDiscountValue = 50;
                                   item.voucherDurationHours = 24;
-                                  item.title = "Voucher NC Booster +50% (24 Jam)";
                                 } else if (cat === "MARKET_MOD") {
                                   item.voucherDiscountValue = 25;
-                                  item.title = "Voucher Diskon Mod Market 25%";
+                                  item.voucherDurationHours = 0;
                                 } else if (cat === "FLEET_BUY") {
                                   item.voucherDiscountValue = 15;
-                                  item.title = "Voucher Diskon Beli Fleet 15%";
-                                } else if (cat === "GARAGE_UPGRADE") {
-                                  item.voucherDiscountValue = 20;
-                                  item.title = "Voucher Diskon Upgrade Garasi 20%";
+                                  item.voucherDurationHours = 0;
+                                } else if (cat === "GARAGE_RENT" || cat === "GARAGE_UPGRADE") {
+                                  item.voucherDiscountValue = 25;
+                                  item.voucherDurationHours = 0;
                                 }
+                                item.title = buildAutoVoucherTitle({
+                                  category: cat,
+                                  discountValue: item.voucherDiscountValue,
+                                  durationHours: item.voucherDurationHours,
+                                  maxDiscount: item.voucherMaxDiscount,
+                                });
                                 setPrizes(updated);
                               }}
                               className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-bold outline-none"
                             >
-                              <option value="NC_BOOSTER">⚡ Booster NC</option>
-                              <option value="FLEET_MAINTENANCE">🔧 Servis Truk (Bebas / Diskon)</option>
-                              <option value="MARKET_MOD">🛒 Diskon Mod Market</option>
-                              <option value="FLEET_BUY">🚛 Diskon Pembelian Armada</option>
-                              <option value="GARAGE_UPGRADE">🏢 Diskon Upgrade Garasi</option>
+                              <option value="NC_BOOSTER">Booster NC</option>
+                              <option value="FLEET_MAINTENANCE">Diskon Servis Armada</option>
+                              <option value="FLEET_BUY">Diskon Beli Armada</option>
+                              <option value="GARAGE_RENT">Diskon Operasional Garasi</option>
+                              <option value="MARKET_MOD">Diskon Mod Workshop</option>
                             </select>
                           </div>
 
                           <div>
                             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                              {r.voucherCategory === "NC_BOOSTER" ? "Bonus Booster (%)" : "Nilai Diskon (%)"}
+                              {r.voucherCategory === "NC_BOOSTER" ? "Bonus NC (%)" : "Diskon (%)"}
                             </label>
                             <div className="relative">
                               <input
                                 type="number"
                                 min={1}
-                                max={100}
+                                max={r.voucherCategory === "NC_BOOSTER" ? 200 : 100}
                                 value={r.voucherDiscountValue ?? 50}
                                 onChange={(e) => {
                                   const val = Number(e.target.value);
                                   const updated = [...prizes];
                                   const item = updated[tIdx].rewards[rIdx];
                                   item.voucherDiscountValue = val;
-                                  if (item.voucherCategory === "NC_BOOSTER") {
-                                    item.title = `Voucher NC Booster +${val}% (${item.voucherDurationHours || 24} Jam)`;
-                                  } else if (item.voucherCategory === "FLEET_MAINTENANCE") {
-                                    item.title = val === 100 ? "Voucher Bebas Servis Armada (100%)" : `Voucher Diskon Servis ${val}%`;
-                                  }
+                                  item.title = buildAutoVoucherTitle({
+                                    category: item.voucherCategory || "NC_BOOSTER",
+                                    discountValue: val,
+                                    durationHours: item.voucherDurationHours || 24,
+                                    maxDiscount: item.voucherMaxDiscount || 0,
+                                  });
                                   setPrizes(updated);
                                 }}
                                 className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-mono font-bold outline-none"
@@ -1106,15 +1110,15 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
                               <span className="absolute right-2.5 top-1.5 text-xs font-bold text-muted-foreground">%</span>
                             </div>
                             <span className="text-[9px] text-muted-foreground mt-0.5 block">
-                              {r.voucherCategory === "NC_BOOSTER" ? "Tambahan NC per job" : "Isi 100 untuk gratis 100%"}
+                              {r.voucherCategory === "NC_BOOSTER" ? "Tambahan NC per job" : "Isi 100 untuk gratis penuh"}
                             </span>
                           </div>
 
-                          {/* Khusus NC Booster: Input Jam Durasi Aktif */}
-                          {r.voucherCategory === "NC_BOOSTER" && (
+                          {/* Khusus NC Booster: Durasi Aktif (Jam). Non-Booster: Maks. Potongan (NC) */}
+                          {r.voucherCategory === "NC_BOOSTER" ? (
                             <div>
                               <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                                Durasi Booster (Jam)
+                                Durasi Aktif (Jam)
                               </label>
                               <div className="relative">
                                 <input
@@ -1126,7 +1130,11 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
                                     const updated = [...prizes];
                                     const item = updated[tIdx].rewards[rIdx];
                                     item.voucherDurationHours = hrs;
-                                    item.title = `Voucher NC Booster +${item.voucherDiscountValue || 50}% (${hrs} Jam)`;
+                                    item.title = buildAutoVoucherTitle({
+                                      category: "NC_BOOSTER",
+                                      discountValue: item.voucherDiscountValue || 50,
+                                      durationHours: hrs,
+                                    });
                                     setPrizes(updated);
                                   }}
                                   className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-mono font-bold outline-none"
@@ -1135,7 +1143,36 @@ export default function GiveawayFormClient({ initialData, isEdit }: GiveawayForm
                                 <span className="absolute right-2.5 top-1.5 text-xs font-bold text-muted-foreground">Jam</span>
                               </div>
                               <span className="text-[9px] text-muted-foreground mt-0.5 block">
-                                Durasi aktif boost saat diaktifkan
+                                Lama boost aktif setelah dipakai
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                Maks. Potongan (NC)
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                step={500}
+                                value={r.voucherMaxDiscount ?? 0}
+                                onChange={(e) => {
+                                  const maxD = Math.max(0, Number(e.target.value) || 0);
+                                  const updated = [...prizes];
+                                  const item = updated[tIdx].rewards[rIdx];
+                                  item.voucherMaxDiscount = maxD;
+                                  item.title = buildAutoVoucherTitle({
+                                    category: item.voucherCategory || "FLEET_MAINTENANCE",
+                                    discountValue: item.voucherDiscountValue || 25,
+                                    maxDiscount: maxD,
+                                  });
+                                  setPrizes(updated);
+                                }}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-border text-foreground text-xs font-mono font-bold outline-none"
+                                placeholder="0"
+                              />
+                              <span className="text-[9px] text-muted-foreground mt-0.5 block">
+                                0 = Unlimited (tanpa batas)
                               </span>
                             </div>
                           )}

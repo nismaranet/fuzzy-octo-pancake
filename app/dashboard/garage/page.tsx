@@ -7,9 +7,14 @@ import { redirect } from "next/navigation";
 import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import Garage from "@/lib/models/Garage";
 import Fleet from "@/lib/models/Fleet";
+import UserVoucher from "@/lib/models/UserVoucher";
 import mongoose from "mongoose";
 import GarageClient from "./GarageClient";
 import "@/lib/models/User";
+import {
+  getUserListedSafeboxTickets,
+  sweepExpiredCommunityMarketItems,
+} from "@/lib/communityMarket";
 
 import dbConnect from "@/lib/mongoose";
 
@@ -111,8 +116,26 @@ export default async function GarageDashboardPage() {
     }
   }
 
-  // Convert mongoose doc to plain object for client component
-  const garageData = JSON.parse(JSON.stringify(garage));
+  await sweepExpiredCommunityMarketItems();
+  const now = new Date();
+  const [safeboxListed, rentVouchersRaw] = await Promise.all([
+    getUserListedSafeboxTickets(String(session.user.discordId)),
+    UserVoucher.find({
+      discordId: String(session.user.discordId),
+      status: "ACTIVE",
+      category: { $in: ["GARAGE_RENT", "GARAGE_UPGRADE"] },
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+    })
+      .sort({ discountValue: -1, expiresAt: 1 })
+      .lean(),
+  ]);
 
-  return <GarageClient garage={garageData} />;
+  // Convert mongoose doc to plain object for client component
+  const garageData = {
+    ...JSON.parse(JSON.stringify(garage)),
+    safeboxListed,
+  };
+  const rentVouchers = JSON.parse(JSON.stringify(rentVouchersRaw));
+
+  return <GarageClient garage={garageData} rentVouchers={rentVouchers} />;
 }

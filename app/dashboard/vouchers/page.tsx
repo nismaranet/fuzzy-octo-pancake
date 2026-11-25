@@ -5,12 +5,19 @@ import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import dbConnect from "@/lib/mongoose";
 import UserVoucher from "@/lib/models/UserVoucher";
 import User from "@/lib/models/User";
+import Garage from "@/lib/models/Garage";
+import CommunityMarketListing from "@/lib/models/CommunityMarketListing";
+import { sweepExpiredCommunityMarketItems } from "@/lib/communityMarket";
 import VouchersClient from "@/app/dashboard/vouchers/VouchersClient";
 import { Ticket, Sparkles, CheckCircle2, History } from "lucide-react";
 
 export const metadata = {
   title: "Dompet Kupon & Voucher",
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export default async function VouchersPage() {
   const session = await getServerSession(authOptions);
@@ -24,6 +31,7 @@ export default async function VouchersPage() {
   }
 
   await dbConnect();
+  await sweepExpiredCommunityMarketItems();
 
   // Auto-expire
   await UserVoucher.updateMany(
@@ -35,22 +43,63 @@ export default async function VouchersPage() {
     { $set: { status: "EXPIRED" } },
   );
 
-  const vouchersDoc = await UserVoucher.find({
-    discordId: session.user.discordId,
-  })
-    .sort({ createdAt: -1 })
-    .lean();
+  const [vouchersDoc, activeListings] = await Promise.all([
+    UserVoucher.find({
+      discordId: session.user.discordId,
+    })
+      .sort({ createdAt: -1 })
+      .lean(),
+    CommunityMarketListing.find(
+      {
+        sellerDiscordId: String(session.user.discordId),
+        itemType: "VOUCHER",
+        status: "active",
+      },
+      { itemRefId: 1, slug: 1, unitPrice: 1 }
+    ).lean(),
+  ]);
 
-  const vouchers = JSON.parse(JSON.stringify(vouchersDoc));
+  const listingByVoucherId: Record<string, { slug: string; unitPrice: number }> = {};
+  for (const l of activeListings) {
+    if (l.itemRefId) {
+      listingByVoucherId[String(l.itemRefId)] = {
+        slug: l.slug,
+        unitPrice: l.unitPrice,
+      };
+    }
+  }
+
+  const vouchers = JSON.parse(JSON.stringify(vouchersDoc)).map((v: any) => ({
+    ...v,
+    marketListing: listingByVoucherId[String(v._id)] || null,
+  }));
 
   const activeCount = vouchers.filter((v: any) => v.status === "ACTIVE").length;
   const usedCount = vouchers.filter((v: any) => v.status === "USED").length;
 
-  const user = await User.findOne({
-    discordId: String(session.user.discordId),
-  }).lean();
+  const [user, garageDoc] = await Promise.all([
+    User.findOne({
+      discordId: String(session.user.discordId),
+    }).lean(),
+    Garage.findOne(
+      { discordId: String(session.user.discordId) },
+      { operational_cost: 1, status: 1, next_payment_date: 1, pendingRentVoucher: 1 }
+    ).lean(),
+  ]);
   const activeNcBoost = user?.ncBoost
     ? JSON.parse(JSON.stringify(user.ncBoost))
+    : null;
+  const garageRentSummary = garageDoc
+    ? JSON.parse(
+        JSON.stringify({
+          operationalCost: Number((garageDoc as any).operational_cost || 0),
+          status: (garageDoc as any).status || "operational",
+          nextPaymentDate: (garageDoc as any).next_payment_date || null,
+          pendingRentVoucher: (garageDoc as any).pendingRentVoucher?.voucherId
+            ? (garageDoc as any).pendingRentVoucher
+            : null,
+        })
+      )
     : null;
 
   return (
@@ -108,6 +157,7 @@ export default async function VouchersPage() {
       <VouchersClient
         initialVouchers={vouchers}
         initialNcBoost={activeNcBoost}
+        initialGarageSummary={garageRentSummary}
       />
     </div>
   );

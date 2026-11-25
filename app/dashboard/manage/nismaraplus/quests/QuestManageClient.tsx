@@ -39,6 +39,7 @@ import {
   getActiveAndNextWeekPreviewAction,
 } from "@/app/actions/nplusQuestManageActions";
 import { showAlert, showConfirm } from "@/lib/dialog";
+import { buildAutoVoucherTitle } from "@/lib/communityMarketShared";
 import { INplusQuestTemplate } from "@/lib/models/NplusQuestTemplate";
 
 interface QuestManageClientProps {
@@ -63,7 +64,9 @@ const EMPTY_FORM: Partial<INplusQuestTemplate> = {
     voucherCategory: "FLEET_MAINTENANCE",
     voucherDiscountType: "percentage",
     voucherDiscountValue: 50,
+    voucherMaxDiscount: 0,
     voucherDurationHours: 0,
+    voucherExpireDays: 30,
     description: "Diskon 50% untuk biaya perawatan & servis armada.",
   },
 };
@@ -704,63 +707,167 @@ export default function QuestManageClient({
                 )}
 
                 {/* Khusus Voucher */}
-                {formData.reward?.type === "VOUCHER" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-foreground">Kategori Voucher</label>
-                      <select
-                        value={formData.reward?.voucherCategory || "FLEET_MAINTENANCE"}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            reward: { ...formData.reward!, voucherCategory: e.target.value as any },
-                          })
-                        }
-                        className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
-                      >
-                        <option value="FLEET_MAINTENANCE">Servis Armada</option>
-                        <option value="FLEET_BUY">Pembelian Fleet</option>
-                        <option value="NC_BOOSTER">Booster NC</option>
-                        <option value="MARKET_MOD">Mod Market</option>
-                      </select>
-                    </div>
+                {formData.reward?.type === "VOUCHER" && (() => {
+                  const vCat = formData.reward?.voucherCategory || "FLEET_MAINTENANCE";
+                  const isBoosterCat = vCat === "NC_BOOSTER";
+                  const discVal = formData.reward?.voucherDiscountValue ?? 50;
+                  const hrsVal = formData.reward?.voucherDurationHours ?? 6;
+                  const maxDisc = formData.reward?.voucherMaxDiscount ?? 0;
+                  const expDays = formData.reward?.voucherExpireDays ?? 30;
 
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-foreground">Diskon (%)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={formData.reward?.voucherDiscountValue || 50}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            reward: { ...formData.reward!, voucherDiscountValue: Number(e.target.value) },
-                          })
-                        }
-                        className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
-                      />
-                    </div>
+                  const updateQuestVoucher = (patch: Record<string, any>) => {
+                    const nextCat = patch.voucherCategory ?? vCat;
+                    const nextIsBooster = nextCat === "NC_BOOSTER";
+                    const nextVal = patch.voucherDiscountValue ?? discVal;
+                    const nextHrs = nextIsBooster
+                      ? patch.voucherDurationHours ?? (hrsVal || 6)
+                      : 0;
+                    const nextMax = nextIsBooster
+                      ? 0
+                      : patch.voucherMaxDiscount ?? maxDisc;
 
-                    {formData.reward?.voucherCategory === "NC_BOOSTER" && (
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-foreground">Durasi Booster (Jam)</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={formData.reward?.voucherDurationHours || 6}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              reward: { ...formData.reward!, voucherDurationHours: Number(e.target.value) },
-                            })
-                          }
-                          className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
-                        />
+                    setFormData({
+                      ...formData,
+                      reward: {
+                        ...formData.reward!,
+                        ...patch,
+                        voucherCategory: nextCat,
+                        voucherDurationHours: nextHrs,
+                        voucherMaxDiscount: nextMax,
+                        title: buildAutoVoucherTitle({
+                          category: nextCat,
+                          discountValue: nextVal,
+                          durationHours: nextHrs,
+                          maxDiscount: nextMax,
+                        }),
+                      } as any,
+                    });
+                  };
+
+                  return (
+                    <div className="space-y-3 pt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-foreground">
+                            Jenis Voucher
+                          </label>
+                          <select
+                            value={vCat}
+                            onChange={(e) =>
+                              updateQuestVoucher({
+                                voucherCategory: e.target.value,
+                                voucherDurationHours: e.target.value === "NC_BOOSTER" ? 6 : 0,
+                                voucherMaxDiscount: 0,
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
+                          >
+                            <option value="FLEET_MAINTENANCE">Diskon Servis Armada</option>
+                            <option value="FLEET_BUY">Diskon Beli Armada</option>
+                            <option value="GARAGE_RENT">Diskon Operasional Garasi</option>
+                            <option value="MARKET_MOD">Diskon Mod Workshop</option>
+                            <option value="NC_BOOSTER">Booster NC</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-foreground">
+                            {isBoosterCat ? "Bonus NC (%)" : "Diskon (%)"}
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={isBoosterCat ? 200 : 100}
+                            value={discVal}
+                            onChange={(e) =>
+                              updateQuestVoucher({
+                                voucherDiscountValue: Math.max(1, Number(e.target.value) || 1),
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
+                          />
+                        </div>
+
+                        {isBoosterCat ? (
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold text-foreground">
+                              Durasi Aktif (Jam)
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={72}
+                              value={hrsVal}
+                              onChange={(e) =>
+                                updateQuestVoucher({
+                                  voucherDurationHours: Math.max(1, Number(e.target.value) || 1),
+                                })
+                              }
+                              className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold text-foreground">
+                              Maks. Potongan (NC)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={500}
+                              value={maxDisc}
+                              onChange={(e) =>
+                                updateQuestVoucher({
+                                  voucherMaxDiscount: Math.max(0, Number(e.target.value) || 0),
+                                })
+                              }
+                              className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
+                            />
+                            <span className="text-[10px] text-muted-foreground block">
+                              0 = Unlimited (tanpa batas)
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-foreground">
+                            Masa Berlaku (Hari)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={365}
+                            value={expDays}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                reward: {
+                                  ...formData.reward!,
+                                  voucherExpireDays: Math.max(1, Number(e.target.value) || 30),
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-bold"
+                          />
+                          <span className="text-[10px] text-muted-foreground block">
+                            Hangus otomatis setelah diklaim
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                )}
+
+                      <div className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 font-semibold">
+                        Ringkasan:{" "}
+                        {isBoosterCat
+                          ? `Bonus +${discVal}% NC selama ${hrsVal} jam · Berlaku ${expDays} hari`
+                          : `Diskon ${discVal}% · ${
+                              maxDisc > 0
+                                ? `Maks. potongan ${maxDisc.toLocaleString("id-ID")} NC`
+                                : "Tanpa batas potongan (Unlimited)"
+                            } · Berlaku ${expDays} hari`}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Form Baris 5: Status Pool & Order */}

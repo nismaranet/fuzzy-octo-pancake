@@ -26,6 +26,16 @@ const garageSchema = new mongoose.Schema(
     safeboxLevel: { type: Number, required: true, default: 1 },
     safeboxStock: { type: Number, required: true, default: 0 },
     safebox_operational_cost: { type: Number, required: true, default: 0 },
+    pendingRentVoucher: {
+      voucherId: { type: mongoose.Schema.Types.ObjectId, ref: "UserVoucher", default: null },
+      code: { type: String, default: null },
+      title: { type: String, default: null },
+      discountType: { type: String, enum: ["percentage", "fixed", null], default: null },
+      discountValue: { type: Number, default: 0 },
+      maxDiscount: { type: Number, default: 0 },
+      minSpend: { type: Number, default: 0 },
+      appliedAt: { type: Date, default: null },
+    },
     mechanics: {
       umum: {
         name: { type: String, default: null },

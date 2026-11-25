@@ -2,7 +2,20 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import UserVoucher from "@/lib/models/UserVoucher";
 import User from "@/lib/models/User";
+import Garage from "@/lib/models/Garage";
 import dbConnect from "@/lib/mongoose";
+
+export type VoucherCategory =
+  | "FLEET_MAINTENANCE"
+  | "FLEET_BUY"
+  | "MARKET_MOD"
+  | "GARAGE_RENT"
+  | "GARAGE_UPGRADE"
+  | "NC_BOOSTER";
+
+export function isGarageRentVoucherCategory(category?: string | null): boolean {
+  return category === "GARAGE_RENT" || category === "GARAGE_UPGRADE";
+}
 
 export interface GrantVoucherParams {
   userId: string | mongoose.Types.ObjectId;
@@ -10,15 +23,32 @@ export interface GrantVoucherParams {
   guildId?: string;
   title: string;
   description?: string;
-  category: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_UPGRADE" | "NC_BOOSTER";
+  category: VoucherCategory;
   discountType: "percentage" | "fixed";
   discountValue: number;
   maxDiscount?: number;
   minSpend?: number;
   durationHours?: number;
   source?: string;
+  tradable?: boolean;
   expiresInDays?: number;
   customCodePrefix?: string;
+}
+
+/**
+ * Mengecek apakah sebuah voucher boleh diperdagangkan di Community Market.
+ * Voucher dari gaji manager (MANAGER_SALARY_*) atau yang ditandai tradable=false selalu terkunci.
+ */
+export function isVoucherTradable(voucher: {
+  tradable?: boolean;
+  source?: string | null;
+} | null | undefined): boolean {
+  if (!voucher) return false;
+  if (voucher.tradable === false) return false;
+  if (typeof voucher.source === "string" && /^MANAGER_SALARY/i.test(voucher.source)) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -43,6 +73,12 @@ export async function grantVoucher(params: GrantVoucherParams) {
     expiresAt.setDate(expiresAt.getDate() + params.expiresInDays);
   }
 
+  const resolvedSource = params.source || "SEASONAL_PASS";
+  const resolvedTradable =
+    typeof params.tradable === "boolean"
+      ? params.tradable
+      : !/^MANAGER_SALARY/i.test(resolvedSource);
+
   const voucher = await UserVoucher.create({
     userId: params.userId,
     discordId: String(params.discordId),
@@ -57,7 +93,8 @@ export async function grantVoucher(params: GrantVoucherParams) {
     maxDiscount: params.maxDiscount || 0,
     minSpend: params.minSpend || 0,
     status: "ACTIVE",
-    source: params.source || "SEASONAL_PASS",
+    tradable: resolvedTradable,
+    source: resolvedSource,
     expiresAt,
   });
 
@@ -70,7 +107,7 @@ export async function grantVoucher(params: GrantVoucherParams) {
 export async function validateVoucher(
   voucherId: string | mongoose.Types.ObjectId,
   discordId: string | number,
-  category: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_UPGRADE",
+  category: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_RENT" | "GARAGE_UPGRADE",
   eligibleAmount: number
 ) {
   await dbConnect();
@@ -273,5 +310,157 @@ export async function activateBoosterVoucher(
     multiplier,
     durationHours,
     expiredAt: newExpiredAt,
+  };
+}
+
+/**
+ * Memasang voucher diskon operasional/sewa garasi (GARAGE_RENT / legacy GARAGE_UPGRADE)
+ * untuk memotong tagihan bulanan berikutnya secara otomatis saat cron garage-rent berjalan.
+ */
+export async function applyGarageRentVoucher(
+  voucherId: string | mongoose.Types.ObjectId,
+  discordId: string | number
+) {
+  await dbConnect();
+  const discordIdStr = String(discordId);
+
+  if (!mongoose.Types.ObjectId.isValid(String(voucherId))) {
+    return { success: false, error: "ID Voucher tidak valid." };
+  }
+
+  const voucher = await UserVoucher.findById(voucherId);
+  if (!voucher) {
+    return { success: false, error: "Voucher tidak ditemukan." };
+  }
+  if (String(voucher.discordId) !== discordIdStr) {
+    return { success: false, error: "Voucher ini bukan milik akun Anda." };
+  }
+  if (voucher.status !== "ACTIVE") {
+    return {
+      success: false,
+      error: `Voucher tidak dapat digunakan (Status: ${voucher.status}).`,
+    };
+  }
+  if (!isGarageRentVoucherCategory(voucher.category)) {
+    return {
+      success: false,
+      error: "Voucher ini bukan voucher diskon operasional garasi.",
+    };
+  }
+
+  const now = new Date();
+  if (voucher.expiresAt && now > new Date(voucher.expiresAt)) {
+    voucher.status = "EXPIRED";
+    await voucher.save();
+    return { success: false, error: "Voucher telah kedaluwarsa." };
+  }
+
+  const garage = await Garage.findOne({ discordId: discordIdStr });
+  if (!garage) {
+    return {
+      success: false,
+      error: "Garasi Anda belum aktif. Buka halaman Garasi terlebih dahulu.",
+    };
+  }
+  if (garage.status === "suspended") {
+    return {
+      success: false,
+      error: "Garasi Anda sedang dibekukan karena tunggakan biaya operasional.",
+    };
+  }
+  const operationalCost = Number(garage.operational_cost || 0);
+  if (operationalCost <= 0) {
+    return {
+      success: false,
+      error: "Garasi Anda saat ini bebas biaya operasional bulanan (0 NC), sehingga voucher belum diperlukan.",
+    };
+  }
+  if (garage.pendingRentVoucher?.voucherId) {
+    return {
+      success: false,
+      error: `Garasi Anda sudah memiliki voucher terpasang (${garage.pendingRentVoucher.title || garage.pendingRentVoucher.code}) untuk siklus tagihan berikutnya.`,
+    };
+  }
+  if (voucher.minSpend > 0 && operationalCost < voucher.minSpend) {
+    return {
+      success: false,
+      error: `Minimal tagihan operasional garasi untuk voucher ini adalah ${voucher.minSpend.toLocaleString("id-ID")} NC.`,
+    };
+  }
+
+  // Atomic Gate 1: Kunci voucher ACTIVE -> USED
+  const lockedVoucher = await UserVoucher.findOneAndUpdate(
+    {
+      _id: voucher._id,
+      discordId: discordIdStr,
+      status: "ACTIVE",
+    },
+    {
+      $set: {
+        status: "USED",
+        usedAt: now,
+        usedOrderId: garage._id,
+      },
+    },
+    { returnDocument: "after" }
+  );
+
+  if (!lockedVoucher) {
+    return {
+      success: false,
+      error: "Voucher sudah terpakai atau sedang diproses pada permintaan lain.",
+    };
+  }
+
+  const pendingPayload = {
+    voucherId: lockedVoucher._id,
+    code: lockedVoucher.code,
+    title: lockedVoucher.title,
+    discountType: lockedVoucher.discountType,
+    discountValue: lockedVoucher.discountValue,
+    maxDiscount: lockedVoucher.maxDiscount || 0,
+    minSpend: lockedVoucher.minSpend || 0,
+    appliedAt: now,
+  };
+
+  // Atomic Gate 2: Kunci & pasang voucher pada Garage hanya jika belum ada pendingRentVoucher
+  const updatedGarage = await Garage.findOneAndUpdate(
+    {
+      _id: garage._id,
+      discordId: discordIdStr,
+      status: "operational",
+      $or: [
+        { "pendingRentVoucher.voucherId": null },
+        { "pendingRentVoucher.voucherId": { $exists: false } },
+      ],
+    },
+    {
+      $set: { pendingRentVoucher: pendingPayload },
+    },
+    { returnDocument: "after" }
+  );
+
+  if (!updatedGarage) {
+    // Rollback voucher jika request paralel sudah memasang voucher lain
+    await UserVoucher.updateOne(
+      { _id: lockedVoucher._id },
+      { $set: { status: "ACTIVE", usedAt: null, usedOrderId: null } }
+    );
+    return {
+      success: false,
+      error: "Garasi sudah memiliki voucher terpasang atau status garasi berubah.",
+    };
+  }
+
+  const discountPreview = calculateVoucherDiscount(operationalCost, pendingPayload);
+  const estimatedFinalCost = Math.max(0, operationalCost - discountPreview);
+
+  return {
+    success: true,
+    pendingRentVoucher: pendingPayload,
+    operationalCost,
+    discountPreview,
+    estimatedFinalCost,
+    nextPaymentDate: updatedGarage.next_payment_date,
   };
 }

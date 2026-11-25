@@ -116,6 +116,8 @@ export async function POST(req: NextRequest) {
 
     revalidatePath("/dashboard/manage/giveaways");
     revalidatePath("/giveaways");
+    revalidatePath("/calendar");
+    revalidatePath("/");
 
     return NextResponse.json(
       { success: true, message: "Giveaway berhasil dibuat.", giveaway: newGiveaway },

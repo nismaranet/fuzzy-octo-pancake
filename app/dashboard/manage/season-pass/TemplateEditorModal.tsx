@@ -22,6 +22,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { showAlert, showConfirm } from "@/lib/dialog";
+import { buildAutoVoucherTitle } from "@/lib/communityMarketShared";
 
 interface RewardItem {
   type: string;
@@ -31,7 +32,9 @@ interface RewardItem {
   voucherCategory?: string;
   voucherDiscountType?: string;
   voucherDiscountValue?: number;
+  voucherMaxDiscount?: number;
   voucherDurationHours?: number;
+  voucherExpireDays?: number;
   badgeId?: string;
   imageUrl?: string;
 }
@@ -75,7 +78,9 @@ export default function TemplateEditorModal({
     voucherCategory: "NC_BOOSTER",
     voucherDiscountType: "percentage",
     voucherDiscountValue: 25,
+    voucherMaxDiscount: 0,
     voucherDurationHours: 2,
+    voucherExpireDays: 90,
     badgeId: "",
   });
 
@@ -163,11 +168,28 @@ export default function TemplateEditorModal({
       return;
     }
 
+    const sanitizedReward: RewardItem =
+      rewardForm.type === "VOUCHER"
+        ? {
+            ...rewardForm,
+            voucherDiscountType: "percentage",
+            voucherDurationHours:
+              rewardForm.voucherCategory === "NC_BOOSTER"
+                ? Math.max(1, Number(rewardForm.voucherDurationHours) || 2)
+                : 0,
+            voucherMaxDiscount:
+              rewardForm.voucherCategory === "NC_BOOSTER"
+                ? 0
+                : Math.max(0, Number(rewardForm.voucherMaxDiscount) || 0),
+            voucherExpireDays: Math.max(1, Number(rewardForm.voucherExpireDays) || 90),
+          }
+        : { ...rewardForm };
+
     setLevels((prev) =>
       prev.map((lvl) => {
         if (lvl.level !== selectedLevelNum) return lvl;
         const targetList = track === "free" ? [...lvl.freeRewards] : [...lvl.premiumRewards];
-        targetList.push({ ...rewardForm });
+        targetList.push(sanitizedReward);
         return {
           ...lvl,
           [track === "free" ? "freeRewards" : "premiumRewards"]: targetList,
@@ -502,7 +524,16 @@ export default function TemplateEditorModal({
                         defaultTitle = "1x Tiket Hukuman Safebox";
                         defaultAmt = 1;
                       } else if (t === "VOUCHER") {
-                        defaultTitle = "Voucher Booster +25% NC (2 Jam)";
+                        const cat = rewardForm.voucherCategory || "NC_BOOSTER";
+                        const val = rewardForm.voucherDiscountValue || 25;
+                        const hrs = rewardForm.voucherDurationHours || 2;
+                        const maxD = cat === "NC_BOOSTER" ? 0 : rewardForm.voucherMaxDiscount || 0;
+                        defaultTitle = buildAutoVoucherTitle({
+                          category: cat,
+                          discountValue: val,
+                          durationHours: hrs,
+                          maxDiscount: maxD,
+                        });
                         defaultAmt = 0;
                       } else if (t === "NPLUS_TRIAL") {
                         defaultTitle = "3 Hari Nismara+ Trial";
@@ -556,49 +587,190 @@ export default function TemplateEditorModal({
                   </div>
                 )}
 
-                {rewardForm.type === "VOUCHER" && (
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                        Kategori Voucher
-                      </label>
-                      <select
-                        value={rewardForm.voucherCategory || "NC_BOOSTER"}
-                        onChange={(e: any) => setRewardForm({ ...rewardForm, voucherCategory: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs"
-                      >
-                        <option value="NC_BOOSTER">Booster NC (+25% / +50%)</option>
-                        <option value="FLEET_MAINTENANCE">Diskon Servis Truk</option>
-                        <option value="MARKET_MOD">Diskon Pembelian Mod</option>
-                        <option value="GARAGE_UPGRADE">Diskon Upgrade Garasi</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                {rewardForm.type === "VOUCHER" && (() => {
+                  const cat = rewardForm.voucherCategory || "NC_BOOSTER";
+                  const isBoosterCat = cat === "NC_BOOSTER";
+                  const discVal = rewardForm.voucherDiscountValue ?? 25;
+                  const hrsVal = rewardForm.voucherDurationHours ?? 2;
+                  const maxDisc = rewardForm.voucherMaxDiscount ?? 0;
+                  const expDays = rewardForm.voucherExpireDays ?? 90;
+
+                  const updateVoucherField = (patch: Partial<RewardItem>) => {
+                    const nextCat = patch.voucherCategory ?? cat;
+                    const nextIsBooster = nextCat === "NC_BOOSTER";
+                    const nextVal = patch.voucherDiscountValue ?? discVal;
+                    const nextHrs = nextIsBooster
+                      ? patch.voucherDurationHours ?? (hrsVal || 2)
+                      : 0;
+                    const nextMax = nextIsBooster
+                      ? 0
+                      : patch.voucherMaxDiscount ?? maxDisc;
+
+                    setRewardForm({
+                      ...rewardForm,
+                      ...patch,
+                      voucherCategory: nextCat,
+                      voucherDurationHours: nextHrs,
+                      voucherMaxDiscount: nextMax,
+                      title: buildAutoVoucherTitle({
+                        category: nextCat,
+                        discountValue: nextVal,
+                        durationHours: nextHrs,
+                        maxDiscount: nextMax,
+                      }),
+                    });
+                  };
+
+                  return (
+                    <div className="space-y-3 p-3.5 rounded-xl bg-white/[0.03] border border-border/70">
                       <div>
                         <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                          Nilai Diskon (%)
+                          Jenis Voucher
+                        </label>
+                        <select
+                          value={cat}
+                          onChange={(e) => {
+                            const nextCat = e.target.value;
+                            const suggestedVal =
+                              nextCat === "NC_BOOSTER"
+                                ? 25
+                                : nextCat === "FLEET_BUY"
+                                  ? 15
+                                  : 25;
+                            updateVoucherField({
+                              voucherCategory: nextCat,
+                              voucherDiscountValue: suggestedVal,
+                              voucherDurationHours: nextCat === "NC_BOOSTER" ? 2 : 0,
+                              voucherMaxDiscount: 0,
+                            });
+                          }}
+                          className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs font-bold"
+                        >
+                          <option value="NC_BOOSTER">Booster NC (Bonus Pendapatan)</option>
+                          <option value="FLEET_MAINTENANCE">Diskon Servis Armada</option>
+                          <option value="FLEET_BUY">Diskon Beli Armada</option>
+                          <option value="GARAGE_RENT">Diskon Operasional Garasi</option>
+                          <option value="MARKET_MOD">Diskon Mod Workshop</option>
+                        </select>
+                      </div>
+
+                      {isBoosterCat ? (
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                              Bonus NC (%)
+                            </label>
+                            <input
+                              type="number"
+                              min={5}
+                              max={200}
+                              value={discVal}
+                              onChange={(e) =>
+                                updateVoucherField({
+                                  voucherDiscountValue: Math.max(1, Number(e.target.value) || 1),
+                                })
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                              Durasi Aktif (Jam)
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={72}
+                              value={hrsVal}
+                              onChange={(e) =>
+                                updateVoucherField({
+                                  voucherDurationHours: Math.max(1, Number(e.target.value) || 1),
+                                })
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs font-bold"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                              Diskon (%)
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={discVal}
+                              onChange={(e) =>
+                                updateVoucherField({
+                                  voucherDiscountValue: Math.min(
+                                    100,
+                                    Math.max(1, Number(e.target.value) || 1)
+                                  ),
+                                })
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs font-bold"
+                            />
+                            <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                              Isi 100 untuk gratis penuh
+                            </span>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                              Maks. Potongan (NC)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={500}
+                              value={maxDisc}
+                              onChange={(e) =>
+                                updateVoucherField({
+                                  voucherMaxDiscount: Math.max(0, Number(e.target.value) || 0),
+                                })
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs font-bold"
+                            />
+                            <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                              0 = Unlimited (tanpa batas)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                          Masa Berlaku Setelah Diklaim (Hari)
                         </label>
                         <input
                           type="number"
-                          value={rewardForm.voucherDiscountValue || 25}
-                          onChange={(e) => setRewardForm({ ...rewardForm, voucherDiscountValue: Number(e.target.value) })}
+                          min={1}
+                          max={365}
+                          value={expDays}
+                          onChange={(e) =>
+                            setRewardForm({
+                              ...rewardForm,
+                              voucherExpireDays: Math.max(1, Number(e.target.value) || 90),
+                            })
+                          }
                           className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs font-bold"
                         />
                       </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                          Durasi (Jam)
-                        </label>
-                        <input
-                          type="number"
-                          value={rewardForm.voucherDurationHours || 2}
-                          onChange={(e) => setRewardForm({ ...rewardForm, voucherDurationHours: Number(e.target.value) })}
-                          className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-foreground text-xs font-bold"
-                        />
+
+                      <div className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[11px] text-emerald-300 font-semibold">
+                        Ringkasan:{" "}
+                        {isBoosterCat
+                          ? `Bonus +${discVal}% NC selama ${hrsVal} jam · Berlaku ${expDays} hari`
+                          : `Diskon ${discVal}% · ${
+                              maxDisc > 0
+                                ? `Maks. potongan ${maxDisc.toLocaleString("id-ID")} NC`
+                                : "Tanpa batas potongan (Unlimited)"
+                            } · Berlaku ${expDays} hari`}
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {rewardForm.type === "BADGE" && (
                   <div>

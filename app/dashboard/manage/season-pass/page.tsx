@@ -7,6 +7,7 @@ import SeasonPassOrder from "@/lib/models/SeasonPassOrder";
 import UserSeasonProgress from "@/lib/models/UserSeasonProgress";
 import User from "@/lib/models/User";
 import { ensureSeasonInitialized, getSeasonPassFeatureStatus } from "@/lib/seasonPass";
+import { isWebOwner } from "@/lib/webConfig";
 import ManageSeasonPassClient from "./ManageSeasonPassClient";
 
 export const metadata = {
@@ -28,9 +29,7 @@ export default async function ManageSeasonPassPage() {
     redirect("/dashboard");
   }
 
-  const isOwner =
-    session?.user?.discordId === process.env.OWNER_DISCORD_ID ||
-    session?.user?.discordId === process.env.NISMARA_OWNER_DISCORD_ID;
+  const isOwner = await isWebOwner(session?.user?.discordId);
 
   await dbConnect();
   await ensureSeasonInitialized();

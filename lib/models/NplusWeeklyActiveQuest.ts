@@ -49,7 +49,7 @@ const activeQuestItemSchema = new mongoose.Schema(
       amount: { type: Number, default: 0 },
       voucherCategory: {
         type: String,
-        enum: ["FLEET_MAINTENANCE", "FLEET_BUY", "MARKET_MOD", "GARAGE_UPGRADE", "NC_BOOSTER"],
+        enum: ["FLEET_MAINTENANCE", "FLEET_BUY", "MARKET_MOD", "GARAGE_RENT", "GARAGE_UPGRADE", "NC_BOOSTER"],
       },
       voucherDiscountType: {
         type: String,
@@ -57,7 +57,9 @@ const activeQuestItemSchema = new mongoose.Schema(
         default: "percentage",
       },
       voucherDiscountValue: { type: Number, default: 0 },
+      voucherMaxDiscount: { type: Number, default: 0 },
       voucherDurationHours: { type: Number, default: 0 },
+      voucherExpireDays: { type: Number, default: 30 },
       description: { type: String, default: "" },
     },
     difficulty: {

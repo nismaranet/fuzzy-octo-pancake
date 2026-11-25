@@ -18,9 +18,20 @@ import {
   Zap,
   Flame,
   Timer,
+  Store,
+  Lock,
+  Infinity as InfinityIcon,
+  Warehouse,
 } from "lucide-react";
 import { showAlert, showConfirm } from "@/lib/dialog";
+import { NO_CACHE_FETCH_OPTIONS } from "@/lib/antiCache";
 import { useRouter } from "next/navigation";
+import CreateListingModal from "@/components/community-market/CreateListingModal";
+import {
+  isVoucherTradableClient,
+  formatVoucherBenefitSummary,
+  formatNCWhole,
+} from "@/lib/communityMarketShared";
 
 interface VoucherItem {
   _id: string;
@@ -33,29 +44,41 @@ interface VoucherItem {
   discountValue: number;
   maxDiscount?: number;
   minSpend?: number;
-  status: "ACTIVE" | "USED" | "EXPIRED";
+  status: "ACTIVE" | "LISTED" | "USED" | "EXPIRED";
+  tradable?: boolean;
   source?: string;
   expiresAt?: string | null;
   usedAt?: string | null;
   createdAt: string;
+  marketListing?: { slug: string; unitPrice: number } | null;
 }
 
 export default function VouchersClient({
   initialVouchers,
   initialNcBoost,
+  initialGarageSummary = null,
 }: {
   initialVouchers: VoucherItem[];
   initialNcBoost?: any;
+  initialGarageSummary?: {
+    operationalCost: number;
+    status: string;
+    nextPaymentDate?: string | null;
+    pendingRentVoucher?: any | null;
+  } | null;
 }) {
   const router = useRouter();
   const [vouchers, setVouchers] = useState<VoucherItem[]>(initialVouchers);
   const [ncBoost, setNcBoost] = useState<any>(initialNcBoost);
+  const [garageSummary, setGarageSummary] = useState(initialGarageSummary);
   const [activeTab, setActiveTab] = useState<"ACTIVE" | "HISTORY">("ACTIVE");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState<string | null>(null);
+  const [isApplyingRent, setIsApplyingRent] = useState<string | null>(null);
   const [timeLeftStr, setTimeLeftStr] = useState<string>("");
+  const [sellVoucherId, setSellVoucherId] = useState<string | null>(null);
 
   // Sync state if initial props change
   useEffect(() => {
@@ -65,6 +88,10 @@ export default function VouchersClient({
   useEffect(() => {
     setNcBoost(initialNcBoost);
   }, [initialNcBoost]);
+
+  useEffect(() => {
+    setGarageSummary(initialGarageSummary);
+  }, [initialGarageSummary]);
 
   // Booster Timer Countdown
   useEffect(() => {
@@ -161,13 +188,77 @@ export default function VouchersClient({
     }
   };
 
+  const handleApplyGarageRent = async (voucher: VoucherItem) => {
+    if (garageSummary?.pendingRentVoucher?.voucherId) {
+      await showAlert(
+        "Garasi Anda sudah memiliki voucher operasional terpasang untuk siklus tagihan berikutnya."
+      );
+      return;
+    }
+
+    const opCost = garageSummary?.operationalCost || 0;
+    if (opCost <= 0) {
+      await showAlert(
+        "Biaya operasional bulanan garasi Anda saat ini 0 NC, sehingga voucher belum perlu dipasang."
+      );
+      return;
+    }
+
+    const confirmed = await showConfirm(
+      `Pasang voucher "${voucher.title}" untuk memotong tagihan operasional garasi Anda berikutnya (${opCost.toLocaleString("id-ID")} NC)? Voucher akan langsung terkunci untuk tagihan garasi.`
+    );
+    if (!confirmed) return;
+
+    setIsApplyingRent(voucher._id);
+    try {
+      const res = await fetch("/api/garage/apply-rent-voucher", {
+        method: "POST",
+        ...NO_CACHE_FETCH_OPTIONS,
+        headers: {
+          ...NO_CACHE_FETCH_OPTIONS.headers,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ voucherId: voucher._id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Gagal memasang voucher operasional garasi.");
+      }
+
+      setVouchers((prev) =>
+        prev.map((v) =>
+          v._id === voucher._id
+            ? { ...v, status: "USED", usedAt: new Date().toISOString() }
+            : v
+        )
+      );
+      setGarageSummary((prev) =>
+        prev
+          ? { ...prev, pendingRentVoucher: data.pendingRentVoucher }
+          : prev
+      );
+      await showAlert(data.message || "Voucher operasional garasi berhasil dipasang!");
+      router.refresh();
+    } catch (err: any) {
+      await showAlert(`Gagal: ${err.message}`);
+    } finally {
+      setIsApplyingRent(null);
+    }
+  };
+
   const filteredVouchers = vouchers.filter((v) => {
     // Tab filter
-    if (activeTab === "ACTIVE" && v.status !== "ACTIVE") return false;
-    if (activeTab === "HISTORY" && v.status === "ACTIVE") return false;
+    if (activeTab === "ACTIVE" && v.status !== "ACTIVE" && v.status !== "LISTED") return false;
+    if (activeTab === "HISTORY" && (v.status === "ACTIVE" || v.status === "LISTED")) return false;
 
     // Category filter
-    if (categoryFilter !== "ALL" && v.category !== categoryFilter) return false;
+    if (categoryFilter !== "ALL") {
+      if (categoryFilter === "GARAGE_RENT") {
+        if (v.category !== "GARAGE_RENT" && v.category !== "GARAGE_UPGRADE") return false;
+      } else if (v.category !== categoryFilter) {
+        return false;
+      }
+    }
 
     // Search query
     if (searchQuery.trim()) {
@@ -191,6 +282,7 @@ export default function VouchersClient({
           link: "#",
           actionLabel: "Aktifkan Booster",
           isBooster: true,
+          isGarageRent: false,
         };
       case "FLEET_MAINTENANCE":
         return {
@@ -200,6 +292,7 @@ export default function VouchersClient({
           link: "/dashboard/garage",
           actionLabel: "Buka Garasi",
           isBooster: false,
+          isGarageRent: false,
         };
       case "FLEET_BUY":
         return {
@@ -209,6 +302,7 @@ export default function VouchersClient({
           link: "/dashboard/garage/fleet/buy",
           actionLabel: "Beli Armada",
           isBooster: false,
+          isGarageRent: false,
         };
       case "MARKET_MOD":
         return {
@@ -218,6 +312,18 @@ export default function VouchersClient({
           link: "/market",
           actionLabel: "Buka Market",
           isBooster: false,
+          isGarageRent: false,
+        };
+      case "GARAGE_RENT":
+      case "GARAGE_UPGRADE":
+        return {
+          label: "Operasional Garasi",
+          icon: Warehouse,
+          color: "text-sky-400 bg-sky-500/10 border-sky-500/30",
+          link: "/dashboard/garage",
+          actionLabel: "Pasang ke Garasi",
+          isBooster: false,
+          isGarageRent: true,
         };
       default:
         return {
@@ -227,6 +333,7 @@ export default function VouchersClient({
           link: "/dashboard",
           actionLabel: "Dashboard",
           isBooster: false,
+          isGarageRent: false,
         };
     }
   };
@@ -292,7 +399,7 @@ export default function VouchersClient({
             }`}
           >
             Voucher Aktif (
-            {vouchers.filter((v) => v.status === "ACTIVE").length})
+            {vouchers.filter((v) => v.status === "ACTIVE" || v.status === "LISTED").length})
           </button>
           <button
             onClick={() => setActiveTab("HISTORY")}
@@ -302,7 +409,7 @@ export default function VouchersClient({
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Riwayat ({vouchers.filter((v) => v.status !== "ACTIVE").length})
+            Riwayat ({vouchers.filter((v) => v.status !== "ACTIVE" && v.status !== "LISTED").length})
           </button>
         </div>
 
@@ -331,6 +438,7 @@ export default function VouchersClient({
             <option value="NC_BOOSTER">⚡ NC Booster</option>
             <option value="FLEET_MAINTENANCE">Servis Armada</option>
             <option value="FLEET_BUY">Pembelian Armada</option>
+            <option value="GARAGE_RENT">Operasional Garasi</option>
             <option value="MARKET_MOD">Mod Market</option>
           </select>
         </div>
@@ -503,44 +611,129 @@ export default function VouchersClient({
                   </div>
 
                   {/* Action Button */}
-                  {v.status === "ACTIVE" && (
-                    <>
-                      {isBooster ? (
-                        <button
-                          onClick={() => handleActivateBooster(v)}
-                          disabled={isActivating === v._id || isBoostActive}
-                          className={`w-full py-2.5 px-4 font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                            isBoostActive
-                              ? "bg-muted text-muted-foreground border border-border/80 cursor-not-allowed opacity-60"
-                              : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black shadow-md shadow-amber-500/20 disabled:opacity-50"
-                          }`}
-                        >
-                          <Zap
-                            size={14}
-                            className={
-                              isBoostActive
-                                ? "text-muted-foreground"
-                                : "fill-black"
-                            }
-                          />
-                          <span>
-                            {isActivating === v._id
-                              ? "Mengaktifkan..."
-                              : isBoostActive
-                                ? "Booster Lain Aktif"
-                                : "Aktifkan Booster"}
-                          </span>
-                        </button>
-                      ) : (
-                        <Link
-                          href={meta.link}
-                          className="w-full py-2.5 px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md hover:shadow-primary/20"
-                        >
-                          <span>{meta.actionLabel}</span>
-                          <ArrowUpRight size={14} />
-                        </Link>
-                      )}
-                    </>
+                  {v.status === "ACTIVE" && (() => {
+                    const tradable = isVoucherTradableClient(v);
+                    const benefit = formatVoucherBenefitSummary(v);
+                    return (
+                      <div className="space-y-2">
+                        {v.discountType === "percentage" && !isBooster && (
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+                                benefit.isUnlimitedCap
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              }`}
+                            >
+                              {benefit.isUnlimitedCap && <InfinityIcon size={11} />}
+                              {benefit.capBadge}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          {isBooster ? (
+                            <button
+                              onClick={() => handleActivateBooster(v)}
+                              disabled={isActivating === v._id || isBoostActive}
+                              className={`flex-1 py-2.5 px-3 font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                                isBoostActive
+                                  ? "bg-muted text-muted-foreground border border-border/80 cursor-not-allowed opacity-60"
+                                  : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black shadow-md shadow-amber-500/20 disabled:opacity-50"
+                              }`}
+                            >
+                              <Zap
+                                size={14}
+                                className={
+                                  isBoostActive
+                                    ? "text-muted-foreground"
+                                    : "fill-black"
+                                }
+                              />
+                              <span>
+                                {isActivating === v._id
+                                  ? "Mengaktifkan..."
+                                  : isBoostActive
+                                    ? "Booster Aktif"
+                                    : "Aktifkan"}
+                              </span>
+                            </button>
+                          ) : meta.isGarageRent ? (
+                            <button
+                              type="button"
+                              onClick={() => handleApplyGarageRent(v)}
+                              disabled={
+                                isApplyingRent === v._id ||
+                                Boolean(garageSummary?.pendingRentVoucher?.voucherId)
+                              }
+                              className={`flex-1 py-2.5 px-3 font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                                garageSummary?.pendingRentVoucher?.voucherId
+                                  ? "bg-muted text-muted-foreground border border-border/80 cursor-not-allowed opacity-60"
+                                  : "bg-sky-500 hover:bg-sky-600 text-white shadow-md shadow-sky-500/20 disabled:opacity-50"
+                              }`}
+                            >
+                              <Warehouse size={14} />
+                              <span>
+                                {isApplyingRent === v._id
+                                  ? "Memasang..."
+                                  : garageSummary?.pendingRentVoucher?.voucherId
+                                    ? "Sudah Terpasang"
+                                    : "Pasang ke Garasi"}
+                              </span>
+                            </button>
+                          ) : (
+                            <Link
+                              href={meta.link}
+                              className="flex-1 py-2.5 px-3 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md hover:shadow-primary/20"
+                            >
+                              <span>{meta.actionLabel}</span>
+                              <ArrowUpRight size={14} />
+                            </Link>
+                          )}
+
+                          {tradable && (
+                            <button
+                              type="button"
+                              onClick={() => setSellVoucherId(v._id)}
+                              className="px-3 py-2.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-400 border border-teal-500/35 text-xs font-black uppercase tracking-wider transition-all inline-flex items-center gap-1.5 shrink-0"
+                              title="Jual voucher ini di Community Market"
+                            >
+                              <Store size={14} />
+                              Jual
+                            </button>
+                          )}
+                        </div>
+
+                        {!tradable && (
+                          <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-muted-foreground pt-0.5">
+                            <Lock size={11} />
+                            Eksklusif Staff · Tidak Dapat Diperdagangkan
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {v.status === "LISTED" && (
+                    <div className="space-y-2">
+                      <div className="w-full py-2 px-3 bg-sky-500/10 border border-sky-500/30 rounded-xl text-center text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center justify-center gap-1.5">
+                        <Store size={14} />
+                        Sedang Dijual di Community Market
+                        {v.marketListing?.unitPrice
+                          ? ` (${formatNCWhole(v.marketListing.unitPrice)})`
+                          : ""}
+                      </div>
+                      <Link
+                        href={
+                          v.marketListing?.slug
+                            ? `/community-market/${v.marketListing.slug}`
+                            : "/community-market?tab=my"
+                        }
+                        className="w-full py-2 px-3 bg-card hover:bg-muted border border-border rounded-xl text-center text-xs font-bold text-foreground flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        Lihat / Kelola Iklan <ArrowUpRight size={13} />
+                      </Link>
+                    </div>
                   )}
 
                   {v.status === "USED" && (
@@ -562,6 +755,14 @@ export default function VouchersClient({
           })}
         </div>
       )}
+
+      <CreateListingModal
+        open={Boolean(sellVoucherId)}
+        initialItemType="VOUCHER"
+        preselectedVoucherId={sellVoucherId}
+        onClose={() => setSellVoucherId(null)}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

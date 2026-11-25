@@ -28,6 +28,9 @@ import {
   Flame,
 } from "lucide-react";
 import Link from "next/link";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { isWebOwner } from "@/lib/webConfig";
 import { getCompanyMembersMap } from "@/lib/trucky";
 
 export const metadata = {
@@ -38,6 +41,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function ManageOverview() {
+  const session = await getServerSession(authOptions);
+  const canAccessOwnerLab = await isWebOwner(session?.user?.discordId);
   const client = await clientPromise;
   const db = client.db();
   const guildId = process.env.DISCORD_GUILD_ID || "863959415702028318";
@@ -637,12 +642,26 @@ export default async function ManageOverview() {
                 <Users size={15} /> Driver & Komunitas
               </span>
               <span className="text-[9px] font-bold text-muted-foreground uppercase">
-                8 Layanan
+                9 Layanan
               </span>
             </div>
 
             <div className="space-y-2">
               {[
+                ...(canAccessOwnerLab
+                  ? [
+                      {
+                        name: "Owner Voucher Lab (Testing)",
+                        href: "/dashboard/manage/vouchers",
+                        desc: "Khusus Developer & Owner: buat voucher manual + Audit Log",
+                      },
+                    ]
+                  : []),
+                {
+                  name: "Community Market Config",
+                  href: "/dashboard/manage/community-market",
+                  desc: "Atur rentang harga, pajak 11%, durasi iklan & N+/Booster",
+                },
                 {
                   name: "Audit Center & Integrity",
                   href: "/dashboard/manage/audit",

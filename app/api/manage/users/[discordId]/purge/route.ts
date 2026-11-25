@@ -51,6 +51,23 @@ export async function DELETE(
       );
     }
 
+    // Deduplikasi otomatis untuk panggilan Bot / Webhook (mencegah bentrok antara Silvia & Trucky Webhook atau member_kicked + member_left)
+    if (isBotAuthorized) {
+      try {
+        const lockKey = `purge:lock:${discordId}`;
+        const acquired = await redis.set(lockKey, "1", "EX", 30, "NX");
+        if (!acquired) {
+          return NextResponse.json({
+            success: true,
+            deduplicated: true,
+            message: `Purge untuk Discord ID ${discordId} sudah sedang/baru saja diproses.`,
+          });
+        }
+      } catch (lockErr) {
+        console.warn("[Purge] Redis dedup lock skipped:", lockErr);
+      }
+    }
+
     const client = await clientPromise;
     const db = client.db();
 
@@ -293,10 +310,33 @@ export async function DELETE(
     deletePromises.push(db.collection("marketreviews").deleteMany({ buyerId: discordId }));
     deletePromises.push(db.collection("marketitems").deleteMany({ sellerId: discordId }));
 
+    // --- Community Market (P2P Listings, Buy Orders, Trades & Reviews) ---
+    deletePromises.push(
+      db.collection("communitymarketlistings").deleteMany({ sellerDiscordId: discordId }),
+    );
+    deletePromises.push(
+      db.collection("communitymarketbuyorders").deleteMany({ buyerDiscordId: discordId }),
+    );
+    deletePromises.push(
+      db.collection("communitymarketreviews").deleteMany({
+        $or: [{ sellerDiscordId: discordId }, { buyerDiscordId: discordId }],
+      }),
+    );
+    deletePromises.push(
+      db.collection("communitymarkettrades").deleteMany({
+        $or: [{ sellerDiscordId: discordId }, { buyerDiscordId: discordId }],
+      }),
+    );
+
     // --- Seasonal Pass, Voucher & Nismara+ ---
     deletePromises.push(
       db.collection("uservouchers").deleteMany({
         $or: [{ discordId }, ...(userIdObj ? [{ userId: userIdObj }] : [])],
+      }),
+    );
+    deletePromises.push(
+      db.collection("vouchergrantlogs").deleteMany({
+        recipientDiscordId: discordId,
       }),
     );
     deletePromises.push(
