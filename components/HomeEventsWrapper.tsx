@@ -11,12 +11,16 @@ export default async function HomeEventsWrapper() {
   const startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
   // Jalankan query secara paralel agar cepat
-  const [convoys, contracts, boosts, coupons, goals] = await Promise.all([
+  const [convoys, contracts, boosts, coupons, goals, giveaways] = await Promise.all([
     db.collection("convoylobby").find({}).toArray(),
     db.collection("contracts").find({}).toArray(),
     db.collection("ncevents").find({}).toArray(), // NC Boosts events
     db.collection("coupons").find({}).toArray(),
     db.collection("communitygoals").find({}).toArray(),
+    db
+      .collection("giveaways")
+      .find({ status: { $in: ["scheduled", "ongoing", "drawing", "completed"] } })
+      .toArray(),
   ]);
 
   const events: CalendarEvent[] = [];
@@ -103,6 +107,41 @@ export default async function HomeEventsWrapper() {
         href: `/community-goals/${g.slug}`,
         imageUrl: g.imageUrl,
       });
+    }
+  });
+
+  // 6. GIVEAWAYS
+  giveaways.forEach(g => {
+    const startDt = g.startDate ? new Date(g.startDate) : null;
+    const endDt = g.endDate ? new Date(g.endDate) : null;
+    const drawDt = g.drawDate ? new Date(g.drawDate) : null;
+    const href = `/giveaways/${g.slug || slugify(g.title || "giveaway")}`;
+
+    if (startDt || endDt) {
+      events.push({
+        id: g._id.toString(),
+        title: g.title || "Giveaway Nismara",
+        type: "giveaway",
+        date: startDt || endDt!,
+        endDate: endDt || undefined,
+        href,
+        imageUrl: g.bannerUrl || undefined,
+      });
+    }
+
+    if (drawDt && endDt) {
+      const endDayWib = endDt.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+      const drawDayWib = drawDt.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+      if (drawDayWib > endDayWib) {
+        events.push({
+          id: `${g._id.toString()}-draw`,
+          title: `Pengundian: ${g.title || "Giveaway"}`,
+          type: "giveaway",
+          date: drawDt,
+          href,
+          imageUrl: g.bannerUrl || undefined,
+        });
+      }
     }
   });
 

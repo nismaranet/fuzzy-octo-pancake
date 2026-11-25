@@ -5,6 +5,11 @@ import GalleryGrid from "@/components/gallery/GalleryGrid";
 import AchievementSection from "@/components/profile/AchievementSection";
 import CollectibleSection from "@/components/profile/CollectibleSection";
 import UserBadges from "@/components/icons/UserBadges";
+import DrivingScoreCard from "@/components/DrivingScoreCard";
+import {
+  recalculateUserDrivingScore,
+  type DrivingScoreData,
+} from "@/lib/drivingScore";
 import { notFound } from "next/navigation";
 import {
   Truck,
@@ -223,6 +228,16 @@ export default async function PublicProfilePage(props: {
 
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+  // Driving Score (ambil dari dokumen users; auto-hitung jika belum pernah terisi)
+  let profileDrivingScore: DrivingScoreData | null =
+    (user?.drivingScore as DrivingScoreData | undefined) || null;
+  if (!profileDrivingScore && userDiscordId) {
+    profileDrivingScore = await recalculateUserDrivingScore(
+      db,
+      String(userDiscordId),
+    );
+  }
 
   // Parallel fetches for stats & history
   const [
@@ -727,6 +742,12 @@ export default async function PublicProfilePage(props: {
                   </p>
                 </div>
               </div>
+
+              {/* Driving Score & Safety Rating */}
+              <DrivingScoreCard
+                drivingScore={profileDrivingScore}
+                variant="profile"
+              />
 
               {/* Aktivitas Terkini (Recent Activity) */}
               <div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-2xl p-6">

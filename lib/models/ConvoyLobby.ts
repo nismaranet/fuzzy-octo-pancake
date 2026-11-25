@@ -60,7 +60,11 @@ const convoyLobbySchema = new Schema<IConvoyLobby>(
   {
     guildId: { type: String, required: true },
     gameId: { type: String, required: true }, // 1 = ETS2, 2 = ATS
-    gameplayType: { type: String, enum: ["Convoy Lobby", "TruckersMP", "HaulMP"], default: "Convoy Lobby" },
+    gameplayType: {
+      type: String,
+      enum: ["Convoy Lobby", "TruckersMP", "HaulMP"],
+      default: "Convoy Lobby",
+    },
     lobbyId: { type: String, default: "85568392935732469" },
     serverName: { type: String },
     convoyUri: { type: String, required: true, unique: true },
@@ -91,7 +95,7 @@ const convoyLobbySchema = new Schema<IConvoyLobby>(
     interested: [{ type: String }],
     roadCaptain: { type: String },
     sweeper: { type: String },
-    
+
     rewards: {
       participantBase: { type: Number, default: 1000 },
       participantMultiplier: { type: Number, default: 150 },
@@ -106,6 +110,6 @@ const convoyLobbySchema = new Schema<IConvoyLobby>(
 
 const ConvoyLobby: Model<IConvoyLobby> =
   mongoose.models.ConvoyLobby ||
-  mongoose.model<IConvoyLobby>("ConvoyLobby", convoyLobbySchema);
+  mongoose.model<IConvoyLobby>("ConvoyLobby", convoyLobbySchema, "convoylobby");
 
 export default ConvoyLobby;

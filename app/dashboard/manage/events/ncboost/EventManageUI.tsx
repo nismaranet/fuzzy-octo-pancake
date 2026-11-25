@@ -25,6 +25,9 @@ import {
   Image as ImageIcon,
   X,
   Truck,
+  Bus,
+  Award,
+  ShieldCheck,
   Gamepad2,
   Globe,
   Flame,
@@ -94,7 +97,12 @@ export default function EventManageUI({
     slug: "",
     type: "all",
     gameId: "all",
+    jobCategory: "all" as "all" | "truck" | "coach",
     multiplier: "0.5",
+    dsBonusEnabled: true,
+    gradeABonusPct: "10",
+    gradeSBonusPct: "20",
+    requireRealMiles: true,
     isScheduled: false,
     startDate: getInitialStartDate(),
     endAt: getInitialEndDate(),
@@ -136,7 +144,12 @@ export default function EventManageUI({
       slug: "",
       type: "all",
       gameId: "all",
+      jobCategory: "all",
       multiplier: "0.5",
+      dsBonusEnabled: true,
+      gradeABonusPct: "10",
+      gradeSBonusPct: "20",
+      requireRealMiles: true,
       isScheduled: false,
       startDate: getInitialStartDate(),
       endAt: getInitialEndDate(),
@@ -154,13 +167,22 @@ export default function EventManageUI({
     setEditingEvent(eventItem);
     const start = eventItem.startDate ? new Date(eventItem.startDate) : new Date(eventItem.setAt || Date.now());
     const end = eventItem.endAt ? new Date(eventItem.endAt) : new Date();
+    const dsBonus = eventItem.drivingScoreBonus;
 
     setFormData({
       nameEvent: eventItem.nameEvent || "",
       slug: eventItem.slug || slugify(eventItem.nameEvent || ""),
       type: eventItem.type || "all",
       gameId: eventItem.gameId || "all",
+      jobCategory:
+        eventItem.jobCategory === "truck" || eventItem.jobCategory === "coach"
+          ? eventItem.jobCategory
+          : "all",
       multiplier: String(eventItem.multiplier || "0.5"),
+      dsBonusEnabled: Boolean(dsBonus?.enabled),
+      gradeABonusPct: String(Math.round(Number(dsBonus?.gradeABonus ?? 0.1) * 100)),
+      gradeSBonusPct: String(Math.round(Number(dsBonus?.gradeSBonus ?? 0.2) * 100)),
+      requireRealMiles: dsBonus?.requireRealMiles !== undefined ? Boolean(dsBonus.requireRealMiles) : true,
       isScheduled: Boolean(eventItem.isScheduled),
       startDate: getWIBDateTimeLocal(start),
       endAt: getWIBDateTimeLocal(end),
@@ -298,6 +320,13 @@ export default function EventManageUI({
 
       const payload = {
         ...formData,
+        jobCategory: formData.jobCategory,
+        drivingScoreBonus: {
+          enabled: formData.dsBonusEnabled,
+          gradeABonus: Math.max(0, Number(formData.gradeABonusPct || 0)) / 100,
+          gradeSBonus: Math.max(0, Number(formData.gradeSBonusPct || 0)) / 100,
+          requireRealMiles: formData.requireRealMiles,
+        },
         imageUrl: finalImageUrl,
         setBy: manager?.discordId || manager?.id,
       };
@@ -405,6 +434,28 @@ export default function EventManageUI({
     return (
       <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
         <Globe size={11} /> Semua Game
+      </span>
+    );
+  };
+
+  const getCategoryBadge = (jobCategory?: string) => {
+    if (jobCategory === "truck") {
+      return (
+        <span className="px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+          <Truck size={11} /> Logistics
+        </span>
+      );
+    }
+    if (jobCategory === "coach") {
+      return (
+        <span className="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+          <Bus size={11} /> Coaches
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+        Semua Divisi
       </span>
     );
   };
@@ -622,9 +673,15 @@ export default function EventManageUI({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-1.5">
                       {getGameBadge(item.gameId)}
+                      {getCategoryBadge(item.jobCategory)}
                       <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                         {item.type === "all" ? "Semua Tipe" : item.type}
                       </span>
+                      {item.drivingScoreBonus?.enabled && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[10px] font-bold tracking-wide flex items-center gap-1">
+                          <Award size={11} /> A +{Math.round(Number(item.drivingScoreBonus.gradeABonus ?? 0.1) * 100)}% / S +{Math.round(Number(item.drivingScoreBonus.gradeSBonus ?? 0.2) * 100)}%
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-lg font-black text-foreground tracking-tight line-clamp-1" title={item.nameEvent}>
@@ -864,6 +921,157 @@ export default function EventManageUI({
                     <option value="Convoy">Khusus Convoy</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Target Divisi (Rolling Event Truck vs Coaches) */}
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground block">
+                  Target Divisi Pengiriman
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { id: "all", label: "Semua Divisi", desc: "Truck & Coaches", Icon: Globe },
+                      { id: "truck", label: "Logistics", desc: "Khusus Truck", Icon: Truck },
+                      { id: "coach", label: "Coaches", desc: "Khusus Bus", Icon: Bus },
+                    ] as const
+                  ).map(({ id, label, desc, Icon }) => {
+                    const selected = formData.jobCategory === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, jobCategory: id }))}
+                        className={`min-h-[52px] px-3 py-2.5 rounded-xl border text-left transition flex items-center gap-2.5 ${
+                          selected
+                            ? "bg-amber-500/15 border-amber-500 text-foreground shadow-sm"
+                            : "bg-black/20 border-border/80 text-muted-foreground hover:text-foreground hover:bg-black/35"
+                        }`}
+                      >
+                        <Icon size={16} className={selected ? "text-amber-400 shrink-0" : "shrink-0"} />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold leading-tight truncate">{label}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Bonus Driving Score (Grade A & S) */}
+              <div className="p-4 rounded-2xl bg-black/30 border border-border/80 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                      <Award size={14} className="text-emerald-400" /> Extra Boost Driving Score (Grade A & S)
+                    </span>
+                    <span className="text-xs text-muted-foreground block mt-0.5">
+                      Berikan bonus tambahan bertingkat untuk driver dengan status Driving Score Aktif.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Aktifkan Extra Boost Driving Score"
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, dsBonusEnabled: !prev.dsBonusEnabled }))
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                      formData.dsBonusEnabled ? "bg-emerald-500" : "bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        formData.dsBonusEnabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {formData.dsBonusEnabled && (
+                  <div className="space-y-3 pt-2 border-t border-border/60">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-muted-foreground">
+                          Extra Boost Grade A (%)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max="200"
+                            step="5"
+                            value={formData.gradeABonusPct}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, gradeABonusPct: e.target.value }))
+                            }
+                            className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border focus:border-emerald-500 text-foreground font-mono text-sm outline-none"
+                          />
+                          <span className="text-xs font-bold text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-muted-foreground">
+                          Extra Boost Grade S (%)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max="300"
+                            step="5"
+                            value={formData.gradeSBonusPct}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, gradeSBonusPct: e.target.value }))
+                            }
+                            className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border focus:border-emerald-500 text-foreground font-mono text-sm outline-none"
+                          />
+                          <span className="text-xs font-bold text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <ShieldCheck size={14} className="text-sky-400 shrink-0" /> Wajib Real Miles untuk Extra Boost
+                        </span>
+                        <span className="text-[11px] text-muted-foreground block">
+                          Job Race Miles atau Invalid tetap menerima Base Boost, tetapi Extra Grade A/S tidak diberikan.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Wajib Real Miles"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            requireRealMiles: !prev.requireRealMiles,
+                          }))
+                        }
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          formData.requireRealMiles ? "bg-sky-500" : "bg-muted"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            formData.requireRealMiles ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 font-semibold flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span>Base: +{Math.round(Number(formData.multiplier || 0) * 100)}%</span>
+                      <span>
+                        Grade A: +{Math.round(Number(formData.multiplier || 0) * 100) + Number(formData.gradeABonusPct || 0)}%
+                      </span>
+                      <span>
+                        Grade S: +{Math.round(Number(formData.multiplier || 0) * 100) + Number(formData.gradeSBonusPct || 0)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Schedule Mode Toggle */}

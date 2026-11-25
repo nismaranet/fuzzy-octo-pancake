@@ -10,4 +10,5 @@ const galleryPostSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.models.GalleryPost || mongoose.model("GalleryPost", galleryPostSchema);
+export default mongoose.models.GalleryPost ||
+  mongoose.model("GalleryPost", galleryPostSchema, "gallery_posts");

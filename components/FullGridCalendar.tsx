@@ -30,12 +30,34 @@ export default function FullGridCalendar({ events }: { events: CalendarEvent[] }
   const getEventColor = (type: string) => {
     switch (type) {
       case "convoy": return "bg-primary/20 text-primary border-primary/30";
-      case "boost": return "bg-amber-500/20 text-amber-500 border-amber-500/30";
-      case "coupon": return "bg-green-500/20 text-green-500 border-green-500/30";
-      case "goal": return "bg-purple-500/20 text-purple-500 border-purple-500/30";
+      case "boost": return "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30";
+      case "coupon": return "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30";
+      case "goal": return "bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30";
+      case "giveaway": return "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30";
       default: return "bg-accent-sky/20 text-accent-sky border-accent-sky/30";
     }
   };
+
+  const getEventLabel = (type: string) => {
+    switch (type) {
+      case "convoy": return "Convoy";
+      case "contract": return "Special Contract";
+      case "boost": return "NC Boost";
+      case "coupon": return "Kupon";
+      case "goal": return "Community Goal";
+      case "giveaway": return "Giveaway";
+      default: return type;
+    }
+  };
+
+  const legendItems: { type: CalendarEvent["type"]; label: string; dotClass: string }[] = [
+    { type: "convoy", label: "Convoy", dotClass: "bg-primary" },
+    { type: "contract", label: "Special Contract", dotClass: "bg-accent-sky" },
+    { type: "boost", label: "NC Boost", dotClass: "bg-amber-500" },
+    { type: "giveaway", label: "Giveaway", dotClass: "bg-rose-500" },
+    { type: "coupon", label: "Kupon", dotClass: "bg-green-500" },
+    { type: "goal", label: "Community Goal", dotClass: "bg-purple-500" },
+  ];
 
   const getGoogleCalendarUrl = (ev: CalendarEvent) => {
     const start = ev.date.toISOString().replace(/-|:|\.\d\d\d/g, "");
@@ -51,16 +73,26 @@ export default function FullGridCalendar({ events }: { events: CalendarEvent[] }
   return (
     <div className="glass-panel border border-border/50 rounded-2xl bg-card/80 backdrop-blur-xl overflow-hidden flex flex-col shadow-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 md:p-6 border-b border-border/50 flex-wrap gap-4">
-        <h2 className="text-2xl font-bold capitalize flex-1">
-          {format(currentDate, "MMMM yyyy", { locale: id })}
-        </h2>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Hari Ini</Button>
-          <div className="flex items-center gap-1 bg-background/50 border border-border/50 rounded-lg p-1">
-            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 rounded-md"><ChevronLeft className="w-4 h-4" /></Button>
-            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 rounded-md"><ChevronRight className="w-4 h-4" /></Button>
+      <div className="flex flex-col gap-3 p-4 md:p-6 border-b border-border/50">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <h2 className="text-2xl font-bold capitalize flex-1">
+            {format(currentDate, "MMMM yyyy", { locale: id })}
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Hari Ini</Button>
+            <div className="flex items-center gap-1 bg-background/50 border border-border/50 rounded-lg p-1">
+              <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 rounded-md"><ChevronLeft className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 rounded-md"><ChevronRight className="w-4 h-4" /></Button>
+            </div>
           </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          {legendItems.map((item) => (
+            <span key={item.type} className="inline-flex items-center gap-1.5 font-medium">
+              <span className={`w-2.5 h-2.5 rounded-full ${item.dotClass}`} />
+              {item.label}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -156,7 +188,7 @@ export default function FullGridCalendar({ events }: { events: CalendarEvent[] }
                     <Link href={ev.href} className="absolute inset-0 z-0" aria-label="Lihat event" />
                     <div className="flex items-start justify-between gap-2">
                       <div className={`inline-flex px-2 py-0.5 rounded text-[10px] font-black uppercase border ${getEventColor(ev.type)}`}>
-                        {ev.type}
+                        {getEventLabel(ev.type)}
                       </div>
                       
                       {!isEventPassed(ev) && (

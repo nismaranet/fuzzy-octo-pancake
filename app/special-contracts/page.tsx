@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   Anchor,
   Truck,
+  Bus,
+  MapPin,
   History,
   TrendingUp,
   Package,
@@ -142,6 +144,21 @@ export default async function SpecialContractsPage({
     return "Truck Simulator";
   };
 
+  const getCoachFilterShort = (filter?: string) => {
+    if (filter === "company") return "Bus Company";
+    if (filter === "tourist") return "Bus Tourist";
+    return "Semua Bus";
+  };
+
+  const getTargetLabel = (c: any) => {
+    if (c.contractCategory === "coach") {
+      return Array.isArray(c.targetCities) && c.targetCities.length > 0
+        ? c.targetCities.join(", ")
+        : c.companyName || "Kota Target";
+    }
+    return c.companyName || "-";
+  };
+
   return (
     <main className="min-h-screen pt-24 pb-20 bg-background text-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -215,18 +232,37 @@ export default async function SpecialContractsPage({
                       />
                     </div>
                     <div className="flex-1">
-                      <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border mb-3 inline-block ${contract.gameId === "1" ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-orange-500/10 text-orange-400 border-orange-500/30"}`}
-                      >
-                        {getGameName(contract.gameId)}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border inline-block ${contract.gameId === "1" ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-orange-500/10 text-orange-400 border-orange-500/30"}`}
+                        >
+                          {getGameName(contract.gameId)}
+                        </span>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border inline-flex items-center gap-1 ${
+                            contract.contractCategory === "coach"
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                              : "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                          }`}
+                        >
+                          {contract.contractCategory === "coach" ? <Bus className="w-3 h-3" /> : <Truck className="w-3 h-3" />}
+                          {contract.contractCategory === "coach"
+                            ? `Coaches · ${getCoachFilterShort(contract.coachMarketFilter)}`
+                            : "Truck"}
+                        </span>
+                      </div>
                       <h3 className="text-2xl font-bold text-foreground mb-1">
                         {contract.contractName}
                       </h3>
-                      <p className="text-accent-sky font-medium mb-6 flex items-center gap-2 text-sm uppercase">
-                        <Anchor className="w-4 h-4" /> {contract.companyName}
+                      <p className="text-accent-sky font-medium mb-6 flex items-center gap-2 text-sm">
+                        {contract.contractCategory === "coach" ? (
+                          <MapPin className="w-4 h-4 shrink-0" />
+                        ) : (
+                          <Anchor className="w-4 h-4 shrink-0" />
+                        )}
+                        <span className="truncate">{getTargetLabel(contract)}</span>
                       </p>
-                      <div className="w-full py-4 bg-primary text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+                      <div className="w-full py-4 bg-primary text-primary-foreground font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
                         Detail Kontrak <ChevronRight className="w-5 h-5" />
                       </div>
                     </div>
@@ -276,11 +312,21 @@ export default async function SpecialContractsPage({
 
                     <div className="flex-1 flex flex-col justify-between">
                       <div>
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
                           <span
                             className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border inline-block ${contract.gameId === "1" ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-orange-500/10 text-orange-400 border-orange-500/30"}`}
                           >
                             {getGameName(contract.gameId)}
+                          </span>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border inline-flex items-center gap-1 ${
+                              contract.contractCategory === "coach"
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                : "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                            }`}
+                          >
+                            {contract.contractCategory === "coach" ? <Bus className="w-3 h-3" /> : <Truck className="w-3 h-3" />}
+                            {contract.contractCategory === "coach" ? "Coaches" : "Truck"}
                           </span>
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
                             <Clock className="w-3 h-3" /> Terjadwal
@@ -290,8 +336,13 @@ export default async function SpecialContractsPage({
                         <h3 className="text-2xl font-bold text-foreground mb-1 group-hover:text-amber-400 transition-colors">
                           {contract.contractName}
                         </h3>
-                        <p className="text-accent-sky font-medium mb-4 flex items-center gap-2 text-sm uppercase">
-                          <Anchor className="w-4 h-4" /> {contract.companyName}
+                        <p className="text-accent-sky font-medium mb-4 flex items-center gap-2 text-sm">
+                          {contract.contractCategory === "coach" ? (
+                            <MapPin className="w-4 h-4 shrink-0" />
+                          ) : (
+                            <Anchor className="w-4 h-4 shrink-0" />
+                          )}
+                          <span className="truncate">{getTargetLabel(contract)}</span>
                         </p>
 
                         <div className="space-y-1.5 py-3 px-4 rounded-xl bg-card/60 border border-border/50 text-xs mb-4">
@@ -356,12 +407,22 @@ export default async function SpecialContractsPage({
                   >
                     <div className="p-6 md:p-8 pb-6 flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-border/40 bg-card/20">
                       <div>
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span
                             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border ${history.gameId === "1" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-orange-500/10 text-orange-400 border-orange-500/20"}`}
                           >
                             <Globe className="w-3 h-3" />{" "}
                             {getGameName(history.gameId)}
+                          </span>
+                          <span
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border ${
+                              history.contractCategory === "coach"
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+                            }`}
+                          >
+                            {history.contractCategory === "coach" ? <Bus className="w-3 h-3" /> : <Truck className="w-3 h-3" />}
+                            {history.contractCategory === "coach" ? "Coaches" : "Truck"}
                           </span>
                           <span className="text-[10px] text-gray-500 font-medium">
                             Selesai pada {formatDate(history.updatedAt || history.endAt)}
@@ -370,8 +431,8 @@ export default async function SpecialContractsPage({
                         <h4 className="text-2xl font-extrabold text-foreground">
                           {history.contractName}
                         </h4>
-                        <p className="text-accent-sky text-sm font-medium mt-1 uppercase tracking-wider">
-                          {history.companyName}
+                        <p className="text-accent-sky text-sm font-medium mt-1">
+                          {getTargetLabel(history)}
                         </p>
                       </div>
                     </div>
@@ -406,11 +467,20 @@ export default async function SpecialContractsPage({
                       </div>
                       <div className="text-center md:text-left">
                         <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
-                          Massa Kargo
+                          {history.contractCategory === "coach" ? "Total Penumpang" : "Massa Kargo"}
                         </p>
                         <p className="text-xl font-bold text-foreground flex items-center justify-center md:justify-start gap-2">
-                          <Package className="w-4 h-4 text-green-400" />{" "}
-                          {history.totalMass?.toLocaleString("id-ID")}t
+                          {history.contractCategory === "coach" ? (
+                            <>
+                              <Users className="w-4 h-4 text-emerald-400" />{" "}
+                              {(history.totalPassengers || 0).toLocaleString("id-ID")} pax
+                            </>
+                          ) : (
+                            <>
+                              <Package className="w-4 h-4 text-green-400" />{" "}
+                              {(history.totalMass || 0).toLocaleString("id-ID")}t
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>

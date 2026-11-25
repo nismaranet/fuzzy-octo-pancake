@@ -93,7 +93,7 @@ export async function getUserAggregatedStats(discordId: string, userIdObj: any) 
   const validatedStats = validatedStatsArr[0] || {};
 
   // Convoy Stats
-  const convoys = await db.collection("convoylobbies").find({
+  const convoys = await db.collection("convoylobby").find({
     $or: [
       { interested: discordId },
       { "partisipan.discordId": discordId }

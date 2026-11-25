@@ -5,7 +5,7 @@ import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { format, isSameDay } from "date-fns";
 import { id } from "date-fns/locale";
 import Link from "next/link";
-import { CalendarDays, MapPin, Zap, Tag, Flag, Clock, CalendarPlus } from "lucide-react";
+import { CalendarDays, MapPin, Zap, Tag, Flag, Clock, CalendarPlus, Gift } from "lucide-react";
 import { ScrollReveal } from "./ScrollReveal";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 export type CalendarEvent = {
   id: string;
   title: string;
-  type: "convoy" | "contract" | "boost" | "coupon" | "goal";
+  type: "convoy" | "contract" | "boost" | "coupon" | "goal" | "giveaway";
   date: Date;
   endDate?: Date;
   imageUrl?: string;
@@ -50,7 +50,20 @@ export default function HomeEventsCalendar({ events }: { events: CalendarEvent[]
       case "boost": return <Zap className="w-4 h-4 text-amber-500" />;
       case "coupon": return <Tag className="w-4 h-4 text-green-500" />;
       case "goal": return <Flag className="w-4 h-4 text-purple-500" />;
+      case "giveaway": return <Gift className="w-4 h-4 text-rose-500" />;
       default: return <Clock className="w-4 h-4 text-accent-sky" />;
+    }
+  };
+
+  const getEventLabel = (type: string) => {
+    switch (type) {
+      case "convoy": return "Convoy";
+      case "contract": return "Special Contract";
+      case "boost": return "NC Boost";
+      case "coupon": return "Kupon";
+      case "goal": return "Community Goal";
+      case "giveaway": return "Giveaway";
+      default: return type;
     }
   };
 
@@ -60,6 +73,7 @@ export default function HomeEventsCalendar({ events }: { events: CalendarEvent[]
       case "boost": return "border-amber-500/20 bg-amber-500/10 text-amber-500";
       case "coupon": return "border-green-500/20 bg-green-500/10 text-green-500";
       case "goal": return "border-purple-500/20 bg-purple-500/10 text-purple-500";
+      case "giveaway": return "border-rose-500/25 bg-rose-500/10 text-rose-500 dark:text-rose-400";
       default: return "border-accent-sky/20 bg-accent-sky/10 text-accent-sky";
     }
   };
@@ -70,6 +84,7 @@ export default function HomeEventsCalendar({ events }: { events: CalendarEvent[]
       case "boost": return "bg-amber-500";
       case "coupon": return "bg-green-500";
       case "goal": return "bg-purple-500";
+      case "giveaway": return "bg-rose-500";
       default: return "bg-accent-sky";
     }
   };
@@ -103,7 +118,7 @@ export default function HomeEventsCalendar({ events }: { events: CalendarEvent[]
             Kalender <span className="text-primary">Event Komunitas</span>
           </h2>
           <p className="text-lg text-foreground/60 leading-relaxed font-medium mt-4 max-w-2xl mx-auto">
-            Jangan lewatkan jadwal mabar convoy, periode double exp, hingga pencapaian misi komunitas.
+            Jangan lewatkan jadwal mabar convoy, periode NC boost, giveaway berhadiah, hingga pencapaian misi komunitas.
           </p>
         </ScrollReveal>
 
@@ -191,7 +206,7 @@ export default function HomeEventsCalendar({ events }: { events: CalendarEvent[]
                       <div className="flex-1 flex flex-col justify-center">
                         <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider w-max mb-2 border ${getEventColor(ev.type)}`}>
                           {getEventIcon(ev.type)}
-                          {ev.type}
+                          {getEventLabel(ev.type)}
                         </div>
                         <h4 className="font-bold text-lg leading-tight mb-1 group-hover:text-primary transition-colors">{ev.title}</h4>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">

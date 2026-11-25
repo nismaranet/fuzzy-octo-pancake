@@ -107,6 +107,14 @@ const jobHistorySchema = new mongoose.Schema(
     isHardcore: { type: Boolean, default: false },
     hardcoreRating: { type: Number, default: 0 },
 
+    // Telematika tambahan dari Trucky API (Driving Score)
+    lateDelivery: { type: Boolean, default: false },
+    maxSpeedKmh: { type: Number, default: 0 },
+    averageSpeedKmh: { type: Number, default: 0 },
+    speeding: { type: Boolean, default: false },
+    totalSpeedingTime: { type: Number, default: 0 },
+    autoPark: { type: Boolean, default: false },
+
     // Damage
     damage: {
       vehicle: Number,

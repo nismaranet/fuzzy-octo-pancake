@@ -4,10 +4,16 @@ import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCompanyMemberStats } from "@/lib/trucky";
 import DriverMonthlyJobAnalytics, {
   MonthlyJobStatItem,
 } from "@/components/dashboard/DriverMonthlyJobAnalytics";
+import DrivingScoreCard from "@/components/DrivingScoreCard";
+import RewindPromoBanner from "@/components/rewind/RewindPromoBanner";
+import { getWebConfig, isRewind2026PubliclyLive } from "@/lib/webConfig";
+import {
+  recalculateUserDrivingScore,
+  type DrivingScoreData,
+} from "@/lib/drivingScore";
 import {
   Truck,
   Bus,
@@ -68,17 +74,18 @@ export default async function DashboardPage() {
 
   const client = await clientPromise;
   const db = client.db();
+  const webConfig = await getWebConfig();
+  const showRewind2026Banner = isRewind2026PubliclyLive(webConfig);
 
   // 2. Ambil seluruh data dari Trucky API & MongoDB secara PARALEL (mengurangi waktu respon dari ~3.2s menjadi ~250ms)
   const truckyId = session.user.driverData.truckyId;
   const discordId = session.user.discordId;
   const GUILD_ID = process.env.DISCORD_GUILD_ID;
-  const NISMARA_COMPANY_ID = process.env.TRUCKY_COMPANY_ID;
 
   const [
+    userDoc,
     userPoint,
     userNC,
-    memberData,
     ongoingJobs,
     completedJobs,
     canceledJobs,
@@ -88,6 +95,10 @@ export default async function DashboardPage() {
     initialDLink,
     pointPenalties,
   ] = await Promise.all([
+    db.collection("users").findOne(
+      { discordId: discordId },
+      { projection: { drivingScore: 1, truckyRank: 1, truckyRankColor: 1 } },
+    ),
     db.collection("points").findOne({
       userId: discordId,
       guildId: GUILD_ID,
@@ -96,7 +107,6 @@ export default async function DashboardPage() {
       userId: discordId,
       guildId: GUILD_ID,
     }),
-    getCompanyMemberStats(Number(NISMARA_COMPANY_ID), truckyId),
     db
       .collection("jobhistories")
       .find({ driverId: discordId, jobStatus: "ONGOING" })
@@ -261,6 +271,12 @@ export default async function DashboardPage() {
       .toArray(),
   ]);
 
+  let drivingScore: DrivingScoreData | null =
+    (userDoc?.drivingScore as DrivingScoreData | undefined) || null;
+  if (!drivingScore && discordId) {
+    drivingScore = await recalculateUserDrivingScore(db, String(discordId));
+  }
+
   let dLink = initialDLink;
   if (!dLink && truckyId) {
     dLink = await db.collection("driverlinks").findOne({
@@ -310,17 +326,19 @@ export default async function DashboardPage() {
   const driverJoinDate =
     dLink?.createdAt || (dLink?._id ? dLink._id.getTimestamp() : null);
 
+  const totalDrivenKm = Math.round(
+    divisionSummary.truckKm + divisionSummary.coachKm,
+  );
+
   const stats = {
-    rankName: memberData?.rank?.name || "Driver",
-    rankColor: memberData?.rank?.color || "#b39ddb",
-    distance: Math.round(
-      memberData?.total_driven_distance_km || 0,
-    ).toLocaleString(),
-    points:
-      userPoint?.totalPoints?.toLocaleString() ||
-      memberData?.points?.toLocaleString() ||
-      "0",
-    userNc: userNC?.totalNC?.toLocaleString() || "0",
+    rankName: userDoc?.truckyRank || "Driver",
+    rankColor: userDoc?.truckyRankColor || "#b39ddb",
+    distance: totalDrivenKm.toLocaleString("id-ID"),
+    points: (userPoint?.totalPoints ?? 0).toLocaleString("id-ID"),
+    userNc: (userNC?.totalNC ?? 0).toLocaleString("id-ID", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
     joinDate: driverJoinDate
       ? new Date(driverJoinDate).toLocaleDateString("id-ID", {
           timeZone: "Asia/Jakarta",
@@ -375,6 +393,9 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Banner Promo Rewind 2026 (otomatis muncul mulai 28 Desember 2026 00:00 WIB) */}
+      {showRewind2026Banner && <RewindPromoBanner variant="dashboard" />}
+
       {/* Grid Statistik VTC */}
       <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-foreground">
         <Shield className="text-accent-lilac" /> Statistik Nismara
@@ -405,6 +426,9 @@ export default async function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* Driving Score & Safety Rating */}
+      <DrivingScoreCard drivingScore={drivingScore} variant="dashboard" />
 
       {/* Ringkasan Divisi: Truck Logistics vs Coach / Bus */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">

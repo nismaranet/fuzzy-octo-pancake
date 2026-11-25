@@ -67,10 +67,12 @@ export async function createConvoy(formData: FormData) {
     });
 
     // Integrasi Discord (Notification & Scheduled Event)
+    const { getWebConfig } = await import("@/lib/webConfig");
+    const webConfig = await getWebConfig();
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const channelId = process.env.DISCORD_GENERAL_DRIVER_ID_CHANNEL;
-    const driverDiscordRole = process.env.DISCORD_DRIVER_ROLE_ID;
-    const internDiscordRole = process.env.DISCORD_INTERN_ROLE_ID;
+    const channelId = webConfig.discordChannels.generalDriverChannelId;
+    const driverDiscordRole = webConfig.discordRoles.driverRoleId;
+    const internDiscordRole = webConfig.discordRoles.internRoleId;
 
     if (botToken) {
       const convoyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/convoy/${rawData.convoyUri}`;

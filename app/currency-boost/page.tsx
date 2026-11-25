@@ -1,5 +1,5 @@
 import clientPromise from "@/lib/mongodb";
-import { Calendar, Clock, User, Zap, History, Sparkles } from "lucide-react";
+import { Calendar, Clock, User, Zap, History, Sparkles, Truck, Bus, Award } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -119,7 +119,30 @@ export default async function EventsPage() {
       day: "numeric",
       month: "short",
       year: "numeric",
+      timeZone: "Asia/Jakarta",
     });
+  };
+
+  const renderCategoryChip = (jobCategory?: string) => {
+    if (jobCategory === "truck") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 text-[11px] font-bold">
+          <Truck className="w-3.5 h-3.5" /> Logistics (Truck)
+        </span>
+      );
+    }
+    if (jobCategory === "coach") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-400 text-[11px] font-bold">
+          <Bus className="w-3.5 h-3.5" /> Coaches (Bus)
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted/60 border border-border text-muted-foreground text-[11px] font-bold">
+        Semua Divisi
+      </span>
+    );
   };
 
   return (
@@ -177,6 +200,14 @@ export default async function EventsPage() {
 
                   {/* Event Content */}
                   <div className="p-8 relative z-20">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {renderCategoryChip(event.jobCategory)}
+                      {event.drivingScoreBonus?.enabled && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
+                          <Award className="w-3.5 h-3.5" /> Grade A +{Math.round(Number(event.drivingScoreBonus.gradeABonus ?? 0.1) * 100)}% / S +{Math.round(Number(event.drivingScoreBonus.gradeSBonus ?? 0.2) * 100)}%
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-2xl font-bold text-(-foreground) mb-4 group-hover:text-primary transition-colors">
                       {event.nameEvent}
                     </h3>
@@ -246,6 +277,14 @@ export default async function EventsPage() {
                   </div>
 
                   <div className="p-8 relative z-20">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {renderCategoryChip(event.jobCategory)}
+                      {event.drivingScoreBonus?.enabled && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
+                          <Award className="w-3.5 h-3.5" /> Grade A +{Math.round(Number(event.drivingScoreBonus.gradeABonus ?? 0.1) * 100)}% / S +{Math.round(Number(event.drivingScoreBonus.gradeSBonus ?? 0.2) * 100)}%
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-2xl font-bold text-orange-400 mb-4 transition-colors">
                       {event.nameEvent}
                     </h3>

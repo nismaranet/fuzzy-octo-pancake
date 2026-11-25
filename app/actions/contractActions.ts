@@ -7,12 +7,83 @@ import { redirect } from "next/navigation";
 import { deleteFileFromR2 } from "@/lib/r2";
 import { parseWIBDate } from "@/lib/utils";
 
+type ContractCategory = "truck" | "coach";
+type CoachMarketFilter = "all" | "company" | "tourist";
+
+function normalizeCities(input: unknown): string[] {
+  let raw: string[] = [];
+  if (Array.isArray(input)) {
+    raw = input.map((v) => String(v || "").trim());
+  } else if (typeof input === "string") {
+    try {
+      const parsed = JSON.parse(input);
+      if (Array.isArray(parsed)) {
+        raw = parsed.map((v) => String(v || "").trim());
+      } else {
+        raw = input.split(",").map((v) => v.trim());
+      }
+    } catch {
+      raw = input.split(",").map((v) => v.trim());
+    }
+  }
+  const seen = new Set<string>();
+  const clean: string[] = [];
+  for (const city of raw) {
+    if (!city) continue;
+    const key = city.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      clean.push(city);
+    }
+  }
+  return clean;
+}
+
+function getCoachFilterLabel(filter: CoachMarketFilter): string {
+  if (filter === "company") return "Bus Company Job (Intercity Transit)";
+  if (filter === "tourist") return "Bus Tourist Job (Tourist Charter)";
+  return "Semua Layanan Bus (Company & Tourist)";
+}
+
 export async function createContractAction(formData: any) {
   const client = await clientPromise;
   const db = client.db();
 
-  const { contractName, companyName, imageUrl, gameId, endAt, setBy, guildId, isScheduled, startDate } =
-    formData;
+  const {
+    contractName,
+    contractCategory: rawCategory,
+    companyName,
+    targetCities: rawCities,
+    coachMarketFilter: rawFilter,
+    minPassengers: rawMinPax,
+    imageUrl,
+    gameId,
+    endAt,
+    setBy,
+    guildId,
+    isScheduled,
+    startDate,
+  } = formData;
+
+  const contractCategory: ContractCategory = rawCategory === "coach" ? "coach" : "truck";
+  const isCoach = contractCategory === "coach";
+  const targetCities = isCoach ? normalizeCities(rawCities) : [];
+  const coachMarketFilter: CoachMarketFilter =
+    rawFilter === "company" || rawFilter === "tourist" ? rawFilter : "all";
+  const minPassengers = isCoach ? Math.max(0, Math.floor(Number(rawMinPax || 0))) : 0;
+  const finalCompanyName = isCoach
+    ? targetCities.join(", ")
+    : String(companyName || "").trim();
+
+  if (!String(contractName || "").trim()) {
+    throw new Error("Nama kontrak wajib diisi.");
+  }
+  if (isCoach && targetCities.length === 0) {
+    throw new Error("Pilih minimal 1 kota target untuk Special Contract Coaches.");
+  }
+  if (!isCoach && !finalCompanyName) {
+    throw new Error("Nama perusahaan klien wajib diisi untuk Special Contract Truck.");
+  }
 
   const isSched = Boolean(isScheduled);
   const startDt = isSched && startDate ? parseWIBDate(startDate) : new Date();
@@ -23,51 +94,115 @@ export async function createContractAction(formData: any) {
     throw new Error("Deadline kontrak harus lebih lama daripada waktu mulai!");
   }
 
-  // Jika dijadwalkan dan tanggal mulai masih di masa depan, isActive = false
   const isCurrentlyActive = !isSched || startDt <= now;
   const isTrulyScheduled = isSched && startDt > now;
 
-  await db.collection("contracts").insertOne({
-    guildId,
-    contractName,
-    companyName,
-    imageUrl,
-    gameId: String(gameId), // "1" untuk ETS2, "2" untuk ATS
-    completedContracts: 0,
-    totalNCEarned: 0,
-    totalDistance: 0,
-    totalMass: 0,
-    setBy, // Discord ID Manager
-    setAt: new Date(),
-    startDate: startDt,
-    endAt: endDt,
-    isActive: isCurrentlyActive,
-    isScheduled: isTrulyScheduled,
-    contributors: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+  try {
+    await db.collection("contracts").insertOne({
+      guildId,
+      contractName: String(contractName).trim(),
+      contractCategory,
+      companyName: finalCompanyName,
+      targetCities,
+      coachMarketFilter,
+      minPassengers,
+      imageUrl,
+      gameId: String(gameId), // "1" untuk ETS2, "2" untuk ATS
+      completedContracts: 0,
+      totalNCEarned: 0,
+      totalDistance: 0,
+      totalMass: 0,
+      totalPassengers: 0,
+      setBy, // Discord ID Manager
+      setAt: new Date(),
+      startDate: startDt,
+      endAt: endDt,
+      isActive: isCurrentlyActive,
+      isScheduled: isTrulyScheduled,
+      contributors: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } catch (err: any) {
+    if (err?.code === 11000) {
+      throw new Error(
+        `Sudah ada kontrak aktif untuk ${gameId === "2" ? "ATS" : "ETS2"} kategori ${isCoach ? "Coaches" : "Truck"}. Tutup kontrak aktif tersebut dulu atau jadwalkan untuk waktu mendatang.`
+      );
+    }
+    throw err;
+  }
 
   // Integrasi Discord (Notification & Scheduled Event)
+  const { getWebConfig } = await import("@/lib/webConfig");
+  const webConfig = await getWebConfig();
   const botToken = process.env.DISCORD_BOT_TOKEN;
-  const channelId = process.env.DISCORD_GENERAL_DRIVER_ID_CHANNEL;
-  const driverDiscordRole = process.env.DISCORD_DRIVER_ROLE_ID;
-  const internDiscordRole = process.env.DISCORD_INTERN_ROLE_ID;
+  const channelId = webConfig.discordChannels.generalDriverChannelId;
+  const driverDiscordRole = webConfig.discordRoles.driverRoleId;
+  const internDiscordRole = webConfig.discordRoles.internRoleId;
 
   if (botToken && guildId) {
     const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, "-");
     const contractUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/special-contracts/${slugify(contractName)}`;
+    const targetCitiesLabel = targetCities.join(", ");
+    const coachFilterText = getCoachFilterLabel(coachMarketFilter);
 
     // 1. Kirim Pesan Notifikasi ke Channel Driver
     if (channelId) {
       try {
         const announcementContent = isTrulyScheduled
-          ? `📅 **SPECIAL CONTRACT SCHEDULED** 📅\n-# <@&${driverDiscordRole}> <@&${internDiscordRole}>`
-          : `🚨 **NEW SPECIAL CONTRACT DEPLOYED** 🚨\n-# <@&${driverDiscordRole}> <@&${internDiscordRole}>`;
+          ? `📅 **SPECIAL CONTRACT ${isCoach ? "COACHES " : ""}SCHEDULED** 📅\n-# <@&${driverDiscordRole}> <@&${internDiscordRole}>`
+          : `${isCoach ? "🚌" : "🚨"} **NEW SPECIAL CONTRACT ${isCoach ? "COACHES " : ""}DEPLOYED** ${isCoach ? "🚌" : "🚨"}\n-# <@&${driverDiscordRole}> <@&${internDiscordRole}>`;
 
-        const descMessage = isTrulyScheduled
-          ? `Nismara Transport telah menjadwalkan special contract baru dari **${companyName}**! Kontrak akan resmi dimulai pada <t:${Math.floor(startDt.getTime() / 1000)}:F> (<t:${Math.floor(startDt.getTime() / 1000)}:R>). Bersiaplah!`
-          : `Nismara Transport telah mendapatkan special contract dari **${companyName}**! Ayo segera ambil pekerjaan dari atau menuju ke ${companyName}. Jangan sampai terlambat!`;
+        const descMessage = isCoach
+          ? isTrulyScheduled
+            ? `Nismara Transport menjadwalkan Special Contract **Coaches** dengan target kota **${targetCitiesLabel}** (${coachFilterText}). Kontrak mulai pada <t:${Math.floor(startDt.getTime() / 1000)}:F> (<t:${Math.floor(startDt.getTime() / 1000)}:R>).`
+            : `Special Contract **Coaches** baru telah dibuka! Ambil perjalanan bus dari, menuju, atau singgah di **${targetCitiesLabel}** (${coachFilterText}) untuk mendapatkan bonus 2x NC.`
+          : isTrulyScheduled
+            ? `Nismara Transport telah menjadwalkan special contract baru dari **${finalCompanyName}**! Kontrak akan resmi dimulai pada <t:${Math.floor(startDt.getTime() / 1000)}:F> (<t:${Math.floor(startDt.getTime() / 1000)}:R>). Bersiaplah!`
+            : `Nismara Transport telah mendapatkan special contract dari **${finalCompanyName}**! Ayo segera ambil pekerjaan dari atau menuju ke ${finalCompanyName}. Jangan sampai terlambat!`;
+
+        const embedFields: Array<{ name: string; value: string; inline?: boolean }> = [
+          {
+            name: "Kategori",
+            value: isCoach ? "Coaches (Bus)" : "Truck (Logistik)",
+            inline: true,
+          },
+          {
+            name: "Target Game",
+            value:
+              gameId === "1"
+                ? "Euro Truck Simulator 2"
+                : "American Truck Simulator",
+            inline: true,
+          },
+          {
+            name: isTrulyScheduled ? "Waktu Mulai" : "Deadline",
+            value: isTrulyScheduled
+              ? `<t:${Math.floor(startDt.getTime() / 1000)}:R>`
+              : `<t:${Math.floor(endDt.getTime() / 1000)}:R>`,
+            inline: true,
+          },
+        ];
+
+        if (isCoach) {
+          embedFields.push({
+            name: "Kota Target (Asal / Tujuan / Transit)",
+            value: targetCitiesLabel,
+            inline: false,
+          });
+          embedFields.push({
+            name: "Layanan Bus",
+            value: coachFilterText,
+            inline: true,
+          });
+          if (minPassengers > 0) {
+            embedFields.push({
+              name: "Minimal Penumpang",
+              value: `${minPassengers} pax`,
+              inline: true,
+            });
+          }
+        }
 
         await fetch(
           `https://discord.com/api/v10/channels/${channelId}/messages`,
@@ -84,26 +219,14 @@ export async function createContractAction(formData: any) {
                   title: isTrulyScheduled ? `[SCHEDULED] ${contractName}` : `${contractName}`,
                   description: descMessage,
                   url: contractUrl,
-                  color: gameId === "1" ? 3447003 : 15844367, // Biru ETS2, Orange ATS
+                  color: isCoach ? 1096065 : gameId === "1" ? 3447003 : 15844367,
                   image: imageUrl ? { url: imageUrl } : undefined,
-                  fields: [
-                    {
-                      name: "Target Game",
-                      value:
-                        gameId === "1"
-                          ? "Euro Truck Simulator 2"
-                          : "American Truck Simulator",
-                      inline: true,
-                    },
-                    {
-                      name: isTrulyScheduled ? "Waktu Mulai" : "Deadline",
-                      value: isTrulyScheduled
-                        ? `<t:${Math.floor(startDt.getTime() / 1000)}:R>`
-                        : `<t:${Math.floor(endDt.getTime() / 1000)}:R>`,
-                      inline: true,
-                    },
-                  ],
-                  footer: { text: "Nismara Transport - Special Contract" },
+                  fields: embedFields,
+                  footer: {
+                    text: isCoach
+                      ? "Nismara Transport - Special Contract Coaches"
+                      : "Nismara Transport - Special Contract",
+                  },
                 },
               ],
               components: [
@@ -136,7 +259,6 @@ export async function createContractAction(formData: any) {
           const arrayBuffer = await imgRes.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           const base64 = buffer.toString("base64");
-          // Gunakan tipe webp karena dikompresi jadi webp
           base64Image = `data:image/webp;base64,${base64}`;
         } catch (e) {
           console.error(
@@ -151,6 +273,14 @@ export async function createContractAction(formData: any) {
         : new Date(Date.now() + 60000);
 
       if (endDt > eventStartTime) {
+        const locationLabel = isCoach
+          ? `${targetCitiesLabel} - ${gameId === "1" ? "ETS2" : "ATS"} Coaches`.slice(0, 100)
+          : `${finalCompanyName} - ${gameId === "1" ? "ETS2" : "ATS"}`.slice(0, 100);
+
+        const eventDescription = isCoach
+          ? `Kontrak khusus Coaches (${coachFilterText}) untuk kota ${targetCitiesLabel}. Info lebih lanjut: ${contractUrl}`
+          : `Kontrak logistik khusus dari ${finalCompanyName}. Info lebih lanjut: ${contractUrl}`;
+
         await fetch(
           `https://discord.com/api/v10/guilds/${guildId}/scheduled-events`,
           {
@@ -166,9 +296,9 @@ export async function createContractAction(formData: any) {
               scheduled_end_time: endDt.toISOString(),
               entity_type: 3, // EXTERNAL
               entity_metadata: {
-                location: `${companyName} - ${gameId === "1" ? "ETS2" : "ATS"}`,
+                location: locationLabel,
               },
-              description: `Kontrak logistik khusus dari ${companyName}. Info lebih lanjut: ${contractUrl}`,
+              description: eventDescription,
               image: base64Image,
             }),
           },
@@ -198,6 +328,28 @@ export async function updateContractAction(
       .collection("contracts")
       .findOne({ _id: new ObjectId(contractId) });
 
+    const contractCategory: ContractCategory =
+      String(rawData.contractCategory || existingContract?.contractCategory || "truck") === "coach"
+        ? "coach"
+        : "truck";
+    const isCoach = contractCategory === "coach";
+    const targetCities = isCoach ? normalizeCities(rawData.targetCities) : [];
+    const coachMarketFilter: CoachMarketFilter =
+      rawData.coachMarketFilter === "company" || rawData.coachMarketFilter === "tourist"
+        ? rawData.coachMarketFilter
+        : "all";
+    const minPassengers = isCoach ? Math.max(0, Math.floor(Number(rawData.minPassengers || 0))) : 0;
+    const finalCompanyName = isCoach
+      ? targetCities.join(", ")
+      : String(rawData.companyName || "").trim();
+
+    if (isCoach && targetCities.length === 0) {
+      throw new Error("Pilih minimal 1 kota target untuk Special Contract Coaches.");
+    }
+    if (!isCoach && !finalCompanyName) {
+      throw new Error("Nama perusahaan klien wajib diisi.");
+    }
+
     const isSched = String(rawData.isScheduled) === "true";
     const startDt = isSched && rawData.startDate
       ? parseWIBDate(rawData.startDate as string)
@@ -216,8 +368,12 @@ export async function updateContractAction(
       { _id: new ObjectId(contractId) },
       {
         $set: {
-          contractName: rawData.contractName,
-          companyName: rawData.companyName,
+          contractName: String(rawData.contractName || "").trim(),
+          contractCategory,
+          companyName: finalCompanyName,
+          targetCities,
+          coachMarketFilter,
+          minPassengers,
           imageUrl: rawData.imageUrl || null,
           gameId: String(rawData.gameId),
           isActive: isCurrentlyActive,
@@ -229,7 +385,6 @@ export async function updateContractAction(
       },
     );
 
-    // Jika gambar diubah, hapus gambar lama dari R2
     if (
       existingContract &&
       rawData.imageUrl &&
@@ -237,9 +392,14 @@ export async function updateContractAction(
     ) {
       await deleteFileFromR2(existingContract.imageUrl);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gagal update kontrak:", error);
-    throw new Error("Gagal memperbarui data kontrak");
+    if (error?.code === 11000) {
+      throw new Error(
+        "Sudah ada kontrak aktif lain dengan game dan kategori yang sama."
+      );
+    }
+    throw new Error(error?.message || "Gagal memperbarui data kontrak");
   }
 
   revalidatePath("/dashboard/manage/events/contracts");

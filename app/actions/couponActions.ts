@@ -8,12 +8,13 @@ import { revalidatePath } from "next/cache";
 import { deleteFileFromR2 } from "@/lib/r2";
 import Notification from "@/lib/models/Notification";
 import dbConnect from "@/lib/mongoose";
-
-const DISCORD_COUPON_CHANNEL_ID = process.env.DISCORD_GENERAL_DRIVER_ID_CHANNEL;
+import { getWebConfig } from "@/lib/webConfig";
 
 async function sendDiscordCouponMessage(coupon: any) {
+  const webConfig = await getWebConfig();
   const botToken = process.env.DISCORD_BOT_TOKEN;
-  if (!botToken || !DISCORD_COUPON_CHANNEL_ID) {
+  const couponChannelId = webConfig.discordChannels.generalDriverChannelId;
+  if (!botToken || !couponChannelId) {
     return;
   }
 
@@ -33,8 +34,8 @@ async function sendDiscordCouponMessage(coupon: any) {
     },
   };
 
-  const driverRoleId = process.env.DISCORD_DRIVER_ROLE_ID;
-  const internRoleId = process.env.DISCORD_INTERN_ROLE_ID;
+  const driverRoleId = webConfig.discordRoles.driverRoleId;
+  const internRoleId = webConfig.discordRoles.internRoleId;
 
   const mentions = [
     driverRoleId ? `<@&${driverRoleId}>` : "",
@@ -45,7 +46,7 @@ async function sendDiscordCouponMessage(coupon: any) {
 
   try {
     await fetch(
-      `https://discord.com/api/v10/channels/${DISCORD_COUPON_CHANNEL_ID}/messages`,
+      `https://discord.com/api/v10/channels/${couponChannelId}/messages`,
       {
         method: "POST",
         headers: {

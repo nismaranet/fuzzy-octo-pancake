@@ -6,6 +6,38 @@ import { revalidatePath } from "next/cache";
 import { deleteFileFromR2 } from "@/lib/r2";
 import { slugify, parseWIBDate } from "@/lib/utils";
 
+function normalizeJobCategory(raw: any): "all" | "truck" | "coach" {
+  if (raw === "truck" || raw === "coach") return raw;
+  return "all";
+}
+
+function normalizeDrivingScoreBonus(raw: any) {
+  const enabled = Boolean(raw?.enabled);
+  const rawA = Number(raw?.gradeABonus ?? 0.1);
+  const rawS = Number(raw?.gradeSBonus ?? 0.2);
+  const gradeABonus = Number(
+    Math.min(2, Math.max(0, Number.isFinite(rawA) ? rawA : 0.1)).toFixed(4)
+  );
+  const gradeSBonus = Number(
+    Math.min(3, Math.max(0, Number.isFinite(rawS) ? rawS : 0.2)).toFixed(4)
+  );
+  const requireRealMiles =
+    raw?.requireRealMiles !== undefined ? Boolean(raw.requireRealMiles) : true;
+
+  return {
+    enabled,
+    gradeABonus,
+    gradeSBonus,
+    requireRealMiles,
+  };
+}
+
+function formatCategoryLabel(category: "all" | "truck" | "coach") {
+  if (category === "truck") return "Logistics (Truck)";
+  if (category === "coach") return "Coaches (Bus)";
+  return "Semua Divisi (Truck & Coaches)";
+}
+
 export async function createNCEventAction(formData: any) {
   const client = await clientPromise;
   const db = client.db();
@@ -15,6 +47,8 @@ export async function createNCEventAction(formData: any) {
     slug: rawSlug,
     type,
     gameId,
+    jobCategory: rawJobCategory,
+    drivingScoreBonus: rawDrivingScoreBonus,
     multiplier,
     imageUrl,
     isScheduled,
@@ -23,6 +57,9 @@ export async function createNCEventAction(formData: any) {
     setBy,
     guildId = process.env.DISCORD_GUILD_ID || "863959415702028318",
   } = formData;
+
+  const jobCategory = normalizeJobCategory(rawJobCategory);
+  const drivingScoreBonus = normalizeDrivingScoreBonus(rawDrivingScoreBonus);
 
   try {
     const isSched = Boolean(isScheduled);
@@ -49,6 +86,8 @@ export async function createNCEventAction(formData: any) {
       imageUrl: imageUrl || null,
       type: type || "all",
       gameId: gameId || "all",
+      jobCategory,
+      drivingScoreBonus,
       participants: [],
       isActive: isCurrentlyActive,
       isScheduled: isTrulyScheduled,
@@ -63,10 +102,12 @@ export async function createNCEventAction(formData: any) {
     await db.collection("ncevents").insertOne(newEventDoc);
 
     // Optional Discord Notification
+    const { getWebConfig } = await import("@/lib/webConfig");
+    const webConfig = await getWebConfig();
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const channelId = process.env.DISCORD_GENERAL_DRIVER_ID_CHANNEL;
-    const driverDiscordRole = process.env.DISCORD_DRIVER_ROLE_ID;
-    const internDiscordRole = process.env.DISCORD_INTERN_ROLE_ID;
+    const channelId = webConfig.discordChannels.generalDriverChannelId;
+    const driverDiscordRole = webConfig.discordRoles.driverRoleId;
+    const internDiscordRole = webConfig.discordRoles.internRoleId;
 
     if (botToken && guildId && channelId) {
       try {
@@ -98,7 +139,7 @@ export async function createNCEventAction(formData: any) {
                 image: imageUrl ? { url: imageUrl } : undefined,
                 fields: [
                   {
-                    name: "Bonus Multiplier",
+                    name: "Bonus Dasar",
                     value: `+${boostPercent}% NC (+${multiplier}x)`,
                     inline: true,
                   },
@@ -107,6 +148,20 @@ export async function createNCEventAction(formData: any) {
                     value: gameId === "1" ? "Euro Truck Simulator 2" : gameId === "2" ? "American Truck Simulator" : "Semua Game",
                     inline: true,
                   },
+                  {
+                    name: "Divisi",
+                    value: formatCategoryLabel(jobCategory),
+                    inline: true,
+                  },
+                  ...(drivingScoreBonus.enabled
+                    ? [
+                        {
+                          name: "Bonus Driving Score (Status Aktif)",
+                          value: `Grade A: **+${Math.round(drivingScoreBonus.gradeABonus * 100)}%** | Grade S: **+${Math.round(drivingScoreBonus.gradeSBonus * 100)}%**${drivingScoreBonus.requireRealMiles ? "\n*(Khusus pengiriman Real Miles)*" : ""}`,
+                          inline: false,
+                        },
+                      ]
+                    : []),
                   {
                     name: isTrulyScheduled ? "Waktu Mulai" : "Deadline",
                     value: isTrulyScheduled
@@ -130,6 +185,7 @@ export async function createNCEventAction(formData: any) {
 
     revalidatePath("/dashboard/manage/events/ncboost");
     revalidatePath("/currency-boost");
+    revalidatePath(`/currency-boost/${finalSlug}`);
     revalidatePath("/calendar");
     revalidatePath("/");
 
@@ -152,12 +208,17 @@ export async function updateNCEventAction(eventId: string, formData: any) {
     slug: rawSlug,
     type,
     gameId,
+    jobCategory: rawJobCategory,
+    drivingScoreBonus: rawDrivingScoreBonus,
     multiplier,
     imageUrl,
     isScheduled,
     startDate,
     endAt,
   } = formData;
+
+  const jobCategory = normalizeJobCategory(rawJobCategory);
+  const drivingScoreBonus = normalizeDrivingScoreBonus(rawDrivingScoreBonus);
 
   try {
     const existing = await db
@@ -190,6 +251,8 @@ export async function updateNCEventAction(eventId: string, formData: any) {
           multiplier: Number(multiplier),
           type: type || "all",
           gameId: gameId || "all",
+          jobCategory,
+          drivingScoreBonus,
           imageUrl: imageUrl || null,
           isActive: isCurrentlyActive,
           isScheduled: isTrulyScheduled,
@@ -208,6 +271,7 @@ export async function updateNCEventAction(eventId: string, formData: any) {
 
     revalidatePath("/dashboard/manage/events/ncboost");
     revalidatePath("/currency-boost");
+    revalidatePath(`/currency-boost/${finalSlug}`);
     revalidatePath("/calendar");
     revalidatePath("/");
 

@@ -2,9 +2,12 @@ import clientPromise from "@/lib/mongodb";
 import BoostDetailClient from "./BoostDetailClient";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function generateMetadata({ params }: any): Promise<Metadata> {
   const resolvedParams = await params;
@@ -16,7 +19,12 @@ export async function generateMetadata({ params }: any): Promise<Metadata> {
   if (!event) return { title: "Event Tidak Ditemukan" };
 
   const title = `${event.nameEvent}`;
-  const description = `Ikuti event ${event.nameEvent} dan dapatkan bonus multiplier sebesar +${Math.round(Number(event.multiplier || 0) * 100)}% NC!`;
+  const basePct = Math.round(Number(event.multiplier || 0) * 100);
+  const dsBonus = event.drivingScoreBonus;
+  const dsText = dsBonus?.enabled
+    ? ` Plus extra +${Math.round(Number(dsBonus.gradeABonus ?? 0.1) * 100)}% untuk Grade A dan +${Math.round(Number(dsBonus.gradeSBonus ?? 0.2) * 100)}% untuk Grade S!`
+    : "";
+  const description = `Ikuti event ${event.nameEvent} dan dapatkan bonus dasar +${basePct}% NC!${dsText}`;
   const imageUrl = event.imageUrl || "https://images.nismara.my.id/227300_188.jpg";
   const pageUrl = `https://transport.nismara.web.id/currency-boost/${resolvedParams.slug}`;
 
@@ -104,6 +112,35 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
     nismaraPlusStartedAt: organizerUser?.nismaraplus?.startedAt || null,
   };
 
+  const session = await getServerSession(authOptions);
+  let currentUserDrivingScore: {
+    score: number;
+    grade: string;
+    status: string;
+  } | null = null;
+
+  if (session?.user?.discordId) {
+    const me = await db
+      .collection("users")
+      .findOne(
+        { discordId: session.user.discordId },
+        { projection: { drivingScore: 1 } }
+      );
+    if (me?.drivingScore) {
+      currentUserDrivingScore = {
+        score: Number(me.drivingScore.score ?? 0),
+        grade: String(me.drivingScore.grade ?? "N/A"),
+        status: String(me.drivingScore.status ?? "inactive"),
+      };
+    } else {
+      currentUserDrivingScore = {
+        score: 0,
+        grade: "N/A",
+        status: "inactive",
+      };
+    }
+  }
+
   const serializedEvent = {
     _id: event._id.toString(),
     slug: event.slug,
@@ -112,6 +149,26 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
     imageUrl: event.imageUrl,
     type: event.type,
     gameId: event.gameId,
+    jobCategory:
+      event.jobCategory === "truck" || event.jobCategory === "coach"
+        ? event.jobCategory
+        : "all",
+    drivingScoreBonus: event.drivingScoreBonus
+      ? {
+          enabled: Boolean(event.drivingScoreBonus.enabled),
+          gradeABonus: Number(event.drivingScoreBonus.gradeABonus ?? 0.1),
+          gradeSBonus: Number(event.drivingScoreBonus.gradeSBonus ?? 0.2),
+          requireRealMiles:
+            event.drivingScoreBonus.requireRealMiles !== undefined
+              ? Boolean(event.drivingScoreBonus.requireRealMiles)
+              : true,
+        }
+      : {
+          enabled: false,
+          gradeABonus: 0.1,
+          gradeSBonus: 0.2,
+          requireRealMiles: true,
+        },
     isActive: event.isActive,
     isScheduled: event.isScheduled,
     startDate: event.startDate ? event.startDate.toISOString() : null,
@@ -126,6 +183,8 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
       .map((p: any) => ({
         discordId: p.discordId,
         totalEarned: p.totalEarned,
+        jobsCount: Number(p.jobsCount || 0),
+        gradeBonusEarned: Number(p.gradeBonusEarned || 0),
         joinedAt: p.joinedAt ? p.joinedAt.toISOString() : null,
         name: p.name,
         avatarUrl: p.avatarUrl,
@@ -140,5 +199,10 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
       .sort((a: any, b: any) => b.totalEarned - a.totalEarned),
   };
 
-  return <BoostDetailClient event={serializedEvent} />;
+  return (
+    <BoostDetailClient
+      event={serializedEvent}
+      currentUserDrivingScore={currentUserDrivingScore}
+    />
+  );
 }

@@ -6,6 +6,8 @@ import {
   Target,
   Award,
   Truck,
+  Bus,
+  MapPin,
   Package,
   Globe,
   Anchor,
@@ -37,6 +39,16 @@ export default async function ContractDetailPage(props: {
   }
 
   const now = new Date();
+  const isCoachContract = contract.contractCategory === "coach";
+  const targetCities: string[] = Array.isArray(contract.targetCities)
+    ? contract.targetCities
+    : [];
+  const coachFilterLabel =
+    contract.coachMarketFilter === "company"
+      ? "Bus Company Job (Intercity Transit)"
+      : contract.coachMarketFilter === "tourist"
+        ? "Bus Tourist Job (Tourist Charter)"
+        : "Semua Layanan Bus (Company & Tourist)";
   const isPending = Boolean(contract.isScheduled && new Date(contract.startDate) > now);
   const isHistory = Boolean(!contract.isActive && !isPending);
   const rawContributors = contract.contributors || [];
@@ -143,7 +155,18 @@ export default async function ContractDetailPage(props: {
               </h4>
               <p className="text-sm text-gray-300 leading-relaxed">
                 Kontrak ini telah dijadwalkan dan akan resmi dibuka pada{" "}
-                <strong className="text-amber-400">{formatDateTime(contract.startDate)}</strong>. Pengiriman muatan dari atau menuju ke <strong className="text-white">{contract.companyName}</strong> baru akan mulai dihitung ke papan kontribusi setelah waktu tersebut dimulai.
+                <strong className="text-amber-400">{formatDateTime(contract.startDate)}</strong>.{" "}
+                {isCoachContract ? (
+                  <>
+                    Perjalanan bus yang berangkat dari, menuju, atau singgah di{" "}
+                    <strong className="text-white">{targetCities.join(", ")}</strong> baru akan mulai dihitung ke papan kontribusi setelah waktu tersebut dimulai.
+                  </>
+                ) : (
+                  <>
+                    Pengiriman muatan dari atau menuju ke{" "}
+                    <strong className="text-white">{contract.companyName}</strong> baru akan mulai dihitung ke papan kontribusi setelah waktu tersebut dimulai.
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -159,7 +182,7 @@ export default async function ContractDetailPage(props: {
             />
             <div className="absolute inset-0 bg-linear-to-t from-background via-background/20 to-transparent" />
             <div className="absolute bottom-8 left-8 right-8">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
                 <span
                   className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border shadow-lg ${
                     contract.gameId === "1"
@@ -171,6 +194,16 @@ export default async function ContractDetailPage(props: {
                   {contract.gameId === "1"
                     ? "Euro Truck Simulator 2"
                     : "American Truck Simulator"}
+                </span>
+                <span
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border shadow-lg inline-flex items-center gap-1 ${
+                    isCoachContract
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                      : "bg-sky-500/20 text-sky-300 border-sky-500/40"
+                  }`}
+                >
+                  {isCoachContract ? <Bus className="w-3 h-3" /> : <Truck className="w-3 h-3" />}
+                  {isCoachContract ? "Coaches" : "Truck"}
                 </span>
                 {isPending && (
                   <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold border border-amber-500/30 uppercase flex items-center gap-1 shadow-lg">
@@ -186,9 +219,31 @@ export default async function ContractDetailPage(props: {
               <h1 className="text-4xl md:text-6xl font-black text-white drop-shadow-md">
                 {contract.contractName}
               </h1>
-              <p className="text-accent-sky font-bold flex items-center gap-2 mt-2 uppercase tracking-widest text-sm">
-                <Anchor className="w-4 h-4" /> {contract.companyName}
-              </p>
+              {isCoachContract ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {targetCities.map((city) => (
+                      <span
+                        key={city}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 px-3 py-1 text-xs font-semibold text-emerald-200"
+                      >
+                        <MapPin className="w-3.5 h-3.5" /> {city}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-200/90">
+                    Layanan: <strong>{coachFilterLabel}</strong>
+                    {Number(contract.minPassengers || 0) > 0
+                      ? ` · Minimal ${contract.minPassengers} penumpang`
+                      : ""}
+                    {" · "}Berlaku untuk kota asal, tujuan, maupun transit (stops)
+                  </p>
+                </div>
+              ) : (
+                <p className="text-accent-sky font-bold flex items-center gap-2 mt-2 uppercase tracking-widest text-sm">
+                  <Anchor className="w-4 h-4" /> {contract.companyName}
+                </p>
+              )}
             </div>
           </div>
 
@@ -203,7 +258,11 @@ export default async function ContractDetailPage(props: {
               </p>
             </div>
             <div className="flex flex-col items-center p-4 rounded-2xl bg-white/5 border border-white/10">
-              <Truck className="text-accent-sky mb-2" />
+              {isCoachContract ? (
+                <Bus className="text-emerald-400 mb-2" />
+              ) : (
+                <Truck className="text-accent-sky mb-2" />
+              )}
               <p className="text-[10px] text-gray-500 font-bold uppercase">
                 Total Jarak
               </p>
@@ -212,13 +271,27 @@ export default async function ContractDetailPage(props: {
               </p>
             </div>
             <div className="flex flex-col items-center p-4 rounded-2xl bg-white/5 border border-white/10">
-              <Package className="text-green-500 mb-2" />
-              <p className="text-[10px] text-gray-500 font-bold uppercase">
-                Total Massa
-              </p>
-              <p className="text-xl font-bold text-white">
-                {(contract.totalMass || 0).toLocaleString("id-ID")} t
-              </p>
+              {isCoachContract ? (
+                <>
+                  <Users className="text-emerald-400 mb-2" />
+                  <p className="text-[10px] text-gray-500 font-bold uppercase">
+                    Total Penumpang
+                  </p>
+                  <p className="text-xl font-bold text-white">
+                    {(contract.totalPassengers || 0).toLocaleString("id-ID")} pax
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Package className="text-green-500 mb-2" />
+                  <p className="text-[10px] text-gray-500 font-bold uppercase">
+                    Total Massa
+                  </p>
+                  <p className="text-xl font-bold text-white">
+                    {(contract.totalMass || 0).toLocaleString("id-ID")} t
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -314,9 +387,11 @@ export default async function ContractDetailPage(props: {
                             Performance
                           </p>
                           <p className="text-sm font-bold text-gray-300">
-                            {driver.totalDistance.toLocaleString("id-ID")}km{" "}
+                            {(driver.totalDistance || 0).toLocaleString("id-ID")}km{" "}
                             <span className="text-gray-600">/</span>{" "}
-                            {driver.totalMass}t
+                            {isCoachContract
+                              ? `${(driver.totalPassengers || 0).toLocaleString("id-ID")} pax`
+                              : `${driver.totalMass || 0}t`}
                           </p>
                         </div>
                         <div className="text-right">

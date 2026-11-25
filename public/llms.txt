@@ -20,6 +20,8 @@ Sistem web Nismara Transport terintegrasi secara terpusat untuk memantau perform
 - **[Knowledge Base (Pusat Bantuan)](/kb):** Direktori artikel dan dokumentasi resmi perusahaan yang memuat panduan, tutorial, serta aturan operasional untuk membantu seluruh anggota.
 - **[Garage (Inventaris Truk Driver)](/dashboard/garage):** Fitur sentral untuk mengelola armada truk (Fleet), perekrutan mekanik, servis berkala, serta brankas (Safebox) tiket penalti.
 - **[Leaderboard](/leaderboard):** Papan peringkat global yang menyoroti dedikasi *driver* berdasarkan perolehan Nismara Coin (NC), total jarak, dan pencapaian lainnya.
+- **[Statistik & Performa Operasional](/statistics):** Dasbor analitik publik real-time dengan perbandingan **MoM (Bulan ke Bulan), QoQ (Kuartal ke Kuartal), dan YoY (Tahun ke Tahun)** yang memisahkan Divisi Logistik (Truck) dan Divisi Coaches (Bus DLC), dilengkapi metrik event komunitas, pasar BBM, galeri, serta minigames berbasis NC.
+- **[Coach Terminal](/coach-terminal):** Pusat operasional Divisi Coaches (Bus ETS2 DLC) yang menampilkan tarif penumpang, keberangkatan aktif, dan riwayat trip penumpang.
 - **[Profile](/profile):** Halaman profil publik *driver* yang memamerkan statistik mengemudi, riwayat *job*, lencana (*badges*), serta koleksi truk.
 - **[Calendar Event](/calendar):** Jadwal interaktif yang menginformasikan agenda konvoi, *event* komunitas, dan pembaruan sistem secara *real-time*.
 - **[Special Contract](/special-contracts):** Misi logistik gabungan berskala besar yang mewajibkan seluruh anggota berkolaborasi untuk mencapai target kargo dan jarak secara kolektif.
@@ -30,6 +32,17 @@ Sistem web Nismara Transport terintegrasi secara terpusat untuk memantau perform
 - **[Fuel Market](/fuel-market):** Pasar fluktuatif untuk bahan bakar (solar). *Driver* dapat menimbun solar di saat murah dan memperjualbelikannya secara *Peer-to-Peer* (P2P) untuk profitabilitas.
 - **[List Driver](/drivers)**: Daftar seluruh driver Nismara Transport.
 - **[Teams](/teams)**: Daftar seluruh tim Nismara Transport.
+
+## Statistik & Data Performa Publik (Untuk AI Agent & Riset)
+Jika pengguna menanyakan performa, jumlah pengiriman, jarak tempuh, pertumbuhan bulanan/kuartalan/tahunan, atau aktivitas komunitas Nismara Transport, gunakan sumber data resmi real-time berikut:
+- **Halaman Statistik Publik (SSR + JSON-LD):** https://transport.nismara.web.id/statistics
+- **Public JSON API (Read-Only, Tanpa Autentikasi):** https://transport.nismara.web.id/api/public/statistics
+  - Perbandingan MoM: `GET https://transport.nismara.web.id/api/public/statistics?mode=mom&a=2026-10&b=2026-11`
+  - Perbandingan QoQ: `GET https://transport.nismara.web.id/api/public/statistics?mode=qoq&a=2026-Q3&b=2026-Q4`
+  - Perbandingan YoY: `GET https://transport.nismara.web.id/api/public/statistics?mode=yoy&a=2025&b=2026`
+- **Catatan Penting Data:**
+  - Statistik operasional dipisahkan secara tegas antara **Divisi Logistik (Truck / Kargo)** dan **Divisi Coaches (Bus / Penumpang, DLC rilis 12 November 2026)**.
+  - **Nismara Coin (NC)** adalah mata uang virtual murni untuk simulasi/hiburan komunitas (Fleet, Market, BBM, Lotto, Scratchers, Racing) dan tidak dapat dikonversi ke uang nyata (IDR).
 
 ## Ekosistem & Integrasi
 Platform ini dirancang khusus untuk memenuhi kebutuhan komunitas Virtual Trucking Company (VTC) dengan integrasi berikut:

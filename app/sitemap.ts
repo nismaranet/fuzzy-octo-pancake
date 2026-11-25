@@ -28,8 +28,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     kbArticles,
   ] = await Promise.all([
     db
-      .collection("jobs")
-      .find({}, { projection: { jobId: 1, updatedAt: 1 } })
+      .collection("jobhistories")
+      .find({ jobStatus: "COMPLETED" }, { projection: { jobId: 1, updatedAt: 1, createdAt: 1 } })
+      .sort({ createdAt: -1 })
+      .limit(1000)
       .toArray(),
     db
       .collection("teams")
@@ -239,6 +241,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const routePaths = [
     "",
     "/jobs",
+    "/statistics",
+    "/coach-terminal",
+    "/giveaways",
     "/teams",
     "/events",
     "/convoy",

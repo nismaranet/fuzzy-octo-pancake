@@ -5,7 +5,7 @@ const lottoPeriodSchema = new mongoose.Schema(
     periodNumber: { type: Number, required: true, unique: true },
     status: {
       type: String,
-      enum: ["OPEN", "CLOSED", "DRAWN"],
+      enum: ["OPEN", "DRAWING", "CLOSED", "DRAWN"],
       default: "OPEN",
     },
     baseJackpot: { type: Number, default: 10000 },
@@ -14,7 +14,7 @@ const lottoPeriodSchema = new mongoose.Schema(
     startDate: { type: Date, default: Date.now },
     endDate: { type: Date }, // Tanggal pengundian
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Virtual field for total prize pool

@@ -8,10 +8,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Kalender Kegiatan & Event Komunitas",
-  description: "Kalender terpadu jadwal konvoi mabar, event boost NC, rilis kupon, dan agenda komunitas Nismara Transport.",
+  description: "Kalender terpadu jadwal konvoi mabar, event boost NC, giveaway berhadiah, rilis kupon, dan agenda komunitas Nismara Transport.",
   openGraph: {
     title: "Kalender Kegiatan & Event Komunitas",
-    description: "Kalender terpadu jadwal konvoi mabar, event boost NC, rilis kupon, dan agenda komunitas Nismara Transport.",
+    description: "Kalender terpadu jadwal konvoi mabar, event boost NC, giveaway berhadiah, rilis kupon, dan agenda komunitas Nismara Transport.",
     url: "https://transport.nismara.web.id/calendar",
     siteName: "Nismara Transport",
     locale: "id_ID",
@@ -28,24 +28,30 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Kalender Kegiatan & Event Komunitas",
-    description: "Kalender terpadu jadwal konvoi mabar, event boost NC, rilis kupon, dan agenda komunitas Nismara Transport.",
+    description: "Kalender terpadu jadwal konvoi mabar, event boost NC, giveaway berhadiah, rilis kupon, dan agenda komunitas Nismara Transport.",
     images: ["https://images.nismara.my.id/227300_188.jpg"],
   },
 };
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export default async function CalendarPage() {
   const client = await clientPromise;
   const db = client.db();
 
   // Fetch all events for the calendar (could be filtered by a specific range, but for now we fetch all since they are lightweight)
-  const [convoys, contracts, boosts, coupons, goals] = await Promise.all([
+  const [convoys, contracts, boosts, coupons, goals, giveaways] = await Promise.all([
     db.collection("convoylobby").find({}).toArray(),
     db.collection("contracts").find({}).toArray(),
     db.collection("ncevents").find({}).toArray(),
     db.collection("coupons").find({}).toArray(),
     db.collection("communitygoals").find({}).toArray(),
+    db
+      .collection("giveaways")
+      .find({ status: { $in: ["scheduled", "ongoing", "drawing", "completed"] } })
+      .toArray(),
   ]);
 
   const events: CalendarEvent[] = [];
@@ -132,6 +138,41 @@ export default async function CalendarPage() {
         href: `/community-goals/${g.slug}`,
         imageUrl: g.imageUrl,
       });
+    }
+  });
+
+  // 6. GIVEAWAYS
+  giveaways.forEach((g) => {
+    const startDt = g.startDate ? new Date(g.startDate) : null;
+    const endDt = g.endDate ? new Date(g.endDate) : null;
+    const drawDt = g.drawDate ? new Date(g.drawDate) : null;
+    const href = `/giveaways/${g.slug || slugify(g.title || "giveaway")}`;
+
+    if (startDt || endDt) {
+      events.push({
+        id: g._id.toString(),
+        title: g.title || "Giveaway Nismara",
+        type: "giveaway",
+        date: startDt || endDt!,
+        endDate: endDt || undefined,
+        href,
+        imageUrl: g.bannerUrl || undefined,
+      });
+    }
+
+    if (drawDt && endDt) {
+      const endDayWib = endDt.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+      const drawDayWib = drawDt.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+      if (drawDayWib > endDayWib) {
+        events.push({
+          id: `${g._id.toString()}-draw`,
+          title: `Pengundian: ${g.title || "Giveaway"}`,
+          type: "giveaway",
+          date: drawDt,
+          href,
+          imageUrl: g.bannerUrl || undefined,
+        });
+      }
     }
   });
 

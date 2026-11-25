@@ -14,6 +14,8 @@ import {
   Timer,
   Clock,
   Truck,
+  Bus,
+  MapPin,
   ChevronRight,
   Briefcase,
   Edit3,
@@ -36,6 +38,21 @@ import { compressImageToWebP } from "@/lib/imageUtils";
 import { useSession } from "next-auth/react";
 import { showAlert, showConfirm } from "@/lib/dialog";
 import { formatWIBDateTimeLocal } from "@/lib/utils";
+import CityMultiSelect from "@/components/contracts/CityMultiSelect";
+
+const COACH_FILTER_LABELS: Record<string, string> = {
+  all: "Semua Layanan Bus",
+  company: "Bus Company Job",
+  tourist: "Bus Tourist Job",
+};
+
+function getContractTargetSummary(c: any): string {
+  if (c.contractCategory === "coach") {
+    const cities = Array.isArray(c.targetCities) ? c.targetCities : [];
+    return cities.length > 0 ? cities.join(", ") : c.companyName || "Target Kota";
+  }
+  return c.companyName || "-";
+}
 
 export default function ContractManageUI({
   ongoing = [],
@@ -47,6 +64,7 @@ export default function ContractManageUI({
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "ongoing" | "scheduled" | "history">("all");
   const [gameFilter, setGameFilter] = useState<"all" | "1" | "2">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "truck" | "coach">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Modal State
@@ -71,7 +89,11 @@ export default function ContractManageUI({
 
   const [formData, setFormData] = useState({
     contractName: "",
+    contractCategory: "truck" as "truck" | "coach",
     companyName: "",
+    targetCities: [] as string[],
+    coachMarketFilter: "all" as "all" | "company" | "tourist",
+    minPassengers: 0,
     imageUrl: "",
     gameId: "1",
     endAt: "",
@@ -82,7 +104,11 @@ export default function ContractManageUI({
   const handleOpenCreateModal = () => {
     setFormData({
       contractName: "",
+      contractCategory: "truck",
       companyName: "",
+      targetCities: [],
+      coachMarketFilter: "all",
+      minPassengers: 0,
       imageUrl: "",
       gameId: "1",
       endAt: getInitialEndDate(),
@@ -162,38 +188,33 @@ export default function ContractManageUI({
   }, [ongoing, scheduled, history]);
 
   // Filter Logic
-  const filteredOngoing = useMemo(() => {
-    return ongoing.filter((c: any) => {
-      const matchGame = gameFilter === "all" || String(c.gameId) === gameFilter;
-      const matchSearch =
-        !searchQuery ||
-        c.contractName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchGame && matchSearch;
-    });
-  }, [ongoing, gameFilter, searchQuery]);
+  const matchesContractFilters = (c: any) => {
+    const matchGame = gameFilter === "all" || String(c.gameId) === gameFilter;
+    const cat = c.contractCategory === "coach" ? "coach" : "truck";
+    const matchCategory = categoryFilter === "all" || cat === categoryFilter;
+    const q = searchQuery.toLowerCase();
+    const targetText = getContractTargetSummary(c).toLowerCase();
+    const matchSearch =
+      !q ||
+      c.contractName?.toLowerCase().includes(q) ||
+      targetText.includes(q);
+    return matchGame && matchCategory && matchSearch;
+  };
 
-  const filteredScheduled = useMemo(() => {
-    return scheduled.filter((c: any) => {
-      const matchGame = gameFilter === "all" || String(c.gameId) === gameFilter;
-      const matchSearch =
-        !searchQuery ||
-        c.contractName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchGame && matchSearch;
-    });
-  }, [scheduled, gameFilter, searchQuery]);
+  const filteredOngoing = useMemo(
+    () => ongoing.filter(matchesContractFilters),
+    [ongoing, gameFilter, categoryFilter, searchQuery]
+  );
 
-  const filteredHistory = useMemo(() => {
-    return history.filter((c: any) => {
-      const matchGame = gameFilter === "all" || String(c.gameId) === gameFilter;
-      const matchSearch =
-        !searchQuery ||
-        c.contractName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchGame && matchSearch;
-    });
-  }, [history, gameFilter, searchQuery]);
+  const filteredScheduled = useMemo(
+    () => scheduled.filter(matchesContractFilters),
+    [scheduled, gameFilter, categoryFilter, searchQuery]
+  );
+
+  const filteredHistory = useMemo(
+    () => history.filter(matchesContractFilters),
+    [history, gameFilter, categoryFilter, searchQuery]
+  );
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -223,8 +244,17 @@ export default function ContractManageUI({
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.contractName || !formData.companyName || !formData.endAt) {
-      showAlert("Harap lengkapi nama kontrak, nama perusahaan, dan deadline!");
+    const isCoach = formData.contractCategory === "coach";
+    if (!formData.contractName || !formData.endAt) {
+      showAlert("Harap lengkapi nama kontrak dan deadline!");
+      return;
+    }
+    if (isCoach && formData.targetCities.length === 0) {
+      showAlert("Harap pilih minimal 1 kota target untuk kontrak Coaches!");
+      return;
+    }
+    if (!isCoach && !formData.companyName.trim()) {
+      showAlert("Harap lengkapi nama perusahaan klien!");
       return;
     }
 
@@ -286,7 +316,11 @@ export default function ContractManageUI({
       setPreviewUrl("");
       setFormData({
         contractName: "",
+        contractCategory: "truck",
         companyName: "",
+        targetCities: [],
+        coachMarketFilter: "all",
+        minPassengers: 0,
         imageUrl: "",
         gameId: "1",
         endAt: getInitialEndDate(),
@@ -499,8 +533,35 @@ export default function ContractManageUI({
           </button>
         </div>
 
-        {/* Game Filter & Search */}
-        <div className="flex items-center gap-3">
+        {/* Game Filter, Category Filter & Search */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center bg-card border border-border rounded-2xl p-1">
+            <button
+              onClick={() => setCategoryFilter("all")}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                categoryFilter === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setCategoryFilter("truck")}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                categoryFilter === "truck" ? "bg-sky-500 text-black" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Truck size={11} /> Truck
+            </button>
+            <button
+              onClick={() => setCategoryFilter("coach")}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                categoryFilter === "coach" ? "bg-emerald-500 text-black" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Bus size={11} /> Coaches
+            </button>
+          </div>
+
           <div className="flex items-center bg-card border border-border rounded-2xl p-1">
             <button
               onClick={() => setGameFilter("all")}
@@ -575,12 +636,24 @@ export default function ContractManageUI({
                       <div className="absolute inset-0 bg-gradient-to-t from-card via-black/40 to-transparent" />
 
                       {/* Floating Badges */}
-                      <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                        <span
-                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-lg ${game.badge}`}
-                        >
-                          {game.name}
-                        </span>
+                      <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-lg ${game.badge}`}
+                          >
+                            {game.name}
+                          </span>
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-lg inline-flex items-center gap-1 ${
+                              c.contractCategory === "coach"
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                                : "bg-sky-500/20 text-sky-300 border-sky-500/40"
+                            }`}
+                          >
+                            {c.contractCategory === "coach" ? <Bus size={11} /> : <Truck size={11} />}
+                            {c.contractCategory === "coach" ? "Coaches" : "Truck"}
+                          </span>
+                        </div>
                         <span className="px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/90 text-black border border-emerald-400 backdrop-blur-md shadow-lg flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-black" /> Live Active
                         </span>
@@ -588,8 +661,12 @@ export default function ContractManageUI({
 
                       {/* Header overlay info */}
                       <div className="absolute bottom-4 left-6 right-6">
-                        <p className="text-emerald-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5 mb-1">
-                          <Briefcase size={12} /> {c.companyName}
+                        <p className="text-emerald-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5 mb-1 truncate">
+                          {c.contractCategory === "coach" ? <MapPin size={12} /> : <Briefcase size={12} />}
+                          {getContractTargetSummary(c)}
+                          {c.contractCategory === "coach" && c.coachMarketFilter && c.coachMarketFilter !== "all"
+                            ? ` • ${COACH_FILTER_LABELS[c.coachMarketFilter]}`
+                            : ""}
                         </p>
                         <h3 className="text-2xl font-black text-white uppercase tracking-tight leading-tight line-clamp-1">
                           {c.contractName}
@@ -731,12 +808,24 @@ export default function ContractManageUI({
                       <div className="absolute inset-0 bg-gradient-to-t from-card via-black/50 to-transparent" />
 
                       {/* Floating Badges */}
-                      <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                        <span
-                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-lg ${game.badge}`}
-                        >
-                          {game.name}
-                        </span>
+                      <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-lg ${game.badge}`}
+                          >
+                            {game.name}
+                          </span>
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-lg inline-flex items-center gap-1 ${
+                              c.contractCategory === "coach"
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                                : "bg-sky-500/20 text-sky-300 border-sky-500/40"
+                            }`}
+                          >
+                            {c.contractCategory === "coach" ? <Bus size={11} /> : <Truck size={11} />}
+                            {c.contractCategory === "coach" ? "Coaches" : "Truck"}
+                          </span>
+                        </div>
                         <span className="px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/90 text-black border border-amber-400 backdrop-blur-md shadow-lg flex items-center gap-1.5 font-mono">
                           <Clock size={12} /> Scheduled
                         </span>
@@ -744,8 +833,9 @@ export default function ContractManageUI({
 
                       {/* Header overlay info */}
                       <div className="absolute bottom-4 left-6 right-6">
-                        <p className="text-amber-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5 mb-1">
-                          <Briefcase size={12} /> {c.companyName}
+                        <p className="text-amber-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5 mb-1 truncate">
+                          {c.contractCategory === "coach" ? <MapPin size={12} /> : <Briefcase size={12} />}
+                          {getContractTargetSummary(c)}
                         </p>
                         <h3 className="text-2xl font-black text-white uppercase tracking-tight leading-tight line-clamp-1 group-hover:text-amber-300 transition-colors">
                           {c.contractName}
@@ -845,22 +935,34 @@ export default function ContractManageUI({
                       const game = getGameInfo(h.gameId);
                       return (
                         <tr key={h._id} className="hover:bg-foreground/[0.02] transition-colors group">
-                          {/* Game Badge */}
+                          {/* Game & Category Badge */}
                           <td className="px-8 py-5">
-                            <span
-                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase border ${game.badge}`}
-                            >
-                              {game.name}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase border ${game.badge}`}
+                              >
+                                {game.name}
+                              </span>
+                              <span
+                                className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase border inline-flex items-center gap-1 ${
+                                  h.contractCategory === "coach"
+                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                    : "bg-sky-500/15 text-sky-400 border-sky-500/30"
+                                }`}
+                              >
+                                {h.contractCategory === "coach" ? <Bus size={10} /> : <Truck size={10} />}
+                                {h.contractCategory === "coach" ? "Coach" : "Truck"}
+                              </span>
+                            </div>
                           </td>
 
-                          {/* Contract & Client */}
+                          {/* Contract & Client / Target Cities */}
                           <td className="px-8 py-5">
                             <p className="font-black text-foreground uppercase group-hover:text-primary transition-colors">
                               {h.contractName}
                             </p>
                             <p className="text-[10px] font-bold text-accent-lilac uppercase tracking-wider">
-                              {h.companyName}
+                              {getContractTargetSummary(h)}
                             </p>
                           </td>
 
@@ -966,77 +1068,210 @@ export default function ContractManageUI({
             </div>
 
             <div className="space-y-5 relative z-10">
-              {/* Target Game Selector Cards */}
+              {/* Kategori Kontrak: Truck vs Coaches */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-accent-lilac uppercase tracking-widest ml-1">
-                  Pilih Target Game
+                <label className="text-xs font-medium text-foreground block">
+                  Kategori Kontrak
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, gameId: "1" })}
-                    className={`p-4 rounded-2xl border text-left transition-all flex items-center gap-3 ${
-                      formData.gameId === "1"
-                        ? "bg-accent-lilac/10 border-accent-lilac text-accent-lilac shadow-md shadow-accent-lilac/10"
-                        : "bg-black/20 border-white/5 text-muted-foreground hover:border-white/20"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        contractCategory: "truck",
+                      })
+                    }
+                    className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                      formData.contractCategory === "truck"
+                        ? "bg-sky-500/15 border-sky-500 text-sky-400"
+                        : "bg-background/60 border-border text-muted-foreground hover:border-foreground/30"
                     }`}
                   >
-                    <div className="p-2 rounded-xl bg-accent-lilac/20 text-accent-lilac">
-                      <Truck size={20} />
+                    <div className="p-2 rounded-lg bg-sky-500/20 text-sky-400">
+                      <Truck size={18} />
                     </div>
                     <div>
-                      <p className="font-black text-sm uppercase">ETS2</p>
-                      <p className="text-[9px] font-medium opacity-70">Euro Truck 2</p>
+                      <p className="font-semibold text-sm">Truck (Logistik)</p>
+                      <p className="text-xs opacity-75">Target berdasarkan Company</p>
                     </div>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, gameId: "2" })}
-                    className={`p-4 rounded-2xl border text-left transition-all flex items-center gap-3 ${
-                      formData.gameId === "2"
-                        ? "bg-amber-500/10 border-amber-500 text-amber-400 shadow-md shadow-amber-500/10"
-                        : "bg-black/20 border-white/5 text-muted-foreground hover:border-white/20"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        contractCategory: "coach",
+                        gameId: "1",
+                      })
+                    }
+                    className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                      formData.contractCategory === "coach"
+                        ? "bg-emerald-500/15 border-emerald-500 text-emerald-400"
+                        : "bg-background/60 border-border text-muted-foreground hover:border-foreground/30"
                     }`}
                   >
-                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
-                      <Truck size={20} />
+                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                      <Bus size={18} />
                     </div>
                     <div>
-                      <p className="font-black text-sm uppercase">ATS</p>
-                      <p className="text-[9px] font-medium opacity-70">American Truck</p>
+                      <p className="font-semibold text-sm">Coaches (Bus)</p>
+                      <p className="text-xs opacity-75">Target Kota + Filter Layanan</p>
                     </div>
                   </button>
                 </div>
               </div>
 
-              {/* Contract & Company Name */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-accent-lilac uppercase tracking-widest ml-1">
-                    Nama Kontrak *
-                  </label>
-                  <input
-                    placeholder="Contoh: Mudik Lebaran 2026"
-                    required
-                    value={formData.contractName}
-                    onChange={(e) => setFormData({ ...formData, contractName: e.target.value })}
-                    className="w-full bg-black/20 border border-white/10 rounded-2xl p-3.5 text-foreground text-sm outline-none focus:border-accent-lilac transition-all"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-accent-lilac uppercase tracking-widest ml-1">
-                    Perusahaan Klien *
-                  </label>
-                  <input
-                    placeholder="Contoh: Sunshine Crops / Tree-ET"
-                    required
-                    value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    className="w-full bg-black/20 border border-white/10 rounded-2xl p-3.5 text-foreground text-sm outline-none focus:border-accent-lilac transition-all"
-                  />
+              {/* Target Game Selector Cards */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground block">
+                  Target Game
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, gameId: "1", targetCities: [] })}
+                    className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                      formData.gameId === "1"
+                        ? "bg-accent-lilac/10 border-accent-lilac text-accent-lilac"
+                        : "bg-background/60 border-border text-muted-foreground hover:border-foreground/30"
+                    }`}
+                  >
+                    <div className="p-2 rounded-lg bg-accent-lilac/20 text-accent-lilac">
+                      {formData.contractCategory === "coach" ? <Bus size={18} /> : <Truck size={18} />}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">ETS2</p>
+                      <p className="text-xs opacity-75">Euro Truck 2</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, gameId: "2", targetCities: [] })}
+                    className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                      formData.gameId === "2"
+                        ? "bg-amber-500/10 border-amber-500 text-amber-400"
+                        : "bg-background/60 border-border text-muted-foreground hover:border-foreground/30"
+                    }`}
+                  >
+                    <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                      {formData.contractCategory === "coach" ? <Bus size={18} /> : <Truck size={18} />}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">ATS</p>
+                      <p className="text-xs opacity-75">American Truck</p>
+                    </div>
+                  </button>
                 </div>
               </div>
+
+              {/* Contract Name + Dynamic Target (Company vs Target Cities) */}
+              {formData.contractCategory === "truck" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground block">
+                      Nama Kontrak *
+                    </label>
+                    <input
+                      placeholder="Contoh: Mudik Lebaran 2026"
+                      required
+                      value={formData.contractName}
+                      onChange={(e) => setFormData({ ...formData, contractName: e.target.value })}
+                      className="w-full min-h-[44px] bg-background border border-input rounded-xl px-3.5 py-2.5 text-foreground text-sm outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground block">
+                      Perusahaan Klien *
+                    </label>
+                    <input
+                      placeholder="Contoh: Sunshine Crops / Tree-ET"
+                      required
+                      value={formData.companyName}
+                      onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                      className="w-full min-h-[44px] bg-background border border-input rounded-xl px-3.5 py-2.5 text-foreground text-sm outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground block">
+                      Nama Kontrak Coaches *
+                    </label>
+                    <input
+                      placeholder="Contoh: Tur Wisata Alpen / Mudik Koridor Jerman"
+                      required
+                      value={formData.contractName}
+                      onChange={(e) => setFormData({ ...formData, contractName: e.target.value })}
+                      className="w-full min-h-[44px] bg-background border border-input rounded-xl px-3.5 py-2.5 text-foreground text-sm outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground block">
+                      Kota Target (Asal / Tujuan / Transit) *
+                    </label>
+                    <CityMultiSelect
+                      gameId={formData.gameId}
+                      value={formData.targetCities}
+                      onChange={(cities) => setFormData({ ...formData, targetCities: cities })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground block">
+                        Filter Jenis Layanan Bus
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {(
+                          [
+                            ["all", "Semua"],
+                            ["company", "Company"],
+                            ["tourist", "Tourist"],
+                          ] as const
+                        ).map(([val, lbl]) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, coachMarketFilter: val })}
+                            className={`min-h-[42px] rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
+                              formData.coachMarketFilter === val
+                                ? "bg-emerald-500/15 border-emerald-500 text-emerald-400"
+                                : "bg-background border-border text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {lbl}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground block">
+                        Minimal Penumpang (Opsional)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={200}
+                        value={formData.minPassengers}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            minPassengers: Math.max(0, Number(e.target.value || 0)),
+                          })
+                        }
+                        placeholder="0 (bebas)"
+                        className="w-full min-h-[42px] bg-background border border-input rounded-xl px-3.5 py-2 text-foreground text-sm font-mono tabular-nums outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Deadline Operasi */}
               <div className="space-y-1.5">
