@@ -70,6 +70,7 @@ export default function Footer() {
             <ul className="space-y-4">
               {[
                 { name: "Dashboard", href: "/dashboard" },
+                { name: "Statistics", href: "/statistics" },
                 { name: "Leaderboard", href: "/leaderboard" },
                 { name: "Special Contract", href: "/special-contracts" },
                 { name: "All Jobs", href: "/jobs" },

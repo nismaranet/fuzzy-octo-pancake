@@ -6,7 +6,7 @@
  * - Set environment variable NEXT_PUBLIC_HALLOWEEN_THEME="false".
  */
 export const HALLOWEEN_THEME_ACTIVE: boolean =
-  process.env.NEXT_PUBLIC_HALLOWEEN_THEME === "false" ? false : true;
+  process.env.NEXT_PUBLIC_HALLOWEEN_THEME === "true";
 
 export const HALLOWEEN_CONFIG = {
   /** Status aktif/nonaktif tema */

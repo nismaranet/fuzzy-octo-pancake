@@ -21,6 +21,7 @@ import {
   Trophy,
   Crown,
   Radio,
+  Store,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -58,6 +59,7 @@ const managementItems = [
   { name: "Manage Data", href: "/dashboard/manage/data", icon: User2 },
   { name: "Manage Events", href: "/dashboard/manage/events", icon: Sparkles },
   { name: "Manage Fleets", href: "/dashboard/manage/fleet", icon: Truck },
+  { name: "Community Market", href: "/dashboard/manage/community-market", icon: Store },
   { name: "Manage Tickets", href: "/dashboard/manage/tickets", icon: FileText },
 ];
 

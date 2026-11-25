@@ -46,6 +46,8 @@ import {
   Gift,
   Coins,
   Bus,
+  BarChart3,
+  Store,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -125,10 +127,9 @@ export default function NavbarClient({
   const isDashboard = pathname?.startsWith("/dashboard");
   const effectiveIsScrolled = isScrolled && !isDashboard;
 
-  // Standard top-level items (excluding Home and Events which are custom handled)
+  // Standard top-level items (excluding Home, Jobs, Events, Community, Market which are custom handled)
   const mainMenuItems = [
     { name: "Convoy", href: "/convoy", icon: Truck },
-    { name: "Market", href: "/market", icon: ShoppingCart },
     { name: "TimeZone", href: "/timezone", icon: Gamepad2 },
   ];
 
@@ -139,11 +140,13 @@ export default function NavbarClient({
     { name: "Jobs Details", href: "/jobs", icon: Briefcase },
     { name: "Coach Terminal", href: "/coach-terminal", icon: Bus },
     { name: "Cargo Market", href: "/cargo-market", icon: Package },
-    { name: "Fuel Market", href: "/fuel-market", icon: Fuel },
     { name: "Convoy", href: "/convoy", icon: Truck },
-    { name: "Market", href: "/market", icon: ShoppingCart },
+    { name: "Mod Workshop", href: "/market", icon: ShoppingCart, separator: true },
+    { name: "Community Market", href: "/community-market", icon: Store },
+    { name: "Fuel Market", href: "/fuel-market", icon: Fuel },
     { name: "Feeds", href: "/feeds", icon: Grid3X3, separator: true },
     { name: "Leaderboard", href: "/leaderboard", icon: Trophy },
+    { name: "Statistics", href: "/statistics", icon: BarChart3 },
     { name: "Achievements", href: "/achievements", icon: Medal },
     { name: "Community Goals", href: "/community-goals", icon: Target },
     { name: "Giveaways", href: "/giveaways", icon: Gift },
@@ -229,8 +232,8 @@ export default function NavbarClient({
                             <Briefcase className="w-4 h-4 text-sky-400" />
                           </div>
                           <div>
-                            <p className="text-xs font-black uppercase tracking-widest text-sky-400">Jobs & Markets</p>
-                            <p className="text-[11px] text-muted-foreground">Pekerjaan dan peluang kargo terbaik</p>
+                            <p className="text-xs font-black uppercase tracking-widest text-sky-400">Jobs &amp; Operations</p>
+                            <p className="text-[11px] text-muted-foreground">Operasional pengiriman, bus, dan peluang kargo terbaik</p>
                           </div>
                         </div>
                         {/* Items */}
@@ -281,20 +284,6 @@ export default function NavbarClient({
                               <div className="min-w-0">
                                 <p className="text-sm font-bold text-foreground leading-tight">Cargo Market</p>
                                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">Pasar kargo dan logistik terbaik dari komunitas</p>
-                              </div>
-                            </NavigationMenuLink>
-                          </li>
-                          <li>
-                            <NavigationMenuLink
-                              render={<Link href="/fuel-market" />}
-                              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all group/item"
-                            >
-                              <div className="w-9 h-9 shrink-0 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center group-hover/item:bg-yellow-500/20 transition-colors">
-                                <Fuel className="w-4 h-4 text-yellow-400" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-foreground leading-tight">Fuel Market</p>
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">Sistem transaksi bahan bakar komunitas yang terpusat</p>
                               </div>
                             </NavigationMenuLink>
                           </li>
@@ -496,6 +485,25 @@ export default function NavbarClient({
                               </div>
                             </NavigationMenuLink>
                           </li>
+                          <li className="col-span-2">
+                            <NavigationMenuLink
+                              render={<Link href="/statistics" />}
+                              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all group/item"
+                            >
+                              <div className="w-9 h-9 shrink-0 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center group-hover/item:bg-sky-500/20 transition-colors">
+                                <BarChart3 className="w-4 h-4 text-sky-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-foreground leading-tight">
+                                  Statistics &amp; Analytics{" "}
+                                  <span className="ml-1 text-[10px] font-black uppercase tracking-wider text-sky-400 bg-sky-500/15 px-1.5 py-0.5 rounded-full">
+                                    New
+                                  </span>
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">Performa operasional Logistik &amp; Coaches (MoM, QoQ, YoY) + Public API</p>
+                              </div>
+                            </NavigationMenuLink>
+                          </li>
                         </ul>
                         {/* Footer banner */}
                         <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500/10 via-violet-500/10 to-pink-500/10 border border-indigo-500/20 p-4 flex items-center gap-4">
@@ -513,6 +521,90 @@ export default function NavbarClient({
                             Explore →
                           </NavigationMenuLink>
                         </div>
+                      </div>
+                    </NavigationMenuContent>
+                  </NavigationMenuItem>
+
+                  {/* Market Mega Menu */}
+                  <NavigationMenuItem>
+                    <NavigationMenuTrigger className="bg-transparent hover:bg-muted/50 data-[state=open]:bg-muted/50">
+                      <ShoppingCart className="mr-2 h-4 w-4 text-muted-foreground" />
+                      Market
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                      <div className="w-[540px] p-5">
+                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border/50">
+                          <div className="p-1.5 rounded-lg bg-primary/15">
+                            <ShoppingCart className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-widest text-primary">
+                              Nismara Markets
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Workshop mod, bursa P2P driver, dan pasar bahan bakar
+                            </p>
+                          </div>
+                        </div>
+                        <ul className="grid grid-cols-1 gap-1">
+                          <li>
+                            <NavigationMenuLink
+                              render={<Link href="/market" />}
+                              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all group/item"
+                            >
+                              <div className="w-9 h-9 shrink-0 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center group-hover/item:bg-purple-500/20 transition-colors">
+                                <ShoppingCart className="w-4 h-4 text-purple-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-foreground leading-tight">
+                                  Mod Workshop
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                  Jual beli mod, livery, dan skin eksklusif karya kreator
+                                </p>
+                              </div>
+                            </NavigationMenuLink>
+                          </li>
+                          <li>
+                            <NavigationMenuLink
+                              render={<Link href="/community-market" />}
+                              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all group/item"
+                            >
+                              <div className="w-9 h-9 shrink-0 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center group-hover/item:bg-teal-500/20 transition-colors">
+                                <Store className="w-4 h-4 text-teal-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-foreground leading-tight">
+                                  Community Market{" "}
+                                  <span className="ml-1 text-[10px] font-black uppercase tracking-wider text-teal-400 bg-teal-500/15 px-1.5 py-0.5 rounded-full">
+                                    New
+                                  </span>
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                  Bursa P2P Voucher, Tiket Penghapus Penalti &amp; Buy Order antar-driver
+                                </p>
+                              </div>
+                            </NavigationMenuLink>
+                          </li>
+                          <li>
+                            <NavigationMenuLink
+                              render={<Link href="/fuel-market" />}
+                              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all group/item"
+                            >
+                              <div className="w-9 h-9 shrink-0 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center group-hover/item:bg-yellow-500/20 transition-colors">
+                                <Fuel className="w-4 h-4 text-yellow-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-foreground leading-tight">
+                                  Fuel Market
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                  Sistem transaksi bahan bakar komunitas dan P2P BBM
+                                </p>
+                              </div>
+                            </NavigationMenuLink>
+                          </li>
+                        </ul>
                       </div>
                     </NavigationMenuContent>
                   </NavigationMenuItem>

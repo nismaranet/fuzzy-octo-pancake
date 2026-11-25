@@ -96,16 +96,27 @@ export const metadata: Metadata = {
 
 import GlobalPopupAd from "@/components/GlobalPopupAd";
 import HalloweenDecorations from "@/components/halloween/HalloweenDecorations";
+import ChristmasNewYearDecorations from "@/components/holiday/ChristmasNewYearDecorations";
+import { getWebConfig } from "@/lib/webConfig";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const webConfig = await getWebConfig();
+  const seasonTheme = webConfig.features.seasonTheme;
   return (
     <html
       lang="id"
-      className={cn("dark", "font-sans", plusJakartaSans.variable, "overflow-x-clip")}
+      data-season-theme={seasonTheme}
+      className={cn(
+        "dark",
+        "font-sans",
+        plusJakartaSans.variable,
+        "overflow-x-clip",
+        seasonTheme === "christmas_new_year" && "season-christmas-new-year"
+      )}
       suppressHydrationWarning
     >
       <body
@@ -121,7 +132,8 @@ export default function RootLayout({
           <Footer />
           <NismaraPlusAdPopup />
           <GlobalPopupAd />
-          <HalloweenDecorations />
+          <HalloweenDecorations enabled={seasonTheme === "halloween"} />
+          <ChristmasNewYearDecorations enabled={seasonTheme === "christmas_new_year"} />
         </Providers>
         {process.env.NEXT_PUBLIC_GA_ID && (
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />

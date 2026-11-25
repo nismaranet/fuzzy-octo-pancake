@@ -8,7 +8,11 @@ import CobwebDecor from "./CobwebDecor";
 import CrackedScreenOverlay from "./CrackedScreenOverlay";
 import JumpscareModal from "./JumpscareModal";
 
-export default function HalloweenDecorations() {
+export default function HalloweenDecorations({
+  enabled = HALLOWEEN_THEME_ACTIVE,
+}: {
+  enabled?: boolean;
+}) {
   const [mounted, setMounted] = useState(false);
   const [isCracked, setIsCracked] = useState(false);
   const [isJumpscareOpen, setIsJumpscareOpen] = useState(false);
@@ -17,7 +21,7 @@ export default function HalloweenDecorations() {
     setMounted(true);
   }, []);
 
-  if (!mounted || !HALLOWEEN_THEME_ACTIVE) {
+  if (!mounted || !enabled) {
     return null;
   }
 

@@ -12,6 +12,8 @@ import { getMonthlyStats, getCompanyDetails } from "@/lib/trucky";
 import { redis } from "@/lib/redis";
 import UserBadges from "@/components/icons/UserBadges";
 import HomeEventsWrapper from "@/components/HomeEventsWrapper";
+import RewindPromoBanner from "@/components/rewind/RewindPromoBanner";
+import { getWebConfig, isRewind2026PubliclyLive } from "@/lib/webConfig";
 import {
   ShieldCheck,
   Trophy,
@@ -44,6 +46,8 @@ const getGameInfo = (id: string) => {
 export default async function Home() {
   const session = await getServerSession(authOptions);
   const isDriver = session?.user?.isDriver || false;
+  const webConfig = await getWebConfig();
+  const showRewind2026Banner = isRewind2026PubliclyLive(webConfig);
 
   const client = await clientPromise;
   const db = client.db();
@@ -441,6 +445,9 @@ export default async function Home() {
       {/* 1. HERO SECTION */}
       <HeroSlider isDriver={isDriver} />
       {/* <HeroAnniversary isDriver={isDriver} /> */}
+
+      {/* Banner Promo Rewind 2026 (otomatis muncul mulai 28 Desember 2026 00:00 WIB) */}
+      {showRewind2026Banner && <RewindPromoBanner variant="home" />}
 
       {/* 2. ABOUT NISMARA SECTION */}
       <section className="relative pt-28 pb-12 overflow-hidden z-10">

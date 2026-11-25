@@ -95,6 +95,23 @@
     --ring: 262 80% 65%;
   }
 
+  /* 4b. SEASONAL LUXURY THEME: Natal & Tahun Baru (Nordic Winter & Champagne Gold) */
+  :where(html.season-christmas-new-year).dark {
+    --primary: 38 66% 58%;            /* Brushed Champagne Gold (#DDA94C) */
+    --primary-foreground: 222 47% 7%; /* Midnight Navy text on Gold (9.6:1 AAA) */
+    --accent-sky: 161 52% 44%;        /* Nordic Pine Emerald (#36A884) */
+    --accent-lilac: 352 58% 52%;      /* Winter Crimson Velvet (#CC3E4E) */
+    --ring: 38 66% 58%;
+  }
+
+  :where(html.season-christmas-new-year):not(.dark) {
+    --primary: 161 48% 24%;           /* Rich Evergreen Pine (#205B48) */
+    --primary-foreground: 40 33% 97%; /* Warm Ivory on Pine (8.2:1 AAA) */
+    --accent-sky: 38 68% 36%;         /* Antique Brass (#9A6A1D) */
+    --accent-lilac: 354 58% 41%;      /* Deep Winter Crimson (#A52C38) */
+    --ring: 161 48% 24%;
+  }
+
   /* 5. USER PREFERENCE THEMES (Color Overrides for .dark & light) */
   .theme-red {
     --primary: 348 83% 47%; 
@@ -214,4 +231,70 @@
 }
 .animate-marquee-right {
   animation: marquee-right 40s linear infinite;
+}
+
+/* Holiday Season Animations (Nordic Winter & Champagne Gold) */
+@keyframes holiday-bulb-breathe {
+  0%, 100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes holiday-sway {
+  0%, 100% {
+    transform: rotate(-2.2deg);
+  }
+  50% {
+    transform: rotate(2.2deg);
+  }
+}
+
+@keyframes holiday-ring-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.holiday-bulb-a {
+  animation: holiday-bulb-breathe 3.4s ease-in-out infinite;
+}
+.holiday-bulb-b {
+  animation: holiday-bulb-breathe 4.2s ease-in-out 1.1s infinite;
+}
+.holiday-bulb-c {
+  animation: holiday-bulb-breathe 3.8s ease-in-out 2.1s infinite;
+}
+.holiday-ornament-sway {
+  transform-origin: top center;
+  animation: holiday-sway 5.5s ease-in-out infinite;
+}
+.holiday-ring-spin {
+  animation: holiday-ring-slow 18s linear infinite;
+}
+
+/* Seasonal LoadingScreen visibility (SSR-safe, zero hydration flash) */
+.loading-season-winter,
+.loading-season-halloween {
+  display: none;
+}
+.loading-season-default {
+  display: flex;
+}
+html[data-season-theme="christmas_new_year"] .loading-season-winter {
+  display: flex;
+}
+html[data-season-theme="christmas_new_year"] .loading-season-default {
+  display: none;
+}
+html[data-season-theme="halloween"] .loading-season-halloween {
+  display: flex;
+}
+html[data-season-theme="halloween"] .loading-season-default {
+  display: none;
 }
