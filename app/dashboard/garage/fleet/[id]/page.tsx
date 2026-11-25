@@ -20,6 +20,7 @@ import FleetMaintenanceClient from "./FleetMaintenanceClient";
 import ToggleDriverClient from "./ToggleDriverClient";
 import FleetNameEditorClient from "./FleetNameEditorClient";
 import FleetImageEditorClient from "./FleetImageEditorClient";
+import { evaluateFleetMaintenance } from "@/lib/fleetMaintenance";
 
 export const metadata = {
   title: "Fleet Detail",
@@ -130,84 +131,44 @@ export default async function FleetDetailPage({
     .toArray();
   const totalNCRevenue = revenueAggregation[0]?.totalRevenue || 0;
 
-  // Determine which parts need maintenance based on Odometer vs Maintenance Threshold
-  const odometer = fleet.odometer || 0;
+  // Fetch user's garage for mechanic boost preview
+  const userGarage = await db
+    .collection("garages")
+    .findOne({ discordId: session.user.discordId });
 
-  // Base intervals from store (defaulting to safe values if not set)
-  const baseIntervals = fleet.modelInfo?.component_cost_unfix_wear || {
-    engine: 45000,
-    tires: 20000,
-    transmission: 80000,
-    brakes: 25000,
+  const evaluation = evaluateFleetMaintenance(
+    fleet,
+    userGarage?.mechanics || null,
+  );
+  const odometer = evaluation.odometer;
+  const thresholds = {
+    engine: evaluation.parts.engine.threshold,
+    tires: evaluation.parts.tires.threshold,
+    transmission: evaluation.parts.transmission.threshold,
+    brakes: evaluation.parts.brakes.threshold,
   };
-
-  // Cost to maintain from store
-  const maintenanceCost = fleet.modelInfo?.component_cost_maintenance || {
-    engine: 2000,
-    tires: 500,
-    transmission: 1500,
-    brakes: 800,
+  const maintenanceCost = {
+    engine: evaluation.parts.engine.maintCost,
+    tires: evaluation.parts.tires.maintCost,
+    transmission: evaluation.parts.transmission.maintCost,
+    brakes: evaluation.parts.brakes.maintCost,
   };
-
-  const thresholds = fleet.maintenance || baseIntervals;
-
-  const needsEngine = odometer >= thresholds.engine;
-  const needsTires = odometer >= thresholds.tires;
-  const needsTransmission = odometer >= thresholds.transmission;
-  const needsBrakes = odometer >= thresholds.brakes;
-
-  const wear = fleet.wear || {
-    unfix_engine: 0,
-    unfix_tires: 0,
-    unfix_transmission: 0,
-    unfix_brakes: 0,
+  const replaceCost = {
+    engine: evaluation.parts.engine.replaceCost,
+    tires: evaluation.parts.tires.replaceCost,
+    transmission: evaluation.parts.transmission.replaceCost,
+    brakes: evaluation.parts.brakes.replaceCost,
   };
-
-  const replaceCost = fleet.modelInfo?.component_cost_unfix_wear || {
-    engine: 40000,
-    tires: 30000,
-    transmission: 60000,
-    brakes: 40000,
+  const wear = {
+    unfix_engine: evaluation.parts.engine.wearPercent,
+    unfix_tires: evaluation.parts.tires.wearPercent,
+    unfix_transmission: evaluation.parts.transmission.wearPercent,
+    unfix_brakes: evaluation.parts.brakes.wearPercent,
   };
-
-  const needsReplaceEngine = wear.unfix_engine >= 100;
-  const needsReplaceTires = wear.unfix_tires >= 100;
-  const needsReplaceTransmission = wear.unfix_transmission >= 100;
-  const needsReplaceBrakes = wear.unfix_brakes >= 100;
-
-  const isReplaceNeeded =
-    needsReplaceEngine ||
-    needsReplaceTires ||
-    needsReplaceTransmission ||
-    needsReplaceBrakes;
-  const isMaintenanceNeeded =
-    needsEngine || needsTires || needsTransmission || needsBrakes;
-
-  const totalComponentCost = isReplaceNeeded
-    ? (needsReplaceEngine ? replaceCost.engine : 0) +
-      (needsReplaceTires ? replaceCost.tires : 0) +
-      (needsReplaceTransmission ? replaceCost.transmission : 0) +
-      (needsReplaceBrakes ? replaceCost.brakes : 0)
-    : (needsEngine ? maintenanceCost.engine : 0) +
-      (needsTires ? maintenanceCost.tires : 0) +
-      (needsTransmission ? maintenanceCost.transmission : 0) +
-      (needsBrakes ? maintenanceCost.brakes : 0);
-
-  const adminFee = 500;
-  const orderType = isReplaceNeeded ? "replace" : "maintenance";
-
-  let serviceDuration = 0;
-  if (isReplaceNeeded) {
-    if (needsReplaceEngine) serviceDuration += 9;
-    if (needsReplaceTires) serviceDuration += 3;
-    if (needsReplaceTransmission) serviceDuration += 15;
-    if (needsReplaceBrakes) serviceDuration += 3;
-  } else {
-    if (needsEngine) serviceDuration += 3;
-    if (needsTires) serviceDuration += 1;
-    if (needsTransmission) serviceDuration += 5;
-    if (needsBrakes) serviceDuration += 1;
-  }
+  const needsEngine = evaluation.parts.engine.mustMaintain;
+  const needsTires = evaluation.parts.tires.mustMaintain;
+  const needsTransmission = evaluation.parts.transmission.mustMaintain;
+  const needsBrakes = evaluation.parts.brakes.mustMaintain;
 
   // Check if there is already an ongoing or pending maintenance order
   const activeOrder = await db.collection("fleetmaintenanceorders").findOne({
@@ -304,22 +265,21 @@ export default async function FleetDetailPage({
                   )}
               </div>
             </div>
-          ) : isReplaceNeeded || isMaintenanceNeeded ? (
-            <FleetMaintenanceClient
-              fleetId={fleet._id.toString()}
-              needsEngine={isReplaceNeeded ? needsReplaceEngine : needsEngine}
-              needsTires={isReplaceNeeded ? needsReplaceTires : needsTires}
-              needsTransmission={
-                isReplaceNeeded ? needsReplaceTransmission : needsTransmission
-              }
-              needsBrakes={isReplaceNeeded ? needsReplaceBrakes : needsBrakes}
-              totalComponentCost={totalComponentCost}
-              adminFee={adminFee}
-              serviceDuration={serviceDuration}
-              thresholds={thresholds}
-              odometer={odometer}
-              orderType={orderType}
-            />
+          ) : evaluation.hasAnyEligible ? (
+            <div className="flex items-center gap-2.5">
+              {!evaluation.hasMandatoryAny && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-4 py-3 rounded-xl flex items-center gap-2">
+                  <Activity size={18} />
+                  <p className="text-xs font-black uppercase tracking-wider">
+                    Kondisi Prima
+                  </p>
+                </div>
+              )}
+              <FleetMaintenanceClient
+                fleetId={fleet._id.toString()}
+                evaluation={evaluation}
+              />
+            </div>
           ) : (
             <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-6 py-3 rounded-xl flex items-center gap-3">
               <Activity size={20} />

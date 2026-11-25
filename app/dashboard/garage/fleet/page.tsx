@@ -9,6 +9,11 @@ import FleetListClient, {
   SerializedFleetItem,
   FleetComponentStatus,
 } from "./FleetListClient";
+import {
+  FLEET_MAINTENANCE_INTERVALS,
+  FLEET_DEFAULT_MAINT_COSTS,
+  getDefaultReplaceCostsByType,
+} from "@/lib/fleetMaintenance";
 
 export const metadata = {
   title: "Fleet",
@@ -117,35 +122,20 @@ export default async function FleetDashboardPage() {
       }
     }
 
-    // Component thresholds & wear calculation (matches /dashboard/garage/fleet/[id]/page.tsx)
-    const baseIntervals = fleet.modelInfo?.component_cost_unfix_wear || {
-      engine: 45000,
-      tires: 20000,
-      transmission: 80000,
-      brakes: 25000,
-    };
+    // Component thresholds & wear calculation (synced with lib/fleetMaintenance.ts)
+    const baseIntervals = FLEET_MAINTENANCE_INTERVALS;
+    const defaultReplace = getDefaultReplaceCostsByType(vehicleType);
 
-    const maintenanceCost = fleet.modelInfo?.component_cost_maintenance || {
-      engine: 2000,
-      tires: 500,
-      transmission: 1500,
-      brakes: 800,
-    };
-
-    const replaceCost = fleet.modelInfo?.component_cost_unfix_wear || {
-      engine: 40000,
-      tires: 30000,
-      transmission: 60000,
-      brakes: 40000,
-    };
+    const maintenanceCost = fleet.modelInfo?.component_cost_maintenance || FLEET_DEFAULT_MAINT_COSTS;
+    const replaceCost = fleet.modelInfo?.component_cost_unfix_wear || defaultReplace;
 
     const thresholds = {
-      engine: Number(fleet.maintenance?.engine || baseIntervals.engine || 45000),
-      tires: Number(fleet.maintenance?.tires || baseIntervals.tires || 20000),
+      engine: Number(fleet.maintenance?.engine || baseIntervals.engine),
+      tires: Number(fleet.maintenance?.tires || baseIntervals.tires),
       transmission: Number(
-        fleet.maintenance?.transmission || baseIntervals.transmission || 80000
+        fleet.maintenance?.transmission || baseIntervals.transmission
       ),
-      brakes: Number(fleet.maintenance?.brakes || baseIntervals.brakes || 25000),
+      brakes: Number(fleet.maintenance?.brakes || baseIntervals.brakes),
     };
 
     const wear = {
@@ -168,32 +158,32 @@ export default async function FleetDashboardPage() {
         label: "Mesin",
         threshold: thresholds.engine,
         wearVal: wear.unfix_engine,
-        maintCost: Number(maintenanceCost.engine || 2000),
-        repCost: Number(replaceCost.engine || 40000),
+        maintCost: Number(maintenanceCost.engine ?? FLEET_DEFAULT_MAINT_COSTS.engine),
+        repCost: Number(replaceCost.engine ?? defaultReplace.engine),
       },
       {
         key: "tires",
         label: "Ban",
         threshold: thresholds.tires,
         wearVal: wear.unfix_tires,
-        maintCost: Number(maintenanceCost.tires || 500),
-        repCost: Number(replaceCost.tires || 30000),
+        maintCost: Number(maintenanceCost.tires ?? FLEET_DEFAULT_MAINT_COSTS.tires),
+        repCost: Number(replaceCost.tires ?? defaultReplace.tires),
       },
       {
         key: "transmission",
         label: "Transmisi",
         threshold: thresholds.transmission,
         wearVal: wear.unfix_transmission,
-        maintCost: Number(maintenanceCost.transmission || 1500),
-        repCost: Number(replaceCost.transmission || 60000),
+        maintCost: Number(maintenanceCost.transmission ?? FLEET_DEFAULT_MAINT_COSTS.transmission),
+        repCost: Number(replaceCost.transmission ?? defaultReplace.transmission),
       },
       {
         key: "brakes",
         label: "Rem",
         threshold: thresholds.brakes,
         wearVal: wear.unfix_brakes,
-        maintCost: Number(maintenanceCost.brakes || 800),
-        repCost: Number(replaceCost.brakes || 40000),
+        maintCost: Number(maintenanceCost.brakes ?? FLEET_DEFAULT_MAINT_COSTS.brakes),
+        repCost: Number(replaceCost.brakes ?? defaultReplace.brakes),
       },
     ];
 

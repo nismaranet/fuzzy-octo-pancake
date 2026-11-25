@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import { compressImageToWebP } from "@/lib/imageUtils";
 import { useSession } from "next-auth/react";
+import {
+  FLEET_DEFAULT_MAINT_COSTS,
+  FLEET_DEFAULT_REPLACE_COSTS_TRUCK,
+  getDefaultReplaceCostsByType,
+} from "@/lib/fleetMaintenance";
 
 export default function FleetStoreManager() {
   const router = useRouter();
@@ -28,18 +33,8 @@ export default function FleetStoreManager() {
   const [gameFilter, setGameFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
 
-  const initialCostMaintenance = {
-    engine: 2000,
-    tires: 500,
-    transmission: 1500,
-    brakes: 800,
-  };
-  const initialCostUnfix = {
-    engine: 40000,
-    transmission: 60000,
-    brakes: 40000,
-    tires: 30000,
-  };
+  const initialCostMaintenance = { ...FLEET_DEFAULT_MAINT_COSTS };
+  const initialCostUnfix = { ...FLEET_DEFAULT_REPLACE_COSTS_TRUCK };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -611,9 +606,19 @@ export default function FleetStoreManager() {
                 </label>
                 <select
                   value={formData.type}
-                  onChange={(e) =>
-                    setFormData({ ...formData, type: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const nextType = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      type: nextType,
+                      ...(!isEditMode
+                        ? {
+                            component_cost_unfix_wear:
+                              getDefaultReplaceCostsByType(nextType),
+                          }
+                        : {}),
+                    }));
+                  }}
                   className="w-full bg-white/5 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-accent-sky transition-all appearance-none cursor-pointer"
                 >
                   <option value="truck" className="bg-card">

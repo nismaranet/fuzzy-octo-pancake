@@ -180,13 +180,18 @@ export default async function PublicFleetProfilePage({
 
   // Components Data - Simplified for public
   const odometer = fleet.odometer || 0;
-  const baseIntervals = fleet.modelInfo?.component_cost_unfix_wear || {
+  const baseIntervals = {
     engine: 45000,
     tires: 20000,
-    transmission: 80000,
-    brakes: 25000,
+    transmission: 60000,
+    brakes: 35000,
   };
-  const thresholds = fleet.maintenance || baseIntervals;
+  const thresholds = {
+    engine: Number(fleet.maintenance?.engine || baseIntervals.engine),
+    tires: Number(fleet.maintenance?.tires || baseIntervals.tires),
+    transmission: Number(fleet.maintenance?.transmission || baseIntervals.transmission),
+    brakes: Number(fleet.maintenance?.brakes || baseIntervals.brakes),
+  };
   const wear = fleet.wear || {
     unfix_engine: 0,
     unfix_tires: 0,

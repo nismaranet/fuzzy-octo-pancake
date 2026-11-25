@@ -640,6 +640,13 @@ export default async function JobDetailPage(props: {
                         value={localJob?.ncCost?.rent}
                         isPenalty
                       />
+                      {localJob?.ncCost?.rentShare > 0 && (
+                        <BreakdownRow
+                          label={`Bagi Hasil Pemilik Armada (${Math.round((localJob?.rentShareRate || 0.25) * 100)}%)`}
+                          value={localJob?.ncCost?.rentShare}
+                          isPenalty
+                        />
+                      )}
                       <BreakdownRow
                         label="Biaya Servis"
                         value={localJob?.ncCost?.service}

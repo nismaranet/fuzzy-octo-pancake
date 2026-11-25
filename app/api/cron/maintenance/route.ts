@@ -10,6 +10,8 @@ import User from "@/lib/models/User";
 import "@/lib/models/GarageSlot";
 import { sendPersonalNotification } from "@/lib/services/NotificationService";
 import { revalidatePath } from "next/cache";
+import { jsonNoCache } from "@/lib/antiCache";
+import { FLEET_MAINTENANCE_INTERVALS, FLEET_PART_KEYS } from "@/lib/fleetMaintenance";
 
 import dbConnect from "@/lib/mongoose";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -53,12 +55,7 @@ async function completeOrder(order: any, now: Date) {
     fleet.maintenance_start_date = null;
     fleet.maintenance_end_date = null;
 
-    const baseIntervals = {
-      engine: 45000,
-      tires: 20000,
-      transmission: 60000,
-      brakes: 35000,
-    };
+    const baseIntervals = FLEET_MAINTENANCE_INTERVALS;
 
     const currentMaintenance = fleet.maintenance || { ...baseIntervals };
     const wear = fleet.wear || {
@@ -69,22 +66,21 @@ async function completeOrder(order: any, now: Date) {
     };
 
     const isReplace = order.type === "replace";
+    const hasExplicitReplaceMap = FLEET_PART_KEYS.some((k) =>
+      Boolean(order.replaceComponents?.[k]),
+    );
 
-    if (order.components?.engine) {
-      if (isReplace) wear.unfix_engine = 0;
-      currentMaintenance.engine = (fleet.odometer || 0) + baseIntervals.engine;
-    }
-    if (order.components?.tires) {
-      if (isReplace) wear.unfix_tires = 0;
-      currentMaintenance.tires = (fleet.odometer || 0) + baseIntervals.tires;
-    }
-    if (order.components?.transmission) {
-      if (isReplace) wear.unfix_transmission = 0;
-      currentMaintenance.transmission = (fleet.odometer || 0) + baseIntervals.transmission;
-    }
-    if (order.components?.brakes) {
-      if (isReplace) wear.unfix_brakes = 0;
-      currentMaintenance.brakes = (fleet.odometer || 0) + baseIntervals.brakes;
+    for (const part of FLEET_PART_KEYS) {
+      if (order.components?.[part]) {
+        const shouldResetWear = hasExplicitReplaceMap
+          ? Boolean(order.replaceComponents?.[part])
+          : isReplace;
+        if (shouldResetWear) {
+          (wear as any)[`unfix_${part}`] = 0;
+        }
+        (currentMaintenance as any)[part] =
+          (fleet.odometer || 0) + baseIntervals[part];
+      }
     }
 
     fleet.maintenance = currentMaintenance;
@@ -285,18 +281,22 @@ export async function GET(request: Request) {
 
     for (const f of activeFleets) {
       const odometer = f.odometer || 0;
-      const baseIntervals = {
-        engine: 45000,
-        tires: 20000,
-        transmission: 60000,
-        brakes: 35000,
-      };
+      const baseIntervals = FLEET_MAINTENANCE_INTERVALS;
       const thresholds = f.maintenance || baseIntervals;
+      const wear = f.wear || {};
 
-      const needsEngine = odometer >= thresholds.engine;
-      const needsTires = odometer >= thresholds.tires;
-      const needsTransmission = odometer >= thresholds.transmission;
-      const needsBrakes = odometer >= thresholds.brakes;
+      const needsEngine =
+        odometer >= (thresholds.engine || baseIntervals.engine) ||
+        Number(wear.unfix_engine || 0) >= 100;
+      const needsTires =
+        odometer >= (thresholds.tires || baseIntervals.tires) ||
+        Number(wear.unfix_tires || 0) >= 100;
+      const needsTransmission =
+        odometer >= (thresholds.transmission || baseIntervals.transmission) ||
+        Number(wear.unfix_transmission || 0) >= 100;
+      const needsBrakes =
+        odometer >= (thresholds.brakes || baseIntervals.brakes) ||
+        Number(wear.unfix_brakes || 0) >= 100;
 
       if (needsEngine || needsTires || needsTransmission || needsBrakes) {
         f.status = "need_maintenance";
@@ -324,7 +324,7 @@ export async function GET(request: Request) {
       console.error("Failed to revalidate maintenance cron paths", e);
     }
 
-    return NextResponse.json({
+    return jsonNoCache({
       success: true,
       processedOrders: completedOrders.length,
       promotedWaitingOrders: promotedCount,
@@ -332,6 +332,6 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     console.error("Cron Maintenance Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return jsonNoCache({ error: error.message }, { status: 500 });
   }
 }

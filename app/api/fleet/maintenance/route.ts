@@ -1,8 +1,6 @@
-import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
-import mongoose from "mongoose";
 import FleetMaintenanceOrder from "@/lib/models/FleetMaintenanceOrder";
 import Fleet from "@/lib/models/Fleet";
 import Garage from "@/lib/models/Garage";
@@ -15,29 +13,42 @@ import { validateVoucher, calculateVoucherDiscount, consumeVoucher } from "@/lib
 import Transaction from "@/lib/models/Transaction";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { jsonNoCache } from "@/lib/antiCache";
+import {
+  evaluateFleetMaintenance,
+  validateAndPriceMaintenanceSelection,
+  FLEET_ADMIN_FEE,
+} from "@/lib/fleetMaintenance";
 
 import dbConnect from "@/lib/mongoose";
+import { getWebConfig } from "@/lib/webConfig";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
-const CATEGORY_ID = process.env.DISCORD_SERVICE_FLEET_CATEGORY_ID; // Or any specific category for maintenance
-const MANAGER_ROLE_ID = process.env.DISCORD_MANAGER_ROLE_ID;
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.discordId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return jsonNoCache({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!checkRateLimit(session.user.discordId, "fleet-maintenance-create", 3000)) {
+      return jsonNoCache(
+        { error: "Terlalu banyak permintaan. Mohon tunggu beberapa detik." },
+        { status: 429 },
+      );
     }
 
     const body = await request.json();
-    const { fleetId, type, voucherId } = body; // type can be 'maintenance' or 'replace'
+    const { fleetId, voucherId, selections } = body;
 
     if (!fleetId) {
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "fleetId is required" },
         { status: 400 },
       );
@@ -51,95 +62,65 @@ export async function POST(request: Request) {
       .collection("users")
       .findOne({ discordId: session.user.discordId });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return jsonNoCache({ error: "User not found" }, { status: 404 });
     }
 
     const fleet = await Fleet.findById(fleetId).populate("model");
     if (!fleet) {
-      return NextResponse.json({ error: "Fleet not found" }, { status: 404 });
+      return jsonNoCache({ error: "Fleet not found" }, { status: 404 });
     }
 
     // Verify ownership
     if (String(fleet.owner || fleet.driver) !== String(user._id)) {
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "Anda bukan pemilik/driver kendaraan ini" },
         { status: 403 },
       );
     }
 
-    // Check garage status
+    // Check garage status & fetch mechanics in one query
     const userGarage = await Garage.findOne({ discordId: session.user.discordId });
     if (userGarage?.status === "suspended") {
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "Akses ditolak! Garasi Anda sedang dibekukan (disita) karena tunggakan biaya operasional. Selesaikan tunggakan terlebih dahulu." },
         { status: 403 }
       );
     }
 
-    // Prevent spam: Check if user already has a pending/waiting maintenance order for this fleet
+    // Prevent spam: Check if user already has a pending/waiting/in_service maintenance order for this fleet
     const existingOrder = await FleetMaintenanceOrder.findOne({
       fleetId: fleet._id,
-      status: { $in: ["pending", "waiting", "in_service"] },
+      status: { $in: ["pending", "processing", "waiting", "in_service"] },
     });
 
     if (existingOrder) {
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "Kendaraan ini sudah dalam proses servis atau menunggu." },
         { status: 400 },
       );
     }
 
-    // Server-side calculation of needs and costs
-    const odometer = fleet.odometer || 0;
-
-    const baseIntervals = {
-      engine: 45000,
-      tires: 20000,
-      transmission: 60000,
-      brakes: 35000,
-    };
-
-    const maintenanceCost = fleet.model?.component_cost_maintenance || {
-      engine: 2000,
-      tires: 500,
-      transmission: 1500,
-      brakes: 800,
-    };
-
-    const replaceCost = fleet.model?.component_cost_unfix_wear || {
-      engine: 40000,
-      tires: 30000,
-      transmission: 60000,
-      brakes: 40000,
-    };
-
-    const thresholds = fleet.maintenance || baseIntervals;
-
-    const needsEngine = odometer >= thresholds.engine;
-    const needsTires = odometer >= thresholds.tires;
-    const needsTransmission = odometer >= thresholds.transmission;
-    const needsBrakes = odometer >= thresholds.brakes;
-
-    if (!needsEngine && !needsTires && !needsTransmission && !needsBrakes) {
-      return NextResponse.json(
-        { error: "Kendaraan belum membutuhkan servis." },
+    // Server-side evaluation & strict validation (supports mandatory, early >=50%, and bundled selections)
+    const evaluation = evaluateFleetMaintenance(fleet, userGarage?.mechanics || null);
+    if (!evaluation.hasAnyEligible) {
+      return jsonNoCache(
+        { error: "Kendaraan masih prima dan belum memenuhi batas minimum servis (50%)." },
         { status: 400 },
       );
     }
 
-    const isReplace = type === "replace";
+    const priced = validateAndPriceMaintenanceSelection(evaluation, selections);
+    if (!priced.valid) {
+      return jsonNoCache(
+        { error: priced.error || "Pilihan komponen servis tidak valid." },
+        { status: 400 },
+      );
+    }
 
-    const totalComponentCost = isReplace
-      ? (needsEngine ? replaceCost.engine : 0) +
-        (needsTires ? replaceCost.tires : 0) +
-        (needsTransmission ? replaceCost.transmission : 0) +
-        (needsBrakes ? replaceCost.brakes : 0)
-      : (needsEngine ? maintenanceCost.engine : 0) +
-        (needsTires ? maintenanceCost.tires : 0) +
-        (needsTransmission ? maintenanceCost.transmission : 0) +
-        (needsBrakes ? maintenanceCost.brakes : 0);
-
-    const adminFee = 500;
+    const isReplace = priced.orderType === "replace";
+    const totalComponentCost = priced.totalComponentCost;
+    const adminFee = FLEET_ADMIN_FEE;
+    const serviceDuration = priced.serviceDuration;
 
     // Voucher handling (Applies to component costs only, Admin Fee remains 500 NC)
     let appliedVoucher: any = null;
@@ -154,7 +135,7 @@ export async function POST(request: Request) {
       );
 
       if (!vRes.valid) {
-        return NextResponse.json({ error: vRes.error }, { status: 400 });
+        return jsonNoCache({ error: vRes.error }, { status: 400 });
       }
 
       appliedVoucher = vRes.voucher;
@@ -164,42 +145,10 @@ export async function POST(request: Request) {
     const finalComponentCost = Math.max(0, totalComponentCost - voucherDiscount);
     const totalPrice = finalComponentCost + adminFee;
 
-    // Fetch garage to check mechanics
-    const garage = await Garage.findOne({ discordId: session.user.discordId });
-    const mechanics = garage?.mechanics || {};
-
-    let serviceDuration = 0;
-
-    // Helper to calculate boosted duration
-    const getBoostedDuration = (
-      baseDuration: number,
-      specialty: "umum" | "ban" | "mesin",
-    ) => {
-      const boost = mechanics[specialty]?.boostPercentage || 0;
-      if (boost > 0) {
-        // e.g. 10 days with 20% boost -> 10 * (1 - 0.20) = 8 days
-        const boosted = baseDuration * (1 - boost / 100);
-        return Math.max(0.5, Number(boosted.toFixed(2))); // Minimum 0.5 day (12 jam)
-      }
-      return baseDuration;
-    };
-
-    if (isReplace) {
-      if (needsEngine) serviceDuration += getBoostedDuration(9, "mesin");
-      if (needsTires) serviceDuration += getBoostedDuration(3, "ban");
-      if (needsTransmission) serviceDuration += getBoostedDuration(12, "mesin"); // Transmission falls under mesin usually
-      if (needsBrakes) serviceDuration += getBoostedDuration(3, "umum"); // Brakes under umum
-    } else {
-      if (needsEngine) serviceDuration += getBoostedDuration(3, "mesin");
-      if (needsTires) serviceDuration += getBoostedDuration(1, "ban");
-      if (needsTransmission) serviceDuration += getBoostedDuration(4, "mesin");
-      if (needsBrakes) serviceDuration += getBoostedDuration(1, "umum");
-    }
-
     // Check balance
     const currencyData = await getCurrencyDataLogic();
     if (currencyData.balance < totalPrice) {
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "Saldo NC tidak mencukupi untuk servis ini" },
         { status: 400 },
       );
@@ -207,6 +156,10 @@ export async function POST(request: Request) {
 
     // 1. Create Discord Channel
     const channelName = `🔧│Service-${fleet.fleet_number.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`;
+
+    const webConfig = await getWebConfig();
+    const CATEGORY_ID = webConfig.discordChannels.serviceFleetCategoryId;
+    const MANAGER_ROLE_ID = webConfig.discordRoles.managerRoleId;
 
     const createChannelRes = await fetch(
       `https://discord.com/api/v10/guilds/${GUILD_ID}/channels`,
@@ -244,7 +197,7 @@ export async function POST(request: Request) {
     if (!createChannelRes.ok) {
       const err = await createChannelRes.text();
       console.error("Discord API Error (Create Channel):", err);
-      return NextResponse.json(
+      return jsonNoCache(
         { error: "Gagal membuat tiket Discord" },
         { status: 500 },
       );
@@ -254,11 +207,20 @@ export async function POST(request: Request) {
     const discordChannelId = channelData.id;
 
     // 2. Post initial message to the channel
-    const partsArray = [];
-    if (needsEngine) partsArray.push("Mesin");
-    if (needsTires) partsArray.push("Ban");
-    if (needsTransmission) partsArray.push("Transmisi");
-    if (needsBrakes) partsArray.push("Rem");
+    const partsSummary = priced.items.map((item) => {
+      const actionLabel = item.action === "replace" ? "Ganti Baru" : "Servis Rutin";
+      const earlyTag = item.isEarly ? " • Lebih Awal" : "";
+      return `• **${item.label}** (${actionLabel}${earlyTag}) — ${item.cost.toLocaleString("id-ID")} NC`;
+    });
+
+    const hasBothActions =
+      priced.items.some((i) => i.action === "replace") &&
+      priced.items.some((i) => i.action === "maintenance");
+    const requestHeading = hasBothActions
+      ? "🔧🔄 Permintaan Servis & Penggantian Komponen"
+      : isReplace
+        ? "🔄 Permintaan Penggantian Komponen"
+        : "🔧 Permintaan Servis Kendaraan";
 
     await fetch(
       `https://discord.com/api/v10/channels/${discordChannelId}/messages`,
@@ -269,23 +231,21 @@ export async function POST(request: Request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          content: `<@${user.discordId}> permintaan ${isReplace ? "penggantian komponen" : "servis"} kendaraan Anda sedang diproses. Mohon tunggu <@&${MANAGER_ROLE_ID}> untuk mengonfirmasi.`,
+          content: `<@${user.discordId}> permintaan ${hasBothActions ? "servis & penggantian komponen" : isReplace ? "penggantian komponen" : "servis"} kendaraan Anda sedang diproses. Mohon tunggu <@&${MANAGER_ROLE_ID}> untuk mengonfirmasi.`,
           embeds: [
             {
-              title: isReplace
-                ? "🔄 Permintaan Penggantian Komponen"
-                : "🔧 Permintaan Servis Kendaraan",
-              color: 0xf59e0b, // amber color
+              title: requestHeading,
+              color: isReplace ? 0xef4444 : 0xf59e0b,
               fields: [
                 {
                   name: "Kendaraan",
-                  value: `${fleet.model.name} (${fleet.fleet_number})`,
+                  value: `${fleet.model?.name || fleet.fleet_name} (${fleet.fleet_number})`,
                   inline: false,
                 },
                 {
-                  name: "Komponen",
-                  value: partsArray.join(", "),
-                  inline: true,
+                  name: "Rincian Komponen",
+                  value: partsSummary.join("\n"),
+                  inline: false,
                 },
                 {
                   name: "Durasi Estimasi",
@@ -295,7 +255,7 @@ export async function POST(request: Request) {
                 {
                   name: "Biaya Komponen",
                   value: `${totalComponentCost.toLocaleString("id-ID")} NC`,
-                  inline: false,
+                  inline: true,
                 },
                 ...(voucherDiscount > 0 && appliedVoucher
                   ? [
@@ -328,16 +288,12 @@ export async function POST(request: Request) {
       userRef: user._id,
       discordId: user.discordId,
       fleetId: fleet._id,
-      type: isReplace ? "replace" : "maintenance",
+      type: priced.orderType,
       status: "pending",
       managerId: null,
       discordChannelId: discordChannelId,
-      components: {
-        engine: needsEngine,
-        tires: needsTires,
-        transmission: needsTransmission,
-        brakes: needsBrakes,
-      },
+      components: priced.components,
+      replaceComponents: priced.replaceComponents,
       basePrice: totalComponentCost,
       adminFee,
       voucherId: appliedVoucher?._id || null,
@@ -356,7 +312,11 @@ export async function POST(request: Request) {
       trxId: `TRX-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
       discordId: user.discordId,
       userId: user._id,
-      title: isReplace ? "Penggantian Komponen Fleet" : "Servis Rutin Fleet",
+      title: hasBothActions
+        ? "Servis & Penggantian Komponen Fleet"
+        : isReplace
+          ? "Penggantian Komponen Fleet"
+          : "Servis Rutin Fleet",
       category: "maintenance",
       amount: totalPrice,
       currency: "NC",
@@ -371,16 +331,17 @@ export async function POST(request: Request) {
 
     try {
       revalidatePath("/dashboard/garage/fleet");
+      revalidatePath(`/dashboard/garage/fleet/${fleet.id}`);
       revalidatePath("/dashboard/manage/fleet/service");
       revalidatePath("/dashboard/transactions");
     } catch (e) {
       console.error("Failed to revalidate maintenance paths", e);
     }
 
-    return NextResponse.json({ success: true, order: newOrder });
+    return jsonNoCache({ success: true, order: newOrder });
   } catch (error) {
     console.error("Fleet Maintenance Order Error:", error);
-    return NextResponse.json(
+    return jsonNoCache(
       { error: "Terjadi kesalahan internal" },
       { status: 500 },
     );

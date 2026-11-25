@@ -5,6 +5,7 @@ import clientPromise from "@/lib/mongodb";
 import mongoose from "mongoose";
 import FleetOrder from "@/lib/models/FleetOrder";
 import FleetStore from "@/lib/models/FleetStore";
+import { FLEET_MAINTENANCE_INTERVALS } from "@/lib/fleetMaintenance";
 import Transaction from "@/lib/models/Transaction";
 import Fleet from "@/lib/models/Fleet";
 import User from "@/lib/models/User";
@@ -237,12 +238,7 @@ export async function POST(
       status: "active",
       has_insurance: false,
       jobs_count: 0,
-      maintenance: order.fleetStoreId.component_cost_unfix_wear || {
-        engine: 45000,
-        tires: 20000,
-        transmission: 80000,
-        brakes: 25000,
-      },
+      maintenance: { ...FLEET_MAINTENANCE_INTERVALS },
     });
 
     createdFleetDbId = String(createdFleet._id);

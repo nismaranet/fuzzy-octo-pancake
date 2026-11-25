@@ -23,6 +23,12 @@ const fleetMaintenanceOrderSchema = new mongoose.Schema(
       transmission: { type: Boolean, default: false },
       brakes: { type: Boolean, default: false },
     },
+    replaceComponents: {
+      engine: { type: Boolean, default: false },
+      tires: { type: Boolean, default: false },
+      transmission: { type: Boolean, default: false },
+      brakes: { type: Boolean, default: false },
+    },
     basePrice: { type: Number, required: true },
     adminFee: { type: Number, required: true, default: 500 },
     voucherId: { type: mongoose.Schema.Types.ObjectId, ref: "UserVoucher", default: null },
