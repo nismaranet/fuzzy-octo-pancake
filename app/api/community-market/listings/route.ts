@@ -10,6 +10,7 @@ import CommunityMarketListing from "@/lib/models/CommunityMarketListing";
 import UserVoucher from "@/lib/models/UserVoucher";
 import Transaction from "@/lib/models/Transaction";
 import { isVoucherTradable } from "@/lib/voucher";
+import { notifyCommunityListingCreated } from "@/lib/discordMarketNotifier";
 import {
   getCommunityMarketConfig,
   calculateFairPriceRange,
@@ -491,6 +492,45 @@ export async function POST(request: Request) {
     lockedVoucherId = null;
     lockedSafeboxQty = 0;
     deductedFeeAmount = 0;
+
+    // Kirim notifikasi ke Channel Market Discord (non-blocking / aman jika gagal)
+    try {
+      const flashThresholdMs = config.flashDealThresholdHours * 3600 * 1000;
+      const vExp = itemSnapshot.expiresAt ? new Date(itemSnapshot.expiresAt).getTime() : null;
+      const isFlashDeal = Boolean(
+        itemType === "VOUCHER" &&
+          vExp &&
+          vExp > now.getTime() &&
+          vExp - now.getTime() <= flashThresholdMs
+      );
+      const discordRef = await notifyCommunityListingCreated({
+        slug: created.slug,
+        sellerDiscordId: discordId,
+        sellerName: userDoc.name || session.user.name || "Driver",
+        itemType,
+        title: itemSnapshot.title,
+        category: itemSnapshot.category,
+        quantity,
+        remainingQuantity: quantity,
+        unitPrice,
+        isFlashDeal,
+        itemExpiresAt: itemSnapshot.expiresAt || null,
+        listingExpiresAt: expiresAt,
+      });
+      if (discordRef) {
+        await CommunityMarketListing.updateOne(
+          { _id: created._id },
+          {
+            $set: {
+              discordChannelId: discordRef.channelId,
+              discordMessageId: discordRef.messageId,
+            },
+          }
+        );
+      }
+    } catch (discordErr) {
+      console.error("[CM POST Listing] Discord notify error:", discordErr);
+    }
 
     try {
       revalidatePath("/community-market");

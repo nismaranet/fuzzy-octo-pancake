@@ -33,6 +33,8 @@ export interface ICommunityMarketListing extends Document {
   status: "active" | "sold" | "cancelled" | "expired";
   cancelledAt?: Date | null;
   soldAt?: Date | null;
+  discordChannelId?: string | null;
+  discordMessageId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,6 +83,8 @@ const communityMarketListingSchema = new Schema<ICommunityMarketListing>(
     },
     cancelledAt: { type: Date, default: null },
     soldAt: { type: Date, default: null },
+    discordChannelId: { type: String, default: null },
+    discordMessageId: { type: String, default: null },
   },
   { timestamps: true }
 );

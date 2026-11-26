@@ -11,6 +11,7 @@ import CommunityMarketTrade from "@/lib/models/CommunityMarketTrade";
 import UserVoucher from "@/lib/models/UserVoucher";
 import Transaction from "@/lib/models/Transaction";
 import Notification from "@/lib/models/Notification";
+import { updateCommunityListingMessage } from "@/lib/discordMarketNotifier";
 import {
   getCommunityMarketConfig,
   calculateSafeboxCapacity,
@@ -365,6 +366,32 @@ export async function POST(
     listingIdToRollback = null;
     qtyToRollback = 0;
     buyerChargedAmount = 0;
+
+    // Update pesan Discord (partial stock update atau TERJUAL HABIS)
+    if (lockedListing.discordChannelId && lockedListing.discordMessageId) {
+      try {
+        await updateCommunityListingMessage(
+          lockedListing.discordChannelId,
+          lockedListing.discordMessageId,
+          {
+            slug: lockedListing.slug,
+            sellerDiscordId: String(lockedListing.sellerDiscordId),
+            itemType: lockedListing.itemType,
+            title: lockedListing.itemSnapshot.title,
+            category: lockedListing.itemSnapshot.category,
+            quantity: lockedListing.quantity,
+            remainingQuantity: lockedListing.remainingQuantity,
+            unitPrice: lockedListing.unitPrice,
+            itemExpiresAt: lockedListing.itemSnapshot.expiresAt || null,
+            listingExpiresAt: lockedListing.expiresAt,
+            status: lockedListing.status,
+            buyerDiscordId,
+          }
+        );
+      } catch (discordErr) {
+        console.error("[CM Buy Listing] Discord update error:", discordErr);
+      }
+    }
 
     try {
       await Notification.create({

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { NO_CACHE_FETCH_OPTIONS } from "@/lib/antiCache";
 import { showAlert, showConfirm } from "@/lib/dialog";
+import MarketAlertToggle from "@/components/market/MarketAlertToggle";
 import {
   type CommunityMarketConfig,
   VOUCHER_CATEGORY_SHORT_LABELS,
@@ -371,6 +372,7 @@ export default function CommunityMarketClient({
           <div className="flex flex-wrap items-center gap-3">
             {currentUser?.isDriver ? (
               <>
+                <MarketAlertToggle className="py-3" />
                 <button
                   type="button"
                   disabled={!config.enabled}

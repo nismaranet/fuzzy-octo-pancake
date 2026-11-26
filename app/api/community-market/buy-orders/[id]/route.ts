@@ -8,6 +8,7 @@ import { jsonNoCache } from "@/lib/antiCache";
 import { checkRateLimit } from "@/lib/rateLimit";
 import CommunityMarketBuyOrder from "@/lib/models/CommunityMarketBuyOrder";
 import { getCommunityMarketConfig } from "@/lib/communityMarketConfig";
+import { updateCommunityBuyOrderMessage } from "@/lib/discordMarketNotifier";
 import {
   GUILD_ID,
   sweepExpiredCommunityMarketItems,
@@ -139,6 +140,31 @@ export async function DELETE(
         reason: `Pengembalian Escrow Pembatalan Buy Order: ${locked.title}`,
         createdAt: now,
       });
+    }
+
+    // Update pesan Discord menjadi DIBATALKAN
+    if (locked.discordChannelId && locked.discordMessageId) {
+      try {
+        await updateCommunityBuyOrderMessage(
+          locked.discordChannelId,
+          locked.discordMessageId,
+          {
+            slug: locked.slug,
+            buyerDiscordId: String(locked.buyerDiscordId),
+            buyerName: session.user.name || "Driver",
+            itemType: locked.itemType,
+            title: locked.title,
+            criteria: locked.criteria,
+            quantity: locked.quantity,
+            remainingQuantity: locked.remainingQuantity,
+            offerPrice: locked.offerPrice,
+            escrowTotal: locked.escrowTotal,
+            status: "cancelled",
+          }
+        );
+      } catch (discordErr) {
+        console.error("[CM DELETE BuyOrder] Discord update error:", discordErr);
+      }
     }
 
     try {

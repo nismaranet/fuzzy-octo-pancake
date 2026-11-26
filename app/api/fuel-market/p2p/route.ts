@@ -4,8 +4,10 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 import dbConnect from "@/lib/mongoose";
 import FuelMarketListing from "@/lib/models/FuelMarketListing";
+import FuelPrice from "@/lib/models/FuelPrice";
 import User from "@/lib/models/User";
 import { revalidatePath } from "next/cache";
+import { notifyFuelP2PCreated } from "@/lib/discordMarketNotifier";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,7 +28,7 @@ export async function GET(request: Request) {
       query.sellerId = sellerId;
     }
     
-    const listings = await FuelMarketListing.find(query).sort({ pricePerLiter: 1, createdAt: -1 }).populate("sellerId", "name discordId image nismaraplus isBooster discordRole topManager").lean();
+    const listings = await FuelMarketListing.find(query).sort({ pricePerLiter: 1, createdAt: -1 }).populate("sellerId", "name discordId image avatarDecoration nismaraplus isBooster discordRole topManager").lean();
 
     return NextResponse.json({ success: true, listings }, {
       headers: {
@@ -115,6 +117,34 @@ export async function POST(request: Request) {
       pricePerLiter,
     });
     await newListing.save();
+
+    // Kirim notifikasi ke Channel Market Discord (non-blocking / aman jika gagal)
+    try {
+      const latestFuelPrice = await FuelPrice.findOne()
+        .sort({ timestamp: -1 })
+        .select("price")
+        .lean<{ price?: number }>();
+      const discordRef = await notifyFuelP2PCreated({
+        sellerDiscordId: discordId,
+        sellerName: userDoc.name || session.user.name || "Driver",
+        amount,
+        pricePerLiter,
+        systemPrice: latestFuelPrice?.price || null,
+      });
+      if (discordRef) {
+        await FuelMarketListing.updateOne(
+          { _id: newListing._id },
+          {
+            $set: {
+              discordChannelId: discordRef.channelId,
+              discordMessageId: discordRef.messageId,
+            },
+          }
+        );
+      }
+    } catch (discordErr) {
+      console.error("[Fuel P2P POST] Discord notify error:", discordErr);
+    }
 
     // Revalidasi cache
     try {

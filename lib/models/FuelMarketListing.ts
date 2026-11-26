@@ -11,8 +11,14 @@ const fuelMarketListingSchema = new mongoose.Schema(
       enum: ["active", "sold", "cancelled"],
       default: "active",
     },
+    discordChannelId: { type: String, default: null },
+    discordMessageId: { type: String, default: null },
   },
   { timestamps: true }
 );
+
+if (process.env.NODE_ENV !== "production") {
+  delete mongoose.models.FuelMarketListing;
+}
 
 export default mongoose.models.FuelMarketListing || mongoose.model("FuelMarketListing", fuelMarketListingSchema);

@@ -7,6 +7,7 @@ import FuelMarketListing from "@/lib/models/FuelMarketListing";
 import FuelTransaction from "@/lib/models/FuelTransaction";
 import User from "@/lib/models/User";
 import { revalidatePath } from "next/cache";
+import { updateFuelP2PMessage } from "@/lib/discordMarketNotifier";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -213,6 +214,27 @@ export async function POST(request: Request) {
       fee: roundedCost - baseCost,
     });
     await fuelTx.save();
+
+    // Update pesan Discord menjadi TERJUAL agar driver lain tidak tertipu barang yang sudah laku
+    if (listing.discordChannelId && listing.discordMessageId) {
+      try {
+        await updateFuelP2PMessage(
+          listing.discordChannelId,
+          listing.discordMessageId,
+          {
+            sellerDiscordId: String(listing.sellerDiscordId),
+            sellerName: listing.sellerId?.name || "Driver",
+            buyerDiscordId,
+            buyerName: session.user.name || "Driver",
+            amount: listing.amount,
+            pricePerLiter: listing.pricePerLiter,
+            status: "sold",
+          }
+        );
+      } catch (discordErr) {
+        console.error("[Fuel P2P Buy] Discord update error:", discordErr);
+      }
+    }
 
     // Revalidasi cache
     try {

@@ -17,6 +17,7 @@ export interface WebConfig {
     serviceFleetCategoryId: string;
     fleetOrderCategoryId: string;
     communityGoalsCategoryId: string;
+    marketChannelId: string;
   };
   discordRoles: {
     driverRoleId: string;
@@ -24,6 +25,7 @@ export interface WebConfig {
     managerRoleId: string;
     nismaraPlusRoleId: string;
     lottoRoleId: string;
+    marketPingRoleId: string;
     staffHrRoleId: string;
     staffOperationalRoleId: string;
     staffGeneralManagerRoleId: string;
@@ -69,6 +71,7 @@ export function getEnvWebConfigDefaults(): WebConfig {
       serviceFleetCategoryId: strEnv("DISCORD_SERVICE_FLEET_CATEGORY_ID"),
       fleetOrderCategoryId: strEnv("DISCORD_FLEET_ORDER_CATEGORY_ID"),
       communityGoalsCategoryId: strEnv("DISCORD_COMMUNITY_GOALS_CATEGORY_ID"),
+      marketChannelId: strEnv("DISCORD_MARKET_CHANNEL_ID", "1575451186499289169"),
     },
     discordRoles: {
       driverRoleId: strEnv("DISCORD_DRIVER_ROLE_ID", "1405532668472590437"),
@@ -76,6 +79,7 @@ export function getEnvWebConfigDefaults(): WebConfig {
       managerRoleId: strEnv("DISCORD_MANAGER_ROLE_ID", "1406574228794507354"),
       nismaraPlusRoleId: strEnv("DISCORD_NISMARAPLUS_ROLE_ID"),
       lottoRoleId: strEnv("DISCORD_LOTTO_ROLE_ID"),
+      marketPingRoleId: strEnv("DISCORD_MARKET_PING_ROLE_ID"),
       staffHrRoleId: strEnv("DISCORD_STAFF_HR_ROLE_ID"),
       staffOperationalRoleId: strEnv("DISCORD_STAFF_OPERATIONAL_ROLE_ID"),
       staffGeneralManagerRoleId: strEnv("DISCORD_STAFF_GENERAL_MANAGER_ROLE_ID"),
@@ -143,6 +147,10 @@ function mergeConfig(stored: any): WebConfig {
         stored.discordChannels?.communityGoalsCategoryId,
         def.discordChannels.communityGoalsCategoryId
       ),
+      marketChannelId: pickStr(
+        stored.discordChannels?.marketChannelId,
+        def.discordChannels.marketChannelId
+      ),
     },
     discordRoles: {
       driverRoleId: pickStr(stored.discordRoles?.driverRoleId, def.discordRoles.driverRoleId),
@@ -153,6 +161,10 @@ function mergeConfig(stored: any): WebConfig {
         def.discordRoles.nismaraPlusRoleId
       ),
       lottoRoleId: pickStr(stored.discordRoles?.lottoRoleId, def.discordRoles.lottoRoleId),
+      marketPingRoleId: pickStr(
+        stored.discordRoles?.marketPingRoleId,
+        def.discordRoles.marketPingRoleId
+      ),
       staffHrRoleId: pickStr(stored.discordRoles?.staffHrRoleId, def.discordRoles.staffHrRoleId),
       staffOperationalRoleId: pickStr(
         stored.discordRoles?.staffOperationalRoleId,

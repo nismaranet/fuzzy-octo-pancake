@@ -8,6 +8,7 @@ import { jsonNoCache } from "@/lib/antiCache";
 import { checkRateLimit } from "@/lib/rateLimit";
 import CommunityMarketBuyOrder from "@/lib/models/CommunityMarketBuyOrder";
 import Transaction from "@/lib/models/Transaction";
+import { notifyCommunityBuyOrderCreated } from "@/lib/discordMarketNotifier";
 import {
   getCommunityMarketConfig,
   calculateFairPriceRange,
@@ -387,6 +388,37 @@ export async function POST(request: Request) {
     });
 
     deductedTotalAmount = 0;
+
+    // Kirim notifikasi Buy Order ke Channel Market Discord (non-blocking)
+    try {
+      const discordRef = await notifyCommunityBuyOrderCreated({
+        slug: created.slug,
+        buyerDiscordId,
+        buyerName: userDoc.name || session.user.name || "Driver",
+        itemType,
+        title,
+        criteria,
+        notes,
+        quantity,
+        remainingQuantity: quantity,
+        offerPrice,
+        escrowTotal,
+        expiresAt,
+      });
+      if (discordRef) {
+        await CommunityMarketBuyOrder.updateOne(
+          { _id: created._id },
+          {
+            $set: {
+              discordChannelId: discordRef.channelId,
+              discordMessageId: discordRef.messageId,
+            },
+          }
+        );
+      }
+    } catch (discordErr) {
+      console.error("[CM POST BuyOrder] Discord notify error:", discordErr);
+    }
 
     try {
       revalidatePath("/community-market");

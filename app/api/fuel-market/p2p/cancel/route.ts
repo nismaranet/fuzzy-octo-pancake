@@ -5,6 +5,7 @@ import clientPromise from "@/lib/mongodb";
 import dbConnect from "@/lib/mongoose";
 import FuelMarketListing from "@/lib/models/FuelMarketListing";
 import { revalidatePath } from "next/cache";
+import { updateFuelP2PMessage } from "@/lib/discordMarketNotifier";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -82,6 +83,25 @@ export async function POST(request: Request) {
       { discordId },
       { $inc: { fuelStock: listing.amount, fuelListed: -listing.amount } }
     );
+
+    // Update pesan Discord menjadi DIBATALKAN
+    if (listing.discordChannelId && listing.discordMessageId) {
+      try {
+        await updateFuelP2PMessage(
+          listing.discordChannelId,
+          listing.discordMessageId,
+          {
+            sellerDiscordId: String(discordId),
+            sellerName: session.user.name || "Driver",
+            amount: listing.amount,
+            pricePerLiter: listing.pricePerLiter,
+            status: "cancelled",
+          }
+        );
+      } catch (discordErr) {
+        console.error("[Fuel P2P Cancel] Discord update error:", discordErr);
+      }
+    }
 
     // Revalidasi cache
     try {

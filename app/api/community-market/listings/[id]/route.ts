@@ -10,6 +10,7 @@ import CommunityMarketListing from "@/lib/models/CommunityMarketListing";
 import CommunityMarketReview from "@/lib/models/CommunityMarketReview";
 import UserVoucher from "@/lib/models/UserVoucher";
 import { getCommunityMarketConfig } from "@/lib/communityMarketConfig";
+import { updateCommunityListingMessage } from "@/lib/discordMarketNotifier";
 import {
   sweepExpiredCommunityMarketItems,
   getEnrichedMarketUsersMap,
@@ -146,6 +147,30 @@ export async function DELETE(
         { discordId },
         { $inc: { safeboxStock: locked.remainingQuantity } }
       );
+    }
+
+    // Update pesan Discord menjadi DIBATALKAN
+    if (locked.discordChannelId && locked.discordMessageId) {
+      try {
+        await updateCommunityListingMessage(
+          locked.discordChannelId,
+          locked.discordMessageId,
+          {
+            slug: locked.slug,
+            sellerDiscordId: String(locked.sellerDiscordId),
+            sellerName: session.user.name || "Driver",
+            itemType: locked.itemType,
+            title: locked.itemSnapshot.title,
+            category: locked.itemSnapshot.category,
+            quantity: locked.quantity,
+            remainingQuantity: locked.remainingQuantity,
+            unitPrice: locked.unitPrice,
+            status: "cancelled",
+          }
+        );
+      } catch (discordErr) {
+        console.error("[CM DELETE Listing] Discord update error:", discordErr);
+      }
     }
 
     try {

@@ -11,6 +11,8 @@ import { Fuel, RefreshCw, ShoppingCart, User, ArrowUpCircle, ArrowDownCircle, Ba
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
+import MarketAlertToggle from "@/components/market/MarketAlertToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Swal from "sweetalert2";
@@ -351,14 +353,17 @@ export default function FuelMarketPage() {
             Pusat perdagangan bahan bakar terpusat. Harga sistem berfluktuasi setiap 1 jam.
           </p>
         </div>
-        <div className="flex items-center gap-4 bg-card border rounded-2xl p-4 shadow-sm">
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Saldo NC Anda</p>
-            <p className="text-xl font-bold text-emerald-500">{balance.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NC</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <MarketAlertToggle />
+          <div className="flex items-center gap-4 bg-card border rounded-2xl p-4 shadow-sm">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Saldo NC Anda</p>
+              <p className="text-xl font-bold text-emerald-500">{balance.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NC</p>
+            </div>
+            <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
           </div>
-          <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
         </div>
       </div>
 
@@ -583,10 +588,16 @@ export default function FuelMarketPage() {
                               <div>
                                 <p className="text-xs text-muted-foreground">Penjual</p>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                  <Avatar className="w-5 h-5">
-                                    <AvatarImage src={item.sellerId?.image || ""} />
-                                    <AvatarFallback className="text-[10px]">{item.sellerId?.name?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>
-                                  </Avatar>
+                                  <DecoratedAvatar
+                                    src={item.sellerId?.image || null}
+                                    alt={item.sellerId?.name || "Anonim"}
+                                    fallbackText={item.sellerId?.name?.substring(0, 2).toUpperCase() || "??"}
+                                    decorationId={item.sellerId?.avatarDecoration || null}
+                                    isNismaraPlus={item.sellerId?.nismaraplus?.status === true}
+                                    userRole={item.sellerId?.discordRole}
+                                    topManager={item.sellerId?.topManager}
+                                    sizeClass="w-6 h-6"
+                                  />
                                   <div className="flex items-center gap-1">
                                     <p className="font-bold text-sm">{item.sellerId?.name || "Anonim"}</p>
                                     <UserBadges 

@@ -3,8 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/mongoose";
 import FuelMarketListing from "@/lib/models/FuelMarketListing";
+import FuelPrice from "@/lib/models/FuelPrice";
 import clientPromise from "@/lib/mongodb";
 import { revalidatePath } from "next/cache";
+import { updateFuelP2PMessage } from "@/lib/discordMarketNotifier";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -38,15 +40,41 @@ export async function POST(request: Request) {
     }
 
     // 🛡️ ATOMIC UPDATE: Hanya update jika listing status masih persis "active" dan dimiliki oleh seller
-    const updateResult = await FuelMarketListing.updateOne(
+    const updatedListing = await FuelMarketListing.findOneAndUpdate(
       { _id: listingId, status: "active", sellerDiscordId: discordId },
-      { $set: { pricePerLiter: Number(newPrice) } }
+      { $set: { pricePerLiter: Number(newPrice) } },
+      { returnDocument: "after" }
     );
 
-    if (updateResult.modifiedCount === 0) {
+    if (!updatedListing) {
       return NextResponse.json({ 
         error: "Gagal mengubah harga. Listing BBM ini sudah terjual, ditarik, atau Anda bukan pemilik listing ini." 
       }, { status: 400 });
+    }
+
+    // Update pesan Discord secara otomatis agar harga selalu sinkron tanpa spam pesan baru
+    if (updatedListing.discordChannelId && updatedListing.discordMessageId) {
+      try {
+        const latestFuelPrice = await FuelPrice.findOne()
+          .sort({ timestamp: -1 })
+          .select("price")
+          .lean<{ price?: number }>();
+        await updateFuelP2PMessage(
+          updatedListing.discordChannelId,
+          updatedListing.discordMessageId,
+          {
+            sellerDiscordId: String(discordId),
+            sellerName: session.user.name || "Driver",
+            amount: updatedListing.amount,
+            pricePerLiter: Number(newPrice),
+            systemPrice: latestFuelPrice?.price || null,
+            status: "active",
+            isEdited: true,
+          }
+        );
+      } catch (discordErr) {
+        console.error("[Fuel P2P Edit] Discord update error:", discordErr);
+      }
     }
 
     // Revalidasi cache

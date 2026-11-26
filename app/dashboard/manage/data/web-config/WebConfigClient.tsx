@@ -994,6 +994,7 @@ export default function WebConfigClient({
             {(
               [
                 ["generalDriverChannelId", "General Driver Channel", "DISCORD_GENERAL_DRIVER_ID_CHANNEL", "channel"],
+                ["marketChannelId", "Channel Market (Fuel & Community)", "DISCORD_MARKET_CHANNEL_ID", "channel"],
                 ["interviewChannelId", "Interview & Evaluasi", "DISCORD_INTERVIEW_CHANNEL_ID", "category"],
                 ["plusCategoryId", "Nismara+ & Season Pass", "DISCORD_PLUS_CATEGORY_ID", "category"],
                 ["ticketCategoryId", "Tiket Bantuan", "DISCORD_TICKET_CATEGORY_ID", "category"],
@@ -1037,6 +1038,7 @@ export default function WebConfigClient({
                 ["managerRoleId", "Manager", "DISCORD_MANAGER_ROLE_ID"],
                 ["nismaraPlusRoleId", "Nismara+", "DISCORD_NISMARAPLUS_ROLE_ID"],
                 ["lottoRoleId", "Lotto", "DISCORD_LOTTO_ROLE_ID"],
+                ["marketPingRoleId", "Market Alert Ping (Opsional)", "DISCORD_MARKET_PING_ROLE_ID"],
                 ["staffHrRoleId", "Staff HR", "DISCORD_STAFF_HR_ROLE_ID"],
                 ["staffOperationalRoleId", "Staff Operational", "DISCORD_STAFF_OPERATIONAL_ROLE_ID"],
                 ["staffGeneralManagerRoleId", "General Manager", "DISCORD_STAFF_GENERAL_MANAGER_ROLE_ID"],

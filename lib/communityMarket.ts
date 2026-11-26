@@ -9,6 +9,10 @@ import CommunityMarketReview from "@/lib/models/CommunityMarketReview";
 import UserVoucher from "@/lib/models/UserVoucher";
 import Notification from "@/lib/models/Notification";
 import {
+  updateCommunityListingMessage,
+  updateCommunityBuyOrderMessage,
+} from "@/lib/discordMarketNotifier";
+import {
   getCommunityMarketConfig,
   type CommunityMarketItemType,
 } from "@/lib/communityMarketConfig";
@@ -96,6 +100,28 @@ export async function sweepExpiredCommunityMarketItems(force = false): Promise<v
         );
       }
 
+      if (locked.discordChannelId && locked.discordMessageId) {
+        try {
+          await updateCommunityListingMessage(
+            locked.discordChannelId,
+            locked.discordMessageId,
+            {
+              slug: locked.slug,
+              sellerDiscordId: String(locked.sellerDiscordId),
+              itemType: locked.itemType,
+              title: locked.itemSnapshot.title,
+              category: locked.itemSnapshot.category,
+              quantity: locked.quantity,
+              remainingQuantity: locked.remainingQuantity,
+              unitPrice: locked.unitPrice,
+              status: "expired",
+            }
+          );
+        } catch (discordErr) {
+          console.error("[CM Sweep] Failed updating expired listing Discord msg:", discordErr);
+        }
+      }
+
       try {
         await Notification.create({
           recipient: locked.sellerDiscordId,
@@ -144,6 +170,29 @@ export async function sweepExpiredCommunityMarketItems(force = false): Promise<v
         });
       }
 
+      if (locked.discordChannelId && locked.discordMessageId) {
+        try {
+          await updateCommunityBuyOrderMessage(
+            locked.discordChannelId,
+            locked.discordMessageId,
+            {
+              slug: locked.slug,
+              buyerDiscordId: String(locked.buyerDiscordId),
+              itemType: locked.itemType,
+              title: locked.title,
+              criteria: locked.criteria,
+              quantity: locked.quantity,
+              remainingQuantity: locked.remainingQuantity,
+              offerPrice: locked.offerPrice,
+              escrowTotal: locked.escrowTotal,
+              status: "expired",
+            }
+          );
+        } catch (discordErr) {
+          console.error("[CM Sweep] Failed updating expired buy order Discord msg:", discordErr);
+        }
+      }
+
       try {
         await Notification.create({
           recipient: locked.buyerDiscordId,
@@ -171,6 +220,7 @@ export interface EnrichedMarketUser {
   isBooster: boolean;
   isNismaraPlus: boolean;
   nismaraPlusStartedAt: string | null;
+  avatarDecoration: string | null;
   topManager: { status?: boolean; month?: string | null; expiredAt?: string | null } | null;
   sellerRating: number;
   reviewCount: number;
@@ -203,6 +253,8 @@ export async function getEnrichedMarketUsersMap(
             isBooster: 1,
             nismaraplus: 1,
             topManager: 1,
+            avatarDecoration: 1,
+            discordRole: 1,
           },
         }
       )
@@ -268,13 +320,14 @@ export async function getEnrichedMarketUsersMap(
       name: u?.name || dl?.truckyName || "Driver Nismara",
       image: u?.image || null,
       truckyId: u?.truckyId ? String(u.truckyId) : dl?.truckyId ? String(dl.truckyId) : null,
-      role: u?.role || "driver",
+      role: u?.discordRole || u?.role || "driver",
       truckyRank: u?.truckyRank || dl?.truckyRank || "",
       isBooster: Boolean(u?.isBooster),
       isNismaraPlus: isNplus,
       nismaraPlusStartedAt: u?.nismaraplus?.startedAt
         ? new Date(u.nismaraplus.startedAt).toISOString()
         : null,
+      avatarDecoration: u?.avatarDecoration || null,
       topManager: u?.topManager
         ? {
             status: Boolean(u.topManager.status),

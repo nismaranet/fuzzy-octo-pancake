@@ -12,6 +12,7 @@ import UserVoucher from "@/lib/models/UserVoucher";
 import Transaction from "@/lib/models/Transaction";
 import Notification from "@/lib/models/Notification";
 import { isVoucherTradable } from "@/lib/voucher";
+import { updateCommunityBuyOrderMessage } from "@/lib/discordMarketNotifier";
 import {
   getCommunityMarketConfig,
   calculateSafeboxCapacity,
@@ -411,6 +412,33 @@ export async function POST(
     orderIdToRollback = null;
     qtyToRollback = 0;
     escrowToRollback = 0;
+
+    // Update pesan Discord (partial fulfillment atau TERPENUHI)
+    if (lockedOrder.discordChannelId && lockedOrder.discordMessageId) {
+      try {
+        await updateCommunityBuyOrderMessage(
+          lockedOrder.discordChannelId,
+          lockedOrder.discordMessageId,
+          {
+            slug: lockedOrder.slug,
+            buyerDiscordId: String(lockedOrder.buyerDiscordId),
+            itemType: lockedOrder.itemType,
+            title: lockedOrder.title,
+            criteria: lockedOrder.criteria,
+            notes: lockedOrder.notes,
+            quantity: lockedOrder.quantity,
+            remainingQuantity: lockedOrder.remainingQuantity,
+            offerPrice: lockedOrder.offerPrice,
+            escrowTotal: lockedOrder.escrowTotal,
+            expiresAt: lockedOrder.expiresAt,
+            status: lockedOrder.status,
+            sellerDiscordId,
+          }
+        );
+      } catch (discordErr) {
+        console.error("[CM Fulfill BuyOrder] Discord update error:", discordErr);
+      }
+    }
 
     try {
       await Notification.create({

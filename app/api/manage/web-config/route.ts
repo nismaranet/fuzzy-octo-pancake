@@ -90,6 +90,7 @@ export async function PUT(request: Request) {
         serviceFleetCategoryId: check(body?.discordChannels?.serviceFleetCategoryId, "Service Fleet Category ID"),
         fleetOrderCategoryId: check(body?.discordChannels?.fleetOrderCategoryId, "Fleet Order Category ID"),
         communityGoalsCategoryId: check(body?.discordChannels?.communityGoalsCategoryId, "Community Goals Category ID"),
+        marketChannelId: check(body?.discordChannels?.marketChannelId, "Market Channel ID"),
       },
       discordRoles: {
         driverRoleId: check(body?.discordRoles?.driverRoleId, "Driver Role ID"),
@@ -97,6 +98,7 @@ export async function PUT(request: Request) {
         managerRoleId: check(body?.discordRoles?.managerRoleId, "Manager Role ID"),
         nismaraPlusRoleId: check(body?.discordRoles?.nismaraPlusRoleId, "Nismara+ Role ID"),
         lottoRoleId: check(body?.discordRoles?.lottoRoleId, "Lotto Role ID"),
+        marketPingRoleId: check(body?.discordRoles?.marketPingRoleId, "Market Ping Role ID"),
         staffHrRoleId: check(body?.discordRoles?.staffHrRoleId, "Staff HR Role ID"),
         staffOperationalRoleId: check(body?.discordRoles?.staffOperationalRoleId, "Staff Operational Role ID"),
         staffGeneralManagerRoleId: check(body?.discordRoles?.staffGeneralManagerRoleId, "Staff General Manager Role ID"),

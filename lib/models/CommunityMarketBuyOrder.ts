@@ -31,6 +31,8 @@ export interface ICommunityMarketBuyOrder extends Document {
   status: "active" | "fulfilled" | "cancelled" | "expired";
   cancelledAt?: Date | null;
   fulfilledAt?: Date | null;
+  discordChannelId?: string | null;
+  discordMessageId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -78,6 +80,8 @@ const communityMarketBuyOrderSchema = new Schema<ICommunityMarketBuyOrder>(
     },
     cancelledAt: { type: Date, default: null },
     fulfilledAt: { type: Date, default: null },
+    discordChannelId: { type: String, default: null },
+    discordMessageId: { type: String, default: null },
   },
   { timestamps: true }
 );
