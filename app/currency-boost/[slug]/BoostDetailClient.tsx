@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 interface CurrentUserDrivingScore {
   score: number;
@@ -277,32 +278,69 @@ export default function BoostDetailClient({
                       <User size={12} /> Penyelenggara Event
                     </p>
                     <div className="flex items-center gap-3 bg-black/30 p-2.5 rounded-2xl border border-white/5 relative z-10 hover:z-50">
-                      {event.organizer.avatarUrl ? (
-                        <img
+                      {event.organizer.truckyId ? (
+                        <Link
+                          href={`/profile/${event.organizer.truckyId}`}
+                          className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          aria-label={`Lihat profil ${event.organizer.name || "Penyelenggara"}`}
+                        >
+                          {event.organizer.avatarUrl ? (
+                            <DecoratedAvatar
+                              src={event.organizer.avatarUrl}
+                              alt={event.organizer.name}
+                              decorationId={event.organizer.avatarDecoration || null}
+                              isNismaraPlus={event.organizer.isNismaraPlus === true}
+                              userRole={event.organizer.role}
+                              topManager={event.organizer.topManager}
+                              sizeClass="w-8 h-8"
+                              frameClass="ring-2 ring-white/10 hover:ring-primary/60 transition-all"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs">
+                              <User size={14} />
+                            </div>
+                          )}
+                        </Link>
+                      ) : event.organizer.avatarUrl ? (
+                        <DecoratedAvatar
                           src={event.organizer.avatarUrl}
                           alt={event.organizer.name}
-                          className="w-8 h-8 rounded-full object-cover ring-2 ring-white/10"
+                          decorationId={event.organizer.avatarDecoration || null}
+                          isNismaraPlus={event.organizer.isNismaraPlus === true}
+                          userRole={event.organizer.role}
+                          topManager={event.organizer.topManager}
+                          sizeClass="w-8 h-8"
+                          frameClass="ring-2 ring-white/10"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs shrink-0">
                           <User size={14} />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-white text-sm truncate">
-                            {event.organizer.name || "Management Nismara"}
-                          </span>
-                          {event.organizer.isNismaraPlus && (
-                            <UserBadges
-                              role={event.organizer.role}
-                              isBooster={event.organizer.isBooster}
-                              isNismaraPlus={event.organizer.isNismaraPlus}
-                              nismaraPlusStartedAt={event.organizer.nismaraPlusStartedAt}
-                              tooltipPlacement="top"
-                              className="w-3.5 h-3.5"
-                            />
+                          {event.organizer.truckyId ? (
+                            <Link
+                              href={`/profile/${event.organizer.truckyId}`}
+                              className="font-bold text-white text-sm truncate hover:underline hover:text-primary transition-colors"
+                            >
+                              {event.organizer.name || "Management Nismara"}
+                            </Link>
+                          ) : (
+                            <span className="font-bold text-white text-sm truncate">
+                              {event.organizer.name || "Management Nismara"}
+                            </span>
                           )}
+                          <UserBadges
+                            role={event.organizer.role}
+                            isBooster={event.organizer.isBooster}
+                            isNismaraPlus={event.organizer.isNismaraPlus}
+                            nismaraPlusStartedAt={event.organizer.nismaraPlusStartedAt}
+                            truckyRank={event.organizer.truckyRank}
+                            topManager={event.organizer.topManager}
+                            tooltipPlacement="top"
+                            className="w-3.5 h-3.5"
+                          />
                         </div>
                         <p className="text-[10px] text-gray-400">
                           {event.organizer.role === "admin"
@@ -490,20 +528,48 @@ export default function BoostDetailClient({
                     </div>
 
                     {/* Avatar & Info */}
-                    <div className="flex-1 flex items-center gap-3">
-                      <div className="relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={p.avatarUrl}
-                          alt={p.name}
-                          className="w-10 h-10 rounded-full object-cover ring-2 ring-background"
-                        />
+                    <div className="flex-1 min-w-0 flex items-center gap-3">
+                      <div className="relative shrink-0">
+                        {p.truckyId ? (
+                          <Link
+                            href={`/profile/${p.truckyId}`}
+                            className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            aria-label={`Lihat profil ${p.name}`}
+                          >
+                            <DecoratedAvatar
+                              src={p.avatarUrl}
+                              alt={p.name}
+                              decoration={p.avatarDecorationDef || null}
+                              forcePreview
+                              sizeClass="w-10 h-10"
+                              frameClass="ring-2 ring-background hover:ring-primary/60 transition-all"
+                            />
+                          </Link>
+                        ) : (
+                          <DecoratedAvatar
+                            src={p.avatarUrl}
+                            alt={p.name}
+                            decoration={p.avatarDecorationDef || null}
+                            forcePreview
+                            sizeClass="w-10 h-10"
+                            frameClass="ring-2 ring-background"
+                          />
+                        )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-white text-sm">
-                            {p.name}
-                          </h4>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {p.truckyId ? (
+                            <Link
+                              href={`/profile/${p.truckyId}`}
+                              className="font-bold text-white text-sm hover:underline hover:text-primary transition-colors truncate max-w-[160px] sm:max-w-[240px]"
+                            >
+                              {p.name}
+                            </Link>
+                          ) : (
+                            <h4 className="font-bold text-white text-sm truncate max-w-[160px] sm:max-w-[240px]">
+                              {p.name}
+                            </h4>
+                          )}
                           <UserBadges
                             role={p.role}
                             isBooster={p.isBooster}

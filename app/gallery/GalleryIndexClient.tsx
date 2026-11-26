@@ -6,6 +6,7 @@ import GalleryModal from "@/components/gallery/GalleryModal";
 import UploadPostDialog from "@/components/gallery/UploadPostDialog";
 import Link from "next/link";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 export default function GalleryIndexClient({
   initialPosts,
@@ -89,10 +90,29 @@ export default function GalleryIndexClient({
                 />
                 {post.imageUrls && post.imageUrls.length > 1 && (
                   <div className="absolute top-3 right-3 z-10 text-white drop-shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                      <path d="M7 3v18" />
+                      <path d="M3 7.5h4" />
+                      <path d="M3 12h18" />
+                      <path d="M3 16.5h4" />
+                      <path d="M17 3v18" />
+                      <path d="M17 7.5h4" />
+                      <path d="M17 16.5h4" />
+                    </svg>
                   </div>
                 )}
-                
+
                 {/* Hover Overlay */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-6 text-white font-bold backdrop-blur-[2px]">
                   <div className="flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
@@ -110,33 +130,51 @@ export default function GalleryIndexClient({
               {post.user && (
                 <div className="flex items-center gap-2 px-1">
                   {post.user.truckyId ? (
-                    <Link href={`/profile/${post.user.truckyId}`} className="shrink-0 relative">
-                      <img 
-                        src={post.user.avatarUrl || "/placeholder-avatar.png"} 
-                        alt={post.user.name} 
-                        className="w-7 h-7 rounded-full object-cover border border-border"
+                    <Link
+                      href={`/profile/${post.user.truckyId}`}
+                      className="shrink-0 relative"
+                    >
+                      <DecoratedAvatar
+                        src={post.user.avatarUrl || "/placeholder-avatar.png"}
+                        alt={post.user.name}
+                        decorationId={post.user.avatarDecoration || null}
+                        isNismaraPlus={post.user.isNismaraPlus === true}
+                        userRole={post.user.role}
+                        topManager={post.user.topManager}
+                        sizeClass="w-7 h-7"
+                        frameClass="border border-border"
                       />
                     </Link>
                   ) : (
-                    <img 
-                      src={post.user.avatarUrl || "/placeholder-avatar.png"} 
-                      alt={post.user.name} 
-                      className="w-7 h-7 rounded-full object-cover border border-border shrink-0"
+                    <DecoratedAvatar
+                      src={post.user.avatarUrl || "/placeholder-avatar.png"}
+                      alt={post.user.name}
+                      decorationId={post.user.avatarDecoration || null}
+                      isNismaraPlus={post.user.isNismaraPlus === true}
+                      userRole={post.user.role}
+                      topManager={post.user.topManager}
+                      sizeClass="w-7 h-7"
+                      frameClass="border border-border"
                     />
                   )}
                   <div className="flex flex-col overflow-hidden">
                     <div className="flex items-center gap-1">
                       {post.user.truckyId ? (
-                        <Link href={`/profile/${post.user.truckyId}`} className="font-bold text-xs truncate hover:text-primary transition-colors">
+                        <Link
+                          href={`/profile/${post.user.truckyId}`}
+                          className="font-bold text-xs truncate hover:text-primary transition-colors"
+                        >
                           {post.user.name}
                         </Link>
                       ) : (
-                        <span className="font-bold text-xs truncate">{post.user.name}</span>
+                        <span className="font-bold text-xs truncate">
+                          {post.user.name}
+                        </span>
                       )}
-                      <UserBadges 
-                        role={post.user.role} 
-                        isBooster={post.user.isBooster} 
-                        isNismaraPlus={post.user.isNismaraPlus} 
+                      <UserBadges
+                        role={post.user.role}
+                        isBooster={post.user.isBooster}
+                        isNismaraPlus={post.user.isNismaraPlus}
                         nismaraPlusStartedAt={post.user.nismaraPlusStartedAt}
                         truckyRank={post.user.truckyRank}
                         topManager={post.user.topManager}
@@ -178,7 +216,10 @@ export default function GalleryIndexClient({
           loggedInUserId={loggedInDiscordId}
           loggedInUserTruckyId={loggedInUserTruckyId}
           profileName={selectedPost.user?.name || "Driver"}
-          profileAvatar={selectedPost.user?.avatarUrl || "/placeholder-avatar.png"}
+          profileAvatar={
+            selectedPost.user?.avatarUrl || "/placeholder-avatar.png"
+          }
+          profileAvatarDecoration={selectedPost.user?.avatarDecoration || null}
           profileTruckyId={selectedPost.user?.truckyId}
           profileIsNismaraPlus={selectedPost.user?.isNismaraPlus}
           profileNismaraPlusStartedAt={selectedPost.user?.nismaraPlusStartedAt}
@@ -188,9 +229,13 @@ export default function GalleryIndexClient({
           isManager={isManager}
           onPostUpdate={(updated) => {
             // Kita perlu mempertahankan data user yang ada karena updated mungkin tidak memilikinya (jika like/comment)
-            const fullUpdated = { ...selectedPost, ...updated, user: selectedPost.user };
+            const fullUpdated = {
+              ...selectedPost,
+              ...updated,
+              user: selectedPost.user,
+            };
             setPosts((prev) =>
-              prev.map((p) => (p._id === fullUpdated._id ? fullUpdated : p))
+              prev.map((p) => (p._id === fullUpdated._id ? fullUpdated : p)),
             );
             setSelectedPost(fullUpdated);
           }}
@@ -208,13 +253,13 @@ export default function GalleryIndexClient({
               user: {
                 name: "Anda (Baru saja)", // Akan direfresh saat reload
                 truckyId: loggedInUserTruckyId,
-                avatarUrl: "/placeholder-avatar.png", 
-                role: isManager ? "manager" : "user"
-              }
+                avatarUrl: "/placeholder-avatar.png",
+                role: isManager ? "manager" : "user",
+              },
             };
             setPosts([tempPost, ...posts]);
             setIsUploadOpen(false);
-            
+
             // Opsional: reload halaman untuk mendapatkan data real dari database
             window.location.reload();
           }}

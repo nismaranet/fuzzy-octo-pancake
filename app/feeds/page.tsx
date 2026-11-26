@@ -116,7 +116,8 @@ export default async function GlobalFeedsPage({
             isBooster: "$uploader.isBooster",
             role: "$uploader.discordRole",
             truckyRank: "$uploader.truckyRank",
-            topManager: "$uploader.topManager"
+            topManager: "$uploader.topManager",
+            avatarDecoration: "$uploader.avatarDecoration",
           },
         },
       },

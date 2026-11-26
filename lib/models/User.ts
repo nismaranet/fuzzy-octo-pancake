@@ -110,6 +110,12 @@ const userSchema = new mongoose.Schema(
       world_of_truck: { type: String, default: null },
       website: { type: String, default: null },
     },
+
+    profileTheme: {
+      preset: { type: String, default: "default" },
+      customBaseColor: { type: String, default: null },
+      customAccentColor: { type: String, default: null },
+    },
   },
   { timestamps: true, strict: false }, // strict false karena skema asli dari next-auth bisa beda-beda
 );

@@ -97,7 +97,7 @@ export async function getLeaderboardData(
     period = availableMonths[0] || "all";
   }
 
-  const cacheKey = `leaderboard:v5:data:${guildId}:${period}:${division}:${category}`;
+  const cacheKey = `leaderboard:v6:data:${guildId}:${period}:${division}:${category}`;
   let rankedDrivers: any[] = [];
 
   try {
@@ -213,6 +213,7 @@ export async function getLeaderboardData(
             nismaraPlusStartedAt: { $ifNull: ["$user.nismaraplus.startedAt", null] },
             topManager: "$user.topManager",
             isBooster: "$user.isBooster",
+            avatarDecoration: { $ifNull: ["$user.avatarDecoration", null] },
           },
         },
       ];
@@ -347,6 +348,7 @@ export async function getLeaderboardData(
             nismaraPlusStartedAt: { $ifNull: ["$user.nismaraplus.startedAt", null] },
             topManager: "$user.topManager",
             isBooster: "$user.isBooster",
+            avatarDecoration: { $ifNull: ["$user.avatarDecoration", null] },
           },
         },
       ];
@@ -376,6 +378,7 @@ export async function getLeaderboardData(
     nismaraPlusStartedAt: d.nismaraPlusStartedAt || null,
     score: Number(d.score || 0),
     isBooster: Boolean(d.isBooster),
+    avatarDecoration: d.avatarDecoration || null,
     topManager: d.topManager || null,
     isCurrentUser: Boolean(currentDiscordId && String(d.discordId || d._id) === String(currentDiscordId)),
   }));

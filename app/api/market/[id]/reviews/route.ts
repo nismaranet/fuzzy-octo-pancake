@@ -47,6 +47,7 @@ export async function GET(
         user: {
           name: user ? user.name : "Unknown",
           image: user ? user.image : null,
+          avatarDecoration: user ? user.avatarDecoration || null : null,
           truckyId: user ? user.truckyId : null,
           isNismaraPlus: user && user.nismaraplus ? user.nismaraplus.status : false,
           nismaraPlusStartedAt: user && user.nismaraplus ? user.nismaraplus.startedAt : null,

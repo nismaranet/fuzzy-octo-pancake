@@ -77,6 +77,31 @@ export async function POST(request: Request) {
       }
     }
 
+    // Validasi khusus folder avatar-decorations (khusus Manager/Admin: GIF, PNG/APNG, WebP/Animated WebP)
+    if (folder === "avatar-decorations") {
+      const isManager =
+        session.user.role === "manager" || session.user.role === "admin";
+      if (!isManager) {
+        return NextResponse.json(
+          { error: "Akses ditolak: upload dekorasi avatar khusus Manager & Admin." },
+          { status: 403, headers: NO_CACHE_HEADERS },
+        );
+      }
+      const allowedDeco = ["image/gif", "image/png", "image/webp"];
+      if (!allowedDeco.includes(String(fileType || "").toLowerCase())) {
+        return NextResponse.json(
+          { error: "Format dekorasi avatar harus GIF, PNG (APNG), atau WebP." },
+          { status: 400, headers: NO_CACHE_HEADERS },
+        );
+      }
+      if (fileSize && fileSize > 5 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: "Ukuran file dekorasi avatar maksimal 5MB." },
+          { status: 400, headers: NO_CACHE_HEADERS },
+        );
+      }
+    }
+
     // Validasi khusus folder gallery
     if (folder === "gallery") {
       if (!["image/jpeg", "image/png", "image/webp"].includes(fileType)) {

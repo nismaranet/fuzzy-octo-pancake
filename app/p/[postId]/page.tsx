@@ -108,6 +108,7 @@ export default async function PostPage(props: {
           discordRole: 1,
           role: 1,
           topManager: 1,
+          avatarDecoration: 1,
         })
         .toArray();
 
@@ -147,6 +148,7 @@ export default async function PostPage(props: {
             isManager: u.isManager,
             truckyRank: u.truckyRank,
             topManager: u.topManager,
+            avatarDecoration: u.avatarDecoration || null,
           },
         };
         // Serialize ObjectId to string for client component
@@ -214,6 +216,7 @@ export default async function PostPage(props: {
         profileIsBooster={profileUser?.isBooster === true}
         profileRole={profileUser?.discordRole || profileUser?.role || "user"}
         profileTopManager={profileUser?.topManager}
+        profileAvatarDecoration={profileUser?.avatarDecoration || null}
         isManager={isManager}
       />
     </>

@@ -4,8 +4,18 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import GalleryGrid from "@/components/gallery/GalleryGrid";
 import AchievementSection from "@/components/profile/AchievementSection";
 import CollectibleSection from "@/components/profile/CollectibleSection";
+import ProfileVisualShell from "@/components/profile/ProfileVisualShell";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import UserBadges from "@/components/icons/UserBadges";
 import DrivingScoreCard from "@/components/DrivingScoreCard";
+import { sanitizeObjectPosition } from "@/lib/profilePosition";
+import { resolveProfileTheme } from "@/lib/profileThemes";
+import {
+  isUserStaffRole,
+  isUserTopManagerActive,
+  resolveActiveDecorationDef,
+} from "@/lib/avatarDecorations";
+import { getAvatarDecorationCatalogMap } from "@/lib/avatarDecorationsServer";
 import {
   recalculateUserDrivingScore,
   type DrivingScoreData,
@@ -416,57 +426,59 @@ export default async function PublicProfilePage(props: {
       ? "American Truck Simulator"
       : "Euro Truck Simulator 2";
 
+  const bannerPosition = sanitizeObjectPosition(user.bannerPosition);
+  const backgroundPosition = sanitizeObjectPosition(user.backgroundPosition);
+  const decorationCatalogMap = user.avatarDecoration
+    ? await getAvatarDecorationCatalogMap()
+    : null;
+  const activeAvatarDecoration =
+    user.avatarDecoration && decorationCatalogMap
+      ? resolveActiveDecorationDef(
+          decorationCatalogMap.get(String(user.avatarDecoration)),
+          {
+            isNismaraPlus: user.nismaraplus?.status === true,
+            isStaff: isUserStaffRole(user.discordRole || user.role),
+            isTopManager: isUserTopManagerActive(user.topManager),
+          },
+        )
+      : null;
+
+  const resolvedProfileTheme = resolveProfileTheme(user.profileTheme, {
+    isNismaraPlus: user.nismaraplus?.status === true,
+    isBooster: user.isBooster === true,
+  });
+
   return (
-    <main
-      className="min-h-screen pt-24 pb-20 relative bg-background bg-fixed bg-cover bg-center overflow-x-hidden"
-      style={{
-        backgroundImage: user.backgroundUrl
-          ? `url(${user.backgroundUrl})`
-          : "none",
-      }}
+    <ProfileVisualShell
+      isOwner={isOwner}
+      bannerUrl={user.bannerUrl || null}
+      backgroundUrl={user.backgroundUrl || null}
+      initialBannerPosition={bannerPosition}
+      initialBackgroundPosition={backgroundPosition}
+      rankColor={rankColor}
+      resolvedTheme={resolvedProfileTheme}
     >
-      {/* Less aggressive overlay so background is visible */}
-      <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] pointer-events-none z-0" />
-
-      <div className="max-w-6xl mx-auto px-4 relative z-10 mt-4 mb-12">
-        {/* --- HEADER SECTION --- */}
-        <div className="w-full rounded-t-3xl overflow-hidden relative z-0 shadow-2xl">
-          {/* Banner */}
-          <div
-            className="h-64 md:h-96 w-full relative bg-cover bg-center"
-            style={{
-              backgroundImage: user.bannerUrl
-                ? `url(${user.bannerUrl})`
-                : "none",
-              backgroundColor: user.bannerUrl
-                ? "transparent"
-                : `${rankColor}22`,
-            }}
-          >
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-background/90 to-transparent" />
-          </div>
-        </div>
-
-        {/* Content Container (Bottom half) directly attached to banner */}
-        <div className="bg-background/80 backdrop-blur-xl border border-border/50 border-t-0 rounded-b-3xl px-6 md:px-10 pb-12 pt-0 shadow-2xl relative z-10 mb-8">
+      {/* Content Container (Bottom half) directly attached to banner */}
+      <div
+        className="bg-background/80 backdrop-blur-xl border border-border/50 border-t-0 rounded-b-3xl px-6 md:px-10 pb-12 pt-0 shadow-2xl relative z-10 mb-8"
+        style={
+          resolvedProfileTheme.surfaceGradient
+            ? { background: resolvedProfileTheme.surfaceGradient }
+            : undefined
+        }
+      >
           <div className="flex flex-col md:flex-row gap-6 md:gap-10 -mt-10 md:-mt-14 relative z-10 mb-12">
             {/* Avatar */}
             <div className="shrink-0 flex justify-center md:block">
-              <div
-                className="w-32 h-32 md:w-48 md:h-48 rounded-3xl border-4 md:border-[6px] border-background overflow-hidden shadow-2xl"
-                style={{
-                  backgroundColor: `${rankColor}11`,
-                }}
-              >
-                <img
-                  src={
-                    user.image ||
-                    "/placeholder-avatar.png"
-                  }
-                  alt={user.name || "Driver"}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <DecoratedAvatar
+                src={user.image || "/placeholder-avatar.png"}
+                alt={user.name || "Driver"}
+                decoration={activeAvatarDecoration}
+                forcePreview
+                sizeClass="w-32 h-32 md:w-44 md:h-44"
+                frameClass="border-4 md:border-[6px] border-background shadow-2xl"
+                fallbackBg={`${rankColor}11`}
+              />
             </div>
 
             {/* Identity Info */}
@@ -912,12 +924,12 @@ export default async function PublicProfilePage(props: {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                      Cuti (Leave)
+                      Status
                     </span>
                     <span
                       className={`text-sm font-bold px-2 py-1 rounded border ${user.isOnLeave ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"}`}
                     >
-                      {user.isOnLeave ? "Sedang Cuti" : "Aktif"}
+                      {user.isOnLeave ? "Cuti" : "Aktif"}
                     </span>
                   </div>
                 </div>
@@ -1078,6 +1090,7 @@ export default async function PublicProfilePage(props: {
               profileAvatar={
                 user.image || "/placeholder-avatar.png"
               }
+              profileAvatarDecoration={user.avatarDecoration || null}
               profileDiscordId={userDiscordId}
               profileIsNismaraPlus={user.nismaraplus?.status === true}
               profileIsBooster={user.isBooster === true}
@@ -1087,7 +1100,6 @@ export default async function PublicProfilePage(props: {
             />
           </div>
         </div>
-      </div>
-    </main>
+    </ProfileVisualShell>
   );
 }

@@ -11,9 +11,15 @@ import NismaraPlusBadge from "@/components/icons/NismaraPlusBadge";
 import { getMonthlyStats, getCompanyDetails } from "@/lib/trucky";
 import { redis } from "@/lib/redis";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import HomeEventsWrapper from "@/components/HomeEventsWrapper";
 import RewindPromoBanner from "@/components/rewind/RewindPromoBanner";
 import { getWebConfig, isRewind2026PubliclyLive } from "@/lib/webConfig";
+import {
+  DEFAULT_HERO_SLIDES,
+  getSeasonBadgeLabel,
+  type HeroSlideItem,
+} from "@/lib/heroSlides";
 import {
   ShieldCheck,
   Trophy,
@@ -70,6 +76,7 @@ export default async function Home() {
     supporters,
     allDrivers,
     top3Drivers,
+    heroSlides,
   ] = await Promise.all([
     // All-time Stats
     db.collection("driverlinks").countDocuments({ guildId }),
@@ -174,9 +181,7 @@ export default async function Home() {
         ])
         .toArray();
 
-      await redis
-        .setex(cacheKey, 600, JSON.stringify(rows))
-        .catch(() => null);
+      await redis.setex(cacheKey, 600, JSON.stringify(rows)).catch(() => null);
       return rows;
     })(),
     db
@@ -201,7 +206,7 @@ export default async function Home() {
     getCompanyDetails(NISMARA_COMPANY_ID),
     // Supporters Nismara+
     (async () => {
-      const cached = await redis.get("nismaraplus:supporters");
+      const cached = await redis.get("nismaraplus:supporters_v2").catch(() => null);
       if (cached) return JSON.parse(cached);
 
       const supportersData = await db
@@ -215,6 +220,10 @@ export default async function Home() {
               image: 1,
               avatarUrl: 1,
               truckyId: 1,
+              avatarDecoration: 1,
+              discordRole: 1,
+              role: 1,
+              topManager: 1,
               "nismaraplus.startedAt": 1,
             },
           },
@@ -230,6 +239,9 @@ export default async function Home() {
             s.avatarUrl ||
             "https://ui-avatars.com/api/?name=Driver&background=random",
           truckyId: s.truckyId,
+          avatarDecoration: s.avatarDecoration || null,
+          role: s.discordRole || s.role || null,
+          topManager: s.topManager || null,
           startedAt: s.nismaraplus?.startedAt || null,
         }))
         .sort((a, b) => {
@@ -237,12 +249,12 @@ export default async function Home() {
           const dateB = b.startedAt ? new Date(b.startedAt).getTime() : 0;
           return dateA - dateB;
         });
-      await redis.setex("nismaraplus:supporters", 3600, JSON.stringify(mapped));
+      await redis.setex("nismaraplus:supporters_v2", 1800, JSON.stringify(mapped)).catch(() => null);
       return mapped;
     })(),
     // All Drivers for Marquee
     (async () => {
-      const cached = await redis.get("homepage:alldrivers");
+      const cached = await redis.get("homepage:alldrivers_v2").catch(() => null);
       if (cached) return JSON.parse(cached);
 
       // Fetch users with images
@@ -257,6 +269,11 @@ export default async function Home() {
               image: 1,
               avatarUrl: 1,
               truckyId: 1,
+              avatarDecoration: 1,
+              nismaraplus: 1,
+              discordRole: 1,
+              role: 1,
+              topManager: 1,
             },
           },
         )
@@ -272,17 +289,21 @@ export default async function Home() {
           s.avatarUrl ||
           "https://ui-avatars.com/api/?name=Driver&background=random",
         truckyId: s.truckyId,
+        avatarDecoration: s.avatarDecoration || null,
+        isNismaraPlus: s.nismaraplus?.status === true,
+        role: s.discordRole || s.role || null,
+        topManager: s.topManager || null,
       }));
 
       // Shuffle for dynamic look
       mapped.sort(() => Math.random() - 0.5);
 
-      await redis.setex("homepage:alldrivers", 3600, JSON.stringify(mapped));
+      await redis.setex("homepage:alldrivers_v2", 1800, JSON.stringify(mapped)).catch(() => null);
       return mapped;
     })(),
     // Top 3 Drivers This Month
     (async () => {
-      const cached = await redis.get("homepage:top3drivers_v2");
+      const cached = await redis.get("homepage:top3drivers_v3").catch(() => null);
       if (cached) return JSON.parse(cached);
 
       const startOfMonth = new Date();
@@ -329,6 +350,7 @@ export default async function Home() {
               nismaraplus: 1,
               truckyRank: 1,
               topManager: 1,
+              avatarDecoration: 1,
             },
           },
         )
@@ -351,15 +373,128 @@ export default async function Home() {
           nismaraPlusStartedAt: user?.nismaraplus?.startedAt,
           truckyRank: user?.truckyRank,
           topManager: user?.topManager,
+          avatarDecoration: user?.avatarDecoration || null,
         };
       });
 
-      await redis.setex(
-        "homepage:top3drivers_v2",
-        3600,
-        JSON.stringify(mappedTop3),
-      );
+      await redis
+        .setex("homepage:top3drivers_v3", 1800, JSON.stringify(mappedTop3))
+        .catch(() => null);
       return mappedTop3;
+    })(),
+    // Top 3 Foto Galeri Terbanyak Likes (Rolling 30 Hari + Fallback Berlapis)
+    (async (): Promise<HeroSlideItem[]> => {
+      const cacheKey = "homepage:hero_slides_v1";
+      const cached = await redis.get(cacheKey).catch(() => null);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {
+          // ignore malformed cache
+        }
+      }
+
+      const fetchTopGallery = async (
+        minDate?: Date,
+        excludeIds: any[] = [],
+        limit = 3,
+      ) => {
+        const matchStage: Record<string, any> = {
+          imageUrl: {
+            $exists: true,
+            $type: "string",
+            $ne: "",
+            $not: /\.gif(\?.*)?$/i,
+          },
+        };
+        if (minDate) {
+          matchStage.createdAt = { $gte: minDate };
+        }
+        if (excludeIds.length > 0) {
+          matchStage._id = { $nin: excludeIds };
+        }
+
+        return db
+          .collection("gallery_posts")
+          .aggregate([
+            { $match: matchStage },
+            {
+              $addFields: {
+                likesCount: { $size: { $ifNull: ["$likes", []] } },
+              },
+            },
+            { $sort: { likesCount: -1, createdAt: -1 } },
+            { $limit: limit },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "discordId",
+                as: "uploader",
+              },
+            },
+            {
+              $unwind: {
+                path: "$uploader",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                imageUrl: 1,
+                likesCount: 1,
+                authorName: "$uploader.name",
+              },
+            },
+          ])
+          .toArray();
+      };
+
+      try {
+        const thirtyDaysAgo = new Date(
+          now.getTime() - 30 * 24 * 60 * 60 * 1000,
+        );
+        const pickedDocs = await fetchTopGallery(thirtyDaysAgo, [], 3);
+
+        // Jika dalam 30 hari terakhir kurang dari 3 foto, lengkapi dari top liked sepanjang waktu
+        if (pickedDocs.length < 3) {
+          const existingIds = pickedDocs.map((d: any) => d._id);
+          const backfillDocs = await fetchTopGallery(
+            undefined,
+            existingIds,
+            3 - pickedDocs.length,
+          );
+          pickedDocs.push(...backfillDocs);
+        }
+
+        const slidesResult: HeroSlideItem[] = pickedDocs
+          .filter((d: any) => typeof d.imageUrl === "string" && d.imageUrl.trim().length > 0)
+          .map((d: any) => ({
+            imageUrl: d.imageUrl,
+            postId: String(d._id),
+            authorName: d.authorName || "Driver Nismara",
+            likesCount: Number(d.likesCount || 0),
+            isFallback: false,
+          }));
+
+        // Jika masih kurang dari 3, lengkapi dengan gambar bawaan Nismara
+        for (const def of DEFAULT_HERO_SLIDES) {
+          if (slidesResult.length >= 3) break;
+          if (!slidesResult.some((s) => s.imageUrl === def.imageUrl)) {
+            slidesResult.push(def);
+          }
+        }
+
+        await redis
+          .setex(cacheKey, 1800, JSON.stringify(slidesResult))
+          .catch(() => null);
+        return slidesResult;
+      } catch (err) {
+        console.error("Failed to fetch homepage hero slides:", err);
+        return DEFAULT_HERO_SLIDES;
+      }
     })(),
   ]);
 
@@ -423,8 +558,7 @@ export default async function Home() {
 
   const completedJobs =
     divisionTelemetry.truck.allJobs + divisionTelemetry.coach.allJobs;
-  const totalKm =
-    divisionTelemetry.truck.allKm + divisionTelemetry.coach.allKm;
+  const totalKm = divisionTelemetry.truck.allKm + divisionTelemetry.coach.allKm;
   const totalNC = Math.round(ncStats[0]?.total || 0);
   const finalTotalDrivers = companyDetails?.members_count ?? totalDrivers;
 
@@ -442,11 +576,16 @@ export default async function Home() {
 
   const hasLiveOps = activeEvents.length > 0 || activeContracts.length > 0;
   const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, "-");
+  const seasonBadgeText = getSeasonBadgeLabel(now);
 
   return (
     <main className="flex flex-col w-full bg-background overflow-hidden">
       {/* 1. HERO SECTION */}
-      <HeroSlider isDriver={isDriver} />
+      <HeroSlider
+        isDriver={isDriver}
+        slides={heroSlides}
+        seasonBadgeText={seasonBadgeText}
+      />
       {/* <HeroAnniversary isDriver={isDriver} /> */}
 
       {/* Banner Promo Rewind 2026 (otomatis muncul mulai 28 Desember 2026 00:00 WIB) */}
@@ -598,7 +737,8 @@ export default async function Home() {
               Pencapaian Komunitas
             </h2>
             <p className="text-muted-foreground mt-3 max-w-2xl mx-auto text-sm md:text-base">
-              Rekapitulasi performa pengiriman kargo logistik dan layanan bus penumpang di seluruh jaringan operasional Nismara Transport.
+              Rekapitulasi performa pengiriman kargo logistik dan layanan bus
+              penumpang di seluruh jaringan operasional Nismara Transport.
             </p>
           </ScrollReveal>
 
@@ -767,7 +907,8 @@ export default async function Home() {
                 {/* Pengiriman Selesai */}
                 <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    <Package className="w-4 h-4 text-orange-400" /> Pengiriman Selesai
+                    <Package className="w-4 h-4 text-orange-400" /> Pengiriman
+                    Selesai
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
                     <div>
@@ -775,7 +916,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-orange-400">
-                        {divisionTelemetry.truck.monthJobs.toLocaleString("id-ID")}
+                        {divisionTelemetry.truck.monthJobs.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="text-right">
@@ -783,7 +926,9 @@ export default async function Home() {
                         All-Time
                       </span>
                       <span className="text-2xl font-black text-foreground">
-                        {divisionTelemetry.truck.allJobs.toLocaleString("id-ID")}
+                        {divisionTelemetry.truck.allJobs.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                   </div>
@@ -792,7 +937,8 @@ export default async function Home() {
                 {/* Jarak Tempuh */}
                 <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    <Route className="w-4 h-4 text-orange-400" /> Jarak Tempuh (KM)
+                    <Route className="w-4 h-4 text-orange-400" /> Jarak Tempuh
+                    (KM)
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
                     <div>
@@ -800,7 +946,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-orange-400">
-                        {divisionTelemetry.truck.monthKm.toLocaleString("id-ID")}
+                        {divisionTelemetry.truck.monthKm.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="text-right">
@@ -817,7 +965,8 @@ export default async function Home() {
                 {/* Tonase Kargo */}
                 <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    <Weight className="w-4 h-4 text-orange-400" /> Total Tonase (Ton)
+                    <Weight className="w-4 h-4 text-orange-400" /> Total Tonase
+                    (Ton)
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
                     <div>
@@ -825,7 +974,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-orange-400">
-                        {divisionTelemetry.truck.monthMass.toLocaleString("id-ID")}{" "}
+                        {divisionTelemetry.truck.monthMass.toLocaleString(
+                          "id-ID",
+                        )}{" "}
                         <span className="text-xs font-bold">T</span>
                       </span>
                     </div>
@@ -834,7 +985,9 @@ export default async function Home() {
                         All-Time
                       </span>
                       <span className="text-2xl font-black text-foreground">
-                        {divisionTelemetry.truck.allMass.toLocaleString("id-ID")}{" "}
+                        {divisionTelemetry.truck.allMass.toLocaleString(
+                          "id-ID",
+                        )}{" "}
                         <span className="text-xs font-bold text-muted-foreground">
                           T
                         </span>
@@ -846,7 +999,8 @@ export default async function Home() {
                 {/* Penghasilan NC */}
                 <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    <Coins className="w-4 h-4 text-orange-400" /> Penghasilan (NC)
+                    <Coins className="w-4 h-4 text-orange-400" /> Penghasilan
+                    (NC)
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
                     <div>
@@ -854,7 +1008,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-orange-400">
-                        {divisionTelemetry.truck.monthNc.toLocaleString("id-ID")}
+                        {divisionTelemetry.truck.monthNc.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="text-right">
@@ -909,7 +1065,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-sky-400">
-                        {divisionTelemetry.coach.monthJobs.toLocaleString("id-ID")}
+                        {divisionTelemetry.coach.monthJobs.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="text-right">
@@ -917,7 +1075,9 @@ export default async function Home() {
                         All-Time
                       </span>
                       <span className="text-2xl font-black text-foreground">
-                        {divisionTelemetry.coach.allJobs.toLocaleString("id-ID")}
+                        {divisionTelemetry.coach.allJobs.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                   </div>
@@ -934,7 +1094,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-sky-400">
-                        {divisionTelemetry.coach.monthKm.toLocaleString("id-ID")}
+                        {divisionTelemetry.coach.monthKm.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="text-right">
@@ -951,7 +1113,8 @@ export default async function Home() {
                 {/* Total Penumpang (Pax) — menggantikan Tonase */}
                 <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    <Users className="w-4 h-4 text-emerald-400" /> Penumpang (Pax)
+                    <Users className="w-4 h-4 text-emerald-400" /> Penumpang
+                    (Pax)
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
                     <div>
@@ -959,7 +1122,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-emerald-400">
-                        {divisionTelemetry.coach.monthPax.toLocaleString("id-ID")}{" "}
+                        {divisionTelemetry.coach.monthPax.toLocaleString(
+                          "id-ID",
+                        )}{" "}
                         <span className="text-xs font-bold">Pax</span>
                       </span>
                     </div>
@@ -988,7 +1153,9 @@ export default async function Home() {
                         Bulan Ini
                       </span>
                       <span className="text-xl font-black text-sky-400">
-                        {divisionTelemetry.coach.monthNc.toLocaleString("id-ID")}
+                        {divisionTelemetry.coach.monthNc.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="text-right">
@@ -1026,7 +1193,8 @@ export default async function Home() {
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground font-medium mt-1">
-                    Total Nismara Coins yang saat ini beredar di seluruh dompet pengemudi aktif
+                    Total Nismara Coins yang saat ini beredar di seluruh dompet
+                    pengemudi aktif
                   </p>
                 </div>
               </div>
@@ -1114,11 +1282,18 @@ export default async function Home() {
                           {rank}
                         </div>
 
-                        <img
-                          src={driver.avatarUrl}
-                          alt={driver.name}
-                          className={`relative z-10 rounded-full object-cover ring-4 ring-background shadow-xl mb-4 transition-transform group-hover:scale-105 ${isFirst ? "w-24 h-24 mt-2" : "w-20 h-20"}`}
-                        />
+                        <div className={`relative z-10 mb-4 transition-transform group-hover:scale-105 ${isFirst ? "mt-2" : ""}`}>
+                          <DecoratedAvatar
+                            src={driver.avatarUrl}
+                            alt={driver.name}
+                            decorationId={driver.avatarDecoration || null}
+                            isNismaraPlus={driver.isNismaraPlus === true}
+                            userRole={driver.role}
+                            topManager={driver.topManager}
+                            sizeClass={isFirst ? "w-24 h-24" : "w-20 h-20"}
+                            frameClass="ring-4 ring-background shadow-xl"
+                          />
+                        </div>
 
                         {/* Nama & Link Publik (Standar UI) */}
                         <Link
@@ -1452,12 +1627,16 @@ export default async function Home() {
                       key={`${driver.discordId}-${idx}`}
                       className="group relative flex flex-col items-center gap-3 transition-transform hover:scale-105 shrink-0"
                     >
-                      <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full p-1 bg-gradient-to-b from-accent-sky/50 to-transparent">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                      <div className="p-2">
+                        <DecoratedAvatar
                           src={driver.avatarUrl}
                           alt={driver.name}
-                          className="w-full h-full rounded-full object-cover border-[4px] border-background"
+                          decorationId={driver.avatarDecoration || null}
+                          isNismaraPlus={driver.isNismaraPlus === true}
+                          userRole={driver.role}
+                          topManager={driver.topManager}
+                          sizeClass="w-24 h-24 md:w-28 md:h-28"
+                          frameClass="border-[4px] border-background ring-2 ring-accent-sky/40"
                         />
                       </div>
                       <span className="text-sm font-bold text-foreground group-hover:text-accent-sky transition-colors w-24 md:w-28 truncate text-center block">
@@ -1503,12 +1682,16 @@ export default async function Home() {
                       key={supporter.discordId}
                       className="group relative flex flex-col items-center gap-3 transition-transform hover:scale-105"
                     >
-                      <div className="relative w-28 h-28 rounded-3xl p-1 bg-gradient-to-b from-amber-400/50 to-transparent shadow-xl">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                      <div className="p-2">
+                        <DecoratedAvatar
                           src={supporter.avatarUrl}
                           alt={supporter.name}
-                          className="w-full h-full rounded-3xl object-cover border-[4px] border-background"
+                          decorationId={supporter.avatarDecoration || null}
+                          isNismaraPlus
+                          userRole={supporter.role}
+                          topManager={supporter.topManager}
+                          sizeClass="w-24 h-24 sm:w-28 sm:h-28"
+                          frameClass="border-[4px] border-background ring-2 ring-amber-400/50 shadow-xl"
                         />
                       </div>
                       <span className="text-sm font-bold text-foreground group-hover:text-amber-400 transition-colors w-28 truncate text-center block">

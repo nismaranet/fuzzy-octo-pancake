@@ -7,9 +7,10 @@ import LottoPeriod from "@/lib/models/LottoPeriod";
 import LottoTicket from "@/lib/models/LottoTicket";
 import User from "@/lib/models/User";
 import LottoClient from "./LottoClient";
-import Image from "next/image";
+import Link from "next/link";
 import { Ticket, Coins, Trophy, Calendar, Users, History } from "lucide-react";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import { getCurrencyData } from "@/app/dashboard/currency/actions";
 import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 
@@ -99,7 +100,7 @@ export default async function LottoPage() {
   const participantsData = await User.find({
     discordId: { $in: participantIds },
   })
-    .select("name image discordId isBooster nismaraplus discordRole truckyRank")
+    .select("name image avatarDecoration discordId truckyId isBooster nismaraplus discordRole topManager truckyRank")
     .lean();
 
   const totalPrizePool =
@@ -217,43 +218,57 @@ export default async function LottoPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {participantsData.map((p) => (
-                  <div
-                    key={p.discordId}
-                    className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border/30"
-                  >
-                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-muted">
-                      {p.image ? (
-                        <Image
-                          src={p.image}
-                          alt={p.name}
-                          fill
-                          unoptimized
-                          sizes="40px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-primary/20 text-primary font-bold">
-                          {p.name.charAt(0)}
+                {participantsData.map((p: any) => {
+                  const content = (
+                    <>
+                      <DecoratedAvatar
+                        src={p.image || null}
+                        alt={p.name || "Driver"}
+                        fallbackText={(p.name || "?").charAt(0)}
+                        decorationId={p.avatarDecoration || null}
+                        isNismaraPlus={p.nismaraplus?.status === true}
+                        userRole={p.discordRole}
+                        topManager={p.topManager}
+                        sizeClass="w-10 h-10"
+                        frameClass="bg-muted border border-border/50"
+                        fallbackBg="bg-primary/20 text-primary"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 font-bold text-sm">
+                          <span className="truncate group-hover:text-primary transition-colors">
+                            {p.name}
+                          </span>
+                          <UserBadges
+                            role={p.discordRole}
+                            isBooster={p.isBooster === true}
+                            isNismaraPlus={p.nismaraplus?.status === true}
+                            nismaraPlusStartedAt={p.nismaraplus?.startedAt}
+                            truckyRank={p.truckyRank}
+                            topManager={p.topManager}
+                            className="w-3 h-3 shrink-0"
+                          />
                         </div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center font-bold text-sm">
-                        {p.name}
-                        <UserBadges 
-                          role={p.discordRole} 
-                          isBooster={p.isBooster === true} 
-                          isNismaraPlus={p.nismaraplus?.status === true} 
-                          nismaraPlusStartedAt={p.nismaraplus?.startedAt}
-                          truckyRank={p.truckyRank}
-                          topManager={p.topManager}
-                          className="w-3 h-3" 
-                        />
                       </div>
+                    </>
+                  );
+
+                  return p.truckyId ? (
+                    <Link
+                      key={p.discordId}
+                      href={`/profile/${p.truckyId}`}
+                      className="relative z-10 hover:z-50 flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border/30 hover:border-primary/40 transition-colors group"
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div
+                      key={p.discordId}
+                      className="relative z-10 hover:z-50 flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border/30"
+                    >
+                      {content}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

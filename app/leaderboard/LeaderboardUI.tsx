@@ -20,6 +20,7 @@ import {
   Trophy,
 } from "lucide-react";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import {
   LeaderboardCategory,
   LeaderboardDivision,
@@ -453,18 +454,21 @@ export default function LeaderboardUI({
 
                 {/* Avatar */}
                 <div className="mt-8 mb-4 relative">
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-slate-300 dark:border-slate-600 shadow-md">
-                    <img
-                      src={
-                        top2.image ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          top2.name
-                        )}&background=334155&color=fff`
-                      }
-                      alt={top2.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <DecoratedAvatar
+                    src={
+                      top2.image ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        top2.name
+                      )}&background=334155&color=fff`
+                    }
+                    alt={top2.name}
+                    decorationId={top2.avatarDecoration || null}
+                    isNismaraPlus={top2.isNismaraPlus}
+                    userRole={top2.role}
+                    topManager={top2.topManager}
+                    sizeClass="w-20 h-20"
+                    frameClass="border-4 border-slate-300 dark:border-slate-600 shadow-md"
+                  />
                 </div>
 
                 {/* Name & Badges */}
@@ -529,19 +533,22 @@ export default function LeaderboardUI({
 
                 {/* Avatar with Golden Frame */}
                 <div className="mt-8 mb-4 relative">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-amber-400 shadow-xl shadow-amber-500/20">
-                    <img
-                      src={
-                        top1.image ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          top1.name
-                        )}&background=B45309&color=fff`
-                      }
-                      alt={top1.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="absolute -top-3 -right-2 bg-amber-500 text-black p-1.5 rounded-full shadow-lg">
+                  <DecoratedAvatar
+                    src={
+                      top1.image ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        top1.name
+                      )}&background=B45309&color=fff`
+                    }
+                    alt={top1.name}
+                    decorationId={top1.avatarDecoration || null}
+                    isNismaraPlus={top1.isNismaraPlus}
+                    userRole={top1.role}
+                    topManager={top1.topManager}
+                    sizeClass="w-24 h-24"
+                    frameClass="border-4 border-amber-400 shadow-xl shadow-amber-500/20"
+                  />
+                  <div className="absolute -top-3 -right-2 z-20 bg-amber-500 text-black p-1.5 rounded-full shadow-lg">
                     <Crown className="w-4 h-4 text-zinc-950 fill-zinc-950" />
                   </div>
                 </div>
@@ -607,18 +614,21 @@ export default function LeaderboardUI({
 
                 {/* Avatar */}
                 <div className="mt-8 mb-4 relative">
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-amber-700/50 shadow-md">
-                    <img
-                      src={
-                        top3.image ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          top3.name
-                        )}&background=78350F&color=fff`
-                      }
-                      alt={top3.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <DecoratedAvatar
+                    src={
+                      top3.image ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        top3.name
+                      )}&background=78350F&color=fff`
+                    }
+                    alt={top3.name}
+                    decorationId={top3.avatarDecoration || null}
+                    isNismaraPlus={top3.isNismaraPlus}
+                    userRole={top3.role}
+                    topManager={top3.topManager}
+                    sizeClass="w-20 h-20"
+                    frameClass="border-4 border-amber-700/50 shadow-md"
+                  />
                 </div>
 
                 {/* Name & Badges */}
@@ -689,18 +699,21 @@ export default function LeaderboardUI({
 
                         {/* Driver Profile */}
                         <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-10 h-10 rounded-full overflow-hidden border border-border shrink-0">
-                            <img
-                              src={
-                                driver.image ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                  driver.name
-                                )}&background=27272A&color=fff`
-                              }
-                              alt={driver.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                          <DecoratedAvatar
+                            src={
+                              driver.image ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                driver.name
+                              )}&background=27272A&color=fff`
+                            }
+                            alt={driver.name}
+                            decorationId={driver.avatarDecoration || null}
+                            isNismaraPlus={driver.isNismaraPlus}
+                            userRole={driver.role}
+                            topManager={driver.topManager}
+                            sizeClass="w-10 h-10"
+                            frameClass="border border-border"
+                          />
 
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">

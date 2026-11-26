@@ -548,6 +548,46 @@ export async function DELETE(
       ),
     );
 
+    // 7.8 Anonimkan jejak penulis di Payroll Templates & Monthly Snapshots tanpa menghapus konfigurasi bersama
+    deletePromises.push(
+      db.collection("payrollrewardtemplates").updateMany(
+        { authorDiscordId: discordId },
+        { $set: { authorDiscordId: null } },
+      ),
+    );
+    deletePromises.push(
+      db.collection("payrollrewardtemplates").updateMany(
+        { updatedByDiscordId: discordId },
+        { $set: { updatedByDiscordId: null } },
+      ),
+    );
+    deletePromises.push(
+      db.collection("payrollmonthlysnapshots").updateMany(
+        { authorDiscordId: discordId },
+        { $set: { authorDiscordId: null } },
+      ),
+    );
+    deletePromises.push(
+      db.collection("payrollmonthlysnapshots").updateMany(
+        { updatedByDiscordId: discordId },
+        { $set: { updatedByDiscordId: null } },
+      ),
+    );
+
+    // 7.9 Anonimkan jejak penulis di koleksi Avatar Decorations tanpa menghapus katalog bersama
+    deletePromises.push(
+      db.collection("avatardecorations").updateMany(
+        { authorDiscordId: discordId },
+        { $set: { authorDiscordId: null } },
+      ),
+    );
+    deletePromises.push(
+      db.collection("avatardecorations").updateMany(
+        { updatedByDiscordId: discordId },
+        { $set: { updatedByDiscordId: null } },
+      ),
+    );
+
     // Jalankan seluruh operasi delete & update paralel
     await Promise.all(deletePromises);
 

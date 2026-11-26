@@ -17,6 +17,7 @@ import {
   Truck,
   ArrowLeftRight,
   Sliders,
+  Sparkles,
 } from "lucide-react";
 import { isWebOwner } from "@/lib/webConfig";
 
@@ -104,6 +105,17 @@ export default async function UserDataHub() {
       border: "border-yellow-500/20",
       hoverBorder: "group-hover:border-yellow-500/50",
       glow: "group-hover:bg-yellow-500/20",
+    },
+    {
+      name: "Avatar Decorations",
+      desc: "Kelola bingkai avatar GIF/APNG/WebP untuk Nismara+, Event, Gratis berbatas waktu, Staff & Top Manager.",
+      icon: Sparkles,
+      href: "/dashboard/manage/data/avatar-decorations",
+      color: "text-amber-400",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/20",
+      hoverBorder: "group-hover:border-amber-500/50",
+      glow: "group-hover:bg-amber-500/20",
     },
     {
       name: "Quiz & Ujian",

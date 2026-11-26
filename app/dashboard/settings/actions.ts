@@ -12,6 +12,19 @@ import {
   deleteDiscordChannel,
 } from "@/lib/discord";
 import { getWebConfig } from "@/lib/webConfig";
+import { redis } from "@/lib/redis";
+import { sanitizeObjectPosition } from "@/lib/profilePosition";
+import {
+  canUseCustomProfileTheme,
+  sanitizeProfileTheme,
+  type UserProfileThemeConfig,
+} from "@/lib/profileThemes";
+import {
+  checkDecorationEligibility,
+  isUserStaffRole,
+  isUserTopManagerActive,
+} from "@/lib/avatarDecorations";
+import { getAvatarDecorationsCatalog } from "@/lib/avatarDecorationsServer";
 
 export async function updateProfile(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -24,6 +37,12 @@ export async function updateProfile(formData: FormData) {
   const image = formData.get("image") as string; // URL Baru dari R2
   const bannerUrl = formData.get("bannerUrl") as string; // URL Baru dari R2
   const backgroundUrl = formData.get("backgroundUrl") as string; // URL Baru dari R2
+  const rawBannerPosition = formData.get("bannerPosition") as string | null;
+  const rawBackgroundPosition = formData.get("backgroundPosition") as string | null;
+  const rawAvatarDecoration = formData.get("avatarDecoration") as string | null;
+  const rawProfileThemePreset = formData.get("profileThemePreset") as string | null;
+  const rawProfileThemeBaseColor = formData.get("profileThemeBaseColor") as string | null;
+  const rawProfileThemeAccentColor = formData.get("profileThemeAccentColor") as string | null;
 
   const social_media = {
     youtube: formData.get("youtube") as string || "",
@@ -70,17 +89,72 @@ export async function updateProfile(formData: FormData) {
     }
 
     // 3. Eksekusi Update ke Database[cite: 17]
+    const setFields: Record<string, any> = {
+      name: name,
+      image: image,
+      bannerUrl: bannerUrl,
+      backgroundUrl: backgroundUrl,
+      social_media: social_media,
+      updatedAt: new Date(),
+    };
+    if (rawBannerPosition !== null) {
+      setFields.bannerPosition = sanitizeObjectPosition(rawBannerPosition);
+    }
+    if (rawBackgroundPosition !== null) {
+      setFields.backgroundPosition = sanitizeObjectPosition(rawBackgroundPosition);
+    }
+    if (rawAvatarDecoration !== null) {
+      const normalizedDeco = rawAvatarDecoration.trim() || null;
+      if (normalizedDeco) {
+        const { items } = await getAvatarDecorationsCatalog({
+          includeInactive: false,
+        });
+        const targetDef = items.find((d) => d.id === normalizedDeco);
+        const eligibility = checkDecorationEligibility(targetDef, {
+          isNismaraPlus: oldUser.nismaraplus?.status === true,
+          isStaff:
+            isUserStaffRole(session.user.role) ||
+            isUserStaffRole(oldUser.discordRole || oldUser.role),
+          isTopManager: isUserTopManagerActive(oldUser.topManager),
+        });
+        if (!eligibility.allowed) {
+          return {
+            success: false,
+            message:
+              eligibility.reason ||
+              "Anda tidak memenuhi syarat untuk menggunakan dekorasi avatar ini.",
+          };
+        }
+      }
+      setFields.avatarDecoration = normalizedDeco;
+    }
+
+    if (rawProfileThemePreset !== null) {
+      const sanitizedTheme = sanitizeProfileTheme({
+        preset: rawProfileThemePreset,
+        customBaseColor: rawProfileThemeBaseColor,
+        customAccentColor: rawProfileThemeAccentColor,
+      });
+      if (
+        sanitizedTheme.preset === "custom" &&
+        !canUseCustomProfileTheme({
+          isNismaraPlus: oldUser.nismaraplus?.status === true,
+          isBooster: oldUser.isBooster === true,
+        })
+      ) {
+        return {
+          success: false,
+          message:
+            "Custom Color Picker profil khusus untuk member Nismara+ atau Discord Server Booster.",
+        };
+      }
+      setFields.profileTheme = sanitizedTheme;
+    }
+
     const updateResult = await db.collection("users").updateOne(
       { _id: oldUser._id },
       {
-        $set: {
-          name: name,
-          image: image,
-          bannerUrl: bannerUrl,
-          backgroundUrl: backgroundUrl,
-          social_media: social_media,
-          updatedAt: new Date(),
-        },
+        $set: setFields,
       },
     );
 
@@ -88,12 +162,218 @@ export async function updateProfile(formData: FormData) {
       return { success: false, message: "Gagal memperbarui profil." };
     }
 
+    revalidatePath(`/profile/${session.user.truckyId}`);
     revalidatePath("/profile/[truckyId]", "page");
     revalidatePath("/dashboard/settings");
 
     return { success: true, message: "Profil berhasil diperbarui!" };
   } catch (error) {
     console.error("Update Profile Error:", error);
+    return { success: false, message: "Terjadi kesalahan sistem." };
+  }
+}
+
+export async function updateProfilePositions(
+  bannerPosition: string,
+  backgroundPosition: string,
+) {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user?.discordId) {
+    return { success: false, message: "Unauthorized: Silakan login kembali." };
+  }
+
+  const safeBannerPos = sanitizeObjectPosition(bannerPosition);
+  const safeBgPos = sanitizeObjectPosition(backgroundPosition);
+
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+
+    const updateResult = await db.collection("users").updateOne(
+      { discordId: String(session.user.discordId) },
+      {
+        $set: {
+          bannerPosition: safeBannerPos,
+          backgroundPosition: safeBgPos,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    if (updateResult.matchedCount === 0) {
+      return { success: false, message: "User tidak ditemukan." };
+    }
+
+    if (session.user.truckyId) {
+      revalidatePath(`/profile/${session.user.truckyId}`);
+    }
+    revalidatePath("/profile/[truckyId]", "page");
+    revalidatePath("/dashboard/settings");
+
+    return {
+      success: true,
+      bannerPosition: safeBannerPos,
+      backgroundPosition: safeBgPos,
+      message: "Posisi banner & wallpaper berhasil disimpan!",
+    };
+  } catch (error) {
+    console.error("Update Profile Positions Error:", error);
+    return { success: false, message: "Terjadi kesalahan sistem." };
+  }
+}
+
+export async function updateAvatarDecoration(decorationId: string | null) {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user?.discordId) {
+    return { success: false, message: "Unauthorized: Silakan login kembali." };
+  }
+
+  const normalizedId =
+    typeof decorationId === "string" && decorationId.trim().length > 0
+      ? decorationId.trim()
+      : null;
+
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+    const user = await db
+      .collection("users")
+      .findOne({ discordId: String(session.user.discordId) });
+
+    if (!user) {
+      return { success: false, message: "User tidak ditemukan." };
+    }
+
+    if (normalizedId) {
+      const { items } = await getAvatarDecorationsCatalog({
+        includeInactive: false,
+      });
+      const targetDef = items.find((d) => d.id === normalizedId);
+      if (!targetDef) {
+        return { success: false, message: "Dekorasi avatar tidak ditemukan atau sedang nonaktif." };
+      }
+
+      const eligibility = checkDecorationEligibility(targetDef, {
+        isNismaraPlus: user.nismaraplus?.status === true,
+        isStaff:
+          isUserStaffRole(session.user.role) ||
+          isUserStaffRole(user.discordRole || user.role),
+        isTopManager: isUserTopManagerActive(user.topManager),
+      });
+
+      if (!eligibility.allowed) {
+        return {
+          success: false,
+          message:
+            eligibility.reason ||
+            "Anda belum memenuhi syarat untuk memasang dekorasi ini.",
+        };
+      }
+    }
+
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          avatarDecoration: normalizedId,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    // Invalidate session Redis cache agar Navbar & Dashboard langsung menampilkan dekorasi baru
+    try {
+      if (process.env.REDIS_URL?.trim()) {
+        await Promise.all([
+          redis.del(`session:profile:${String(user._id)}`),
+          redis.del(`session:profile:${String(session.user.discordId)}`),
+        ]);
+      }
+    } catch {
+      // non-fatal
+    }
+
+    if (user.truckyId) {
+      revalidatePath(`/profile/${user.truckyId}`);
+    }
+    revalidatePath("/profile/[truckyId]", "page");
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard");
+    revalidatePath("/");
+    revalidatePath("/currency-boost/[slug]", "page");
+
+    return {
+      success: true,
+      avatarDecoration: normalizedId,
+      message: normalizedId
+        ? "Dekorasi avatar berhasil dipasang!"
+        : "Dekorasi avatar berhasil dilepas.",
+    };
+  } catch (error) {
+    console.error("Update Avatar Decoration Error:", error);
+    return { success: false, message: "Terjadi kesalahan sistem." };
+  }
+}
+
+export async function updateProfileTheme(themeInput: UserProfileThemeConfig) {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user?.discordId) {
+    return { success: false, message: "Unauthorized: Silakan login kembali." };
+  }
+
+  const sanitized = sanitizeProfileTheme(themeInput);
+
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+    const user = await db
+      .collection("users")
+      .findOne({ discordId: String(session.user.discordId) });
+
+    if (!user) {
+      return { success: false, message: "User tidak ditemukan." };
+    }
+
+    if (
+      sanitized.preset === "custom" &&
+      !canUseCustomProfileTheme({
+        isNismaraPlus: user.nismaraplus?.status === true,
+        isBooster: user.isBooster === true,
+      })
+    ) {
+      return {
+        success: false,
+        message:
+          "Custom Color Picker profil khusus untuk member Nismara+ atau Discord Server Booster.",
+      };
+    }
+
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          profileTheme: sanitized,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    if (user.truckyId) {
+      revalidatePath(`/profile/${user.truckyId}`);
+    }
+    revalidatePath("/profile/[truckyId]", "page");
+    revalidatePath("/dashboard/settings");
+
+    return {
+      success: true,
+      profileTheme: sanitized,
+      message: "Tema warna profil berhasil disimpan!",
+    };
+  } catch (error) {
+    console.error("Update Profile Theme Error:", error);
     return { success: false, message: "Terjadi kesalahan sistem." };
   }
 }
@@ -113,10 +393,13 @@ export async function getUserSettings() {
 
     if (!user) return null;
 
-    const haulmpApp = await db.collection("haulmp_applications").findOne(
-      { discordId: user.discordId },
-      { sort: { createdAt: -1 } }
-    );
+    const [haulmpApp, decoCatalog] = await Promise.all([
+      db.collection("haulmp_applications").findOne(
+        { discordId: user.discordId },
+        { sort: { createdAt: -1 } },
+      ),
+      getAvatarDecorationsCatalog({ includeInactive: false }),
+    ]);
 
     // Pastikan mengembalikan objek plain (stringified) karena ini Server Action
     return {
@@ -124,6 +407,17 @@ export async function getUserSettings() {
       image: user.image || "",
       bannerUrl: user.bannerUrl || "",
       backgroundUrl: user.backgroundUrl || "",
+      bannerPosition: sanitizeObjectPosition(user.bannerPosition),
+      backgroundPosition: sanitizeObjectPosition(user.backgroundPosition),
+      avatarDecoration: user.avatarDecoration || null,
+      profileTheme: sanitizeProfileTheme(user.profileTheme),
+      isNismaraPlus: user.nismaraplus?.status === true,
+      isBooster: user.isBooster === true,
+      isStaff:
+        isUserStaffRole(session.user.role) ||
+        isUserStaffRole(user.discordRole || user.role),
+      isTopManager: isUserTopManagerActive(user.topManager),
+      decorationsCatalog: decoCatalog.items,
       social_media: user.social_media || {
         youtube: "",
         facebook: "",

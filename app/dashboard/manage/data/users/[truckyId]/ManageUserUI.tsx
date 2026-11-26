@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { showAlert, showConfirm } from "@/lib/dialog";
 import { NO_CACHE_FETCH_OPTIONS } from "@/lib/antiCache";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 export default function ManageUserUI({
   user,
@@ -233,15 +234,21 @@ export default function ManageUserUI({
       {/* 1. HEADER PROFILE */}
       <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
         <div className="flex items-center gap-6 relative z-10">
-          <div className="relative group">
+          <div className="relative group shrink-0">
             <div className="absolute -inset-1 bg-linear-to-r from-accent-lilac to-blue-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
-            <img
+            <DecoratedAvatar
               src={
                 user.image ||
                 `https://ui-avatars.com/api/?name=${user.name}&background=6D28D9&color=fff`
               }
-              alt={user.name}
-              className="w-24 h-24 rounded-full border-2 border-white/10 object-cover relative"
+              alt={user.name || "Driver"}
+              decorationId={user.avatarDecoration || null}
+              isNismaraPlus={user.nismaraplus?.status === true}
+              userRole={user.discordRole || user.role}
+              topManager={user.topManager}
+              sizeClass="w-24 h-24"
+              frameClass="border-2 border-white/10"
+              className="relative"
             />
           </div>
 

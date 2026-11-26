@@ -83,14 +83,14 @@ export default async function GoalDetailPage({ params }: any) {
   // Get Creator data
   const creator = await db.collection("users").findOne(
     { discordId: goal.creatorId },
-    { projection: { name: 1, image: 1, avatarUrl: 1, discordRole: 1, truckyRank: 1, isBooster: 1, nismaraplus: 1, truckyId: 1, topManager: 1 } }
+    { projection: { name: 1, image: 1, avatarUrl: 1, avatarDecoration: 1, discordRole: 1, truckyRank: 1, isBooster: 1, nismaraplus: 1, truckyId: 1, topManager: 1 } }
   );
 
   // Get Participants Data
   const participantIds = goal.participants?.map((p: any) => p.discordId) || [];
   const participantUsers = await db.collection("users").find(
     { discordId: { $in: participantIds } },
-    { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, discordRole: 1, nismaraplus: 1, truckyRank: 1, isBooster: 1, truckyId: 1, topManager: 1 } }
+    { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, avatarDecoration: 1, discordRole: 1, nismaraplus: 1, truckyRank: 1, isBooster: 1, truckyId: 1, topManager: 1 } }
   ).toArray();
 
   const enrichedParticipants = (goal.participants || []).map((p: any) => {
@@ -99,6 +99,7 @@ export default async function GoalDetailPage({ params }: any) {
       ...p,
       name: u?.name || "Unknown",
       avatarUrl: u?.image || u?.avatarUrl || null,
+      avatarDecoration: u?.avatarDecoration || null,
       discordRole: u?.discordRole || null,
       nismaraplus: u?.nismaraplus || null,
       truckyRank: u?.truckyRank || null,
@@ -135,6 +136,7 @@ export default async function GoalDetailPage({ params }: any) {
     creator: creator ? {
       name: creator.name,
       avatarUrl: creator.image || creator.avatarUrl,
+      avatarDecoration: creator.avatarDecoration || null,
       role: creator.discordRole,
       isBooster: creator.isBooster,
       nismaraplus: creator.nismaraplus,

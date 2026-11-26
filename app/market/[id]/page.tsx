@@ -6,6 +6,7 @@ import { Download, ShoppingCart, ArrowLeft, Box, CheckCircle2, ShieldAlert, User
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import { Modal } from "@/components/ui/Modal";
 
 export default function MarketItemDetail() {
@@ -332,13 +333,17 @@ export default function MarketItemDetail() {
             href={item.sellerTruckyId ? `/profile/${item.sellerTruckyId}` : "#"} 
             className="flex items-center gap-4 bg-black/30 border border-border/50 rounded-2xl p-4 mb-8 hover:border-primary/50 transition-colors group"
           >
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-black/50 border border-border/50 flex items-center justify-center">
-              {item.sellerImage ? (
-                <img src={item.sellerImage} alt={item.sellerName} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-6 h-6 text-gray-500" />
-              )}
-            </div>
+            <DecoratedAvatar
+              src={item.sellerImage || null}
+              alt={item.sellerName || "Seller"}
+              fallbackText={(item.sellerName || "S").charAt(0)}
+              decorationId={item.sellerAvatarDecoration || null}
+              isNismaraPlus={item.sellerIsNismaraPlus === true}
+              userRole={item.sellerRole}
+              topManager={item.sellerTopManager}
+              sizeClass="w-12 h-12"
+              frameClass="bg-black/50 border border-border/50"
+            />
             <div>
               <p className="text-xs text-gray-500 mb-0.5 uppercase tracking-wider">Kreator Mod</p>
               <div className="flex items-center gap-2">
@@ -528,13 +533,17 @@ export default function MarketItemDetail() {
               {reviews.map((review) => (
                 <div key={review._id} className="bg-black/30 border border-border/50 rounded-2xl p-6 flex gap-4">
                   <Link href={review.user?.truckyId ? `/profile/${review.user.truckyId}` : "#"} className="flex-shrink-0">
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-black/50 border border-border/50">
-                      {review.user?.image ? (
-                        <img src={review.user.image} alt={review.user.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-full h-full p-2 text-gray-500" />
-                      )}
-                    </div>
+                    <DecoratedAvatar
+                      src={review.user?.image || null}
+                      alt={review.user?.name || "User"}
+                      fallbackText={(review.user?.name || "?").charAt(0)}
+                      decorationId={review.user?.avatarDecoration || null}
+                      isNismaraPlus={review.user?.isNismaraPlus === true}
+                      isStaff={review.user?.isManager === true}
+                      topManager={review.user?.topManager}
+                      sizeClass="w-12 h-12"
+                      frameClass="bg-black/50 border border-border/50"
+                    />
                   </Link>
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">

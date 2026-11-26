@@ -115,6 +115,9 @@ export default async function DriversPage() {
         rankColor: truckyRankColor || webUser?.truckyRankColor || "#64748b",
         isNismaraPlus: webUser?.nismaraplus?.status === true,
         nismaraPlusStartedAt: webUser?.nismaraplus?.startedAt,
+        discordRole: webUser?.discordRole || webUser?.role || null,
+        topManager: webUser?.topManager || null,
+        avatarDecoration: webUser?.avatarDecoration || null,
       };
     });
   } else {
@@ -137,6 +140,9 @@ export default async function DriversPage() {
         rankColor: webUser?.truckyRankColor || "#64748b",
         isNismaraPlus: webUser?.nismaraplus?.status === true,
         nismaraPlusStartedAt: webUser?.nismaraplus?.startedAt,
+        discordRole: webUser?.discordRole || webUser?.role || null,
+        topManager: webUser?.topManager || null,
+        avatarDecoration: webUser?.avatarDecoration || null,
       };
     });
   }

@@ -19,6 +19,7 @@ import JoinConvoyButton from "./JoinConvoyButton";
 import ClaimRewardButton from "./ClaimRewardButton";
 import EndConvoyButton from "./EndConvoyButton";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 
 
@@ -210,19 +211,20 @@ export default async function ConvoyDetailPage({
             <div className="flex items-center gap-4 bg-black/10 border border-white/5 rounded-2xl p-5 hover:border-emerald-500/30 transition-colors">
               {convoy.roadCaptain && usersMap.has(convoy.roadCaptain) ? (
                 <>
-                  <Link href={`/profile/${usersMap.get(convoy.roadCaptain)?.truckyId || '#'}`} className="relative shrink-0 w-14 h-14 block hover:opacity-80 transition-opacity">
-                    {usersMap.get(convoy.roadCaptain)?.image ? (
-                      <img
-                        src={usersMap.get(convoy.roadCaptain).image}
-                        alt="Road Captain"
-                        className="w-full h-full rounded-full object-cover border-2 border-emerald-500/50"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-black border-2 border-emerald-500/50">
-                        {usersMap.get(convoy.roadCaptain)?.name?.charAt(0) || "R"}
-                      </div>
-                    )}
-                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-full border-2 border-background">
+                  <Link href={`/profile/${usersMap.get(convoy.roadCaptain)?.truckyId || '#'}`} className="relative shrink-0 block hover:opacity-80 transition-opacity">
+                    <DecoratedAvatar
+                      src={usersMap.get(convoy.roadCaptain)?.image}
+                      alt={usersMap.get(convoy.roadCaptain)?.name || "Road Captain"}
+                      fallbackText={usersMap.get(convoy.roadCaptain)?.name?.charAt(0) || "R"}
+                      decorationId={usersMap.get(convoy.roadCaptain)?.avatarDecoration || null}
+                      isNismaraPlus={usersMap.get(convoy.roadCaptain)?.nismaraplus?.status === true}
+                      userRole={usersMap.get(convoy.roadCaptain)?.discordRole || usersMap.get(convoy.roadCaptain)?.role}
+                      topManager={usersMap.get(convoy.roadCaptain)?.topManager}
+                      sizeClass="w-14 h-14"
+                      frameClass="border-2 border-emerald-500/50"
+                      fallbackBg="bg-emerald-500/20 text-emerald-500"
+                    />
+                    <div className="absolute -bottom-1 -right-1 z-20 bg-emerald-500 text-white p-1 rounded-full border-2 border-background">
                       <Crown size={12} />
                     </div>
                   </Link>
@@ -260,19 +262,20 @@ export default async function ConvoyDetailPage({
             <div className="flex items-center gap-4 bg-black/10 border border-white/5 rounded-2xl p-5 hover:border-accent-lilac/30 transition-colors">
               {convoy.setBy && usersMap.has(convoy.setBy) ? (
                 <>
-                  <Link href={`/profile/${usersMap.get(convoy.setBy)?.truckyId || '#'}`} className="relative shrink-0 w-14 h-14 block hover:opacity-80 transition-opacity">
-                    {usersMap.get(convoy.setBy)?.image ? (
-                      <img
-                        src={usersMap.get(convoy.setBy).image}
-                        alt="Penanggung Jawab"
-                        className="w-full h-full rounded-full object-cover border-2 border-accent-lilac/50"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-accent-lilac/20 flex items-center justify-center text-accent-lilac font-black border-2 border-accent-lilac/50">
-                        {usersMap.get(convoy.setBy)?.name?.charAt(0) || "P"}
-                      </div>
-                    )}
-                    <div className="absolute -bottom-1 -right-1 bg-accent-lilac text-white p-1 rounded-full border-2 border-background">
+                  <Link href={`/profile/${usersMap.get(convoy.setBy)?.truckyId || '#'}`} className="relative shrink-0 block hover:opacity-80 transition-opacity">
+                    <DecoratedAvatar
+                      src={usersMap.get(convoy.setBy)?.image}
+                      alt={usersMap.get(convoy.setBy)?.name || "Penanggung Jawab"}
+                      fallbackText={usersMap.get(convoy.setBy)?.name?.charAt(0) || "P"}
+                      decorationId={usersMap.get(convoy.setBy)?.avatarDecoration || null}
+                      isNismaraPlus={usersMap.get(convoy.setBy)?.nismaraplus?.status === true}
+                      userRole={usersMap.get(convoy.setBy)?.discordRole || usersMap.get(convoy.setBy)?.role}
+                      topManager={usersMap.get(convoy.setBy)?.topManager}
+                      sizeClass="w-14 h-14"
+                      frameClass="border-2 border-accent-lilac/50"
+                      fallbackBg="bg-accent-lilac/20 text-accent-lilac"
+                    />
+                    <div className="absolute -bottom-1 -right-1 z-20 bg-accent-lilac text-white p-1 rounded-full border-2 border-background">
                       <Crown size={12} />
                     </div>
                   </Link>
@@ -311,19 +314,20 @@ export default async function ConvoyDetailPage({
               <div className="flex items-center gap-4 bg-black/10 border border-white/5 rounded-2xl p-5 hover:border-sky-500/30 transition-colors">
                 {usersMap.has(convoy.sweeper) ? (
                   <>
-                    <Link href={`/profile/${usersMap.get(convoy.sweeper)?.truckyId || '#'}`} className="relative shrink-0 w-14 h-14 block hover:opacity-80 transition-opacity">
-                      {usersMap.get(convoy.sweeper)?.image ? (
-                        <img
-                          src={usersMap.get(convoy.sweeper).image}
-                          alt="Sweeper"
-                          className="w-full h-full rounded-full object-cover border-2 border-sky-500/50"
-                        />
-                      ) : (
-                        <div className="w-full h-full rounded-full bg-sky-500/20 flex items-center justify-center text-sky-500 font-black border-2 border-sky-500/50">
-                          {usersMap.get(convoy.sweeper)?.name?.charAt(0) || "S"}
-                        </div>
-                      )}
-                      <div className="absolute -bottom-1 -right-1 bg-sky-500 text-white p-1 rounded-full border-2 border-background">
+                    <Link href={`/profile/${usersMap.get(convoy.sweeper)?.truckyId || '#'}`} className="relative shrink-0 block hover:opacity-80 transition-opacity">
+                      <DecoratedAvatar
+                        src={usersMap.get(convoy.sweeper)?.image}
+                        alt={usersMap.get(convoy.sweeper)?.name || "Sweeper"}
+                        fallbackText={usersMap.get(convoy.sweeper)?.name?.charAt(0) || "S"}
+                        decorationId={usersMap.get(convoy.sweeper)?.avatarDecoration || null}
+                        isNismaraPlus={usersMap.get(convoy.sweeper)?.nismaraplus?.status === true}
+                        userRole={usersMap.get(convoy.sweeper)?.discordRole || usersMap.get(convoy.sweeper)?.role}
+                        topManager={usersMap.get(convoy.sweeper)?.topManager}
+                        sizeClass="w-14 h-14"
+                        frameClass="border-2 border-sky-500/50"
+                        fallbackBg="bg-sky-500/20 text-sky-500"
+                      />
+                      <div className="absolute -bottom-1 -right-1 z-20 bg-sky-500 text-white p-1 rounded-full border-2 border-background">
                         <Crown size={12} />
                       </div>
                     </Link>
@@ -595,16 +599,17 @@ export default async function ConvoyDetailPage({
                   key={idx}
                   className={`relative z-0 hover:z-50 flex items-center gap-2 px-4 py-2 rounded-xl border ${isRoadCaptain ? "bg-emerald-500/10 border-emerald-500/30" : "bg-black/20 border-white/5"} hover:border-primary transition-colors`}
                 >
-                  {userDetail?.image ? (
-                    <img
-                      src={userDetail.image}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold">
-                      {userDetail?.name?.charAt(0) || "?"}
-                    </div>
-                  )}
+                  <DecoratedAvatar
+                    src={userDetail?.image}
+                    alt={userDetail?.name || "Driver"}
+                    fallbackText={userDetail?.name?.charAt(0) || "?"}
+                    decorationId={userDetail?.avatarDecoration || null}
+                    isNismaraPlus={userDetail?.nismaraplus?.status === true}
+                    userRole={userDetail?.discordRole || userDetail?.role}
+                    topManager={userDetail?.topManager}
+                    sizeClass="w-6 h-6"
+                    fallbackBg="bg-primary/20 text-foreground"
+                  />
                   <span
                     className={`text-xs font-bold ${isRoadCaptain ? "text-emerald-400" : "text-foreground"}`}
                   >
@@ -648,19 +653,20 @@ export default async function ConvoyDetailPage({
                   {/* Avatar sebagai Link */}
                   <Link
                     href={`/profile/${p.truckyId}`}
-                    className="w-12 h-12 rounded-full overflow-hidden bg-card border-2 border-border/50 hover:border-primary transition-colors shrink-0"
+                    className="shrink-0 transition-transform hover:scale-105"
                   >
-                    {userDetail?.image ? (
-                      <img
-                        src={userDetail.image}
-                        alt={userDetail.name || "Driver"}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-primary/20 text-primary font-bold">
-                        {(userDetail?.name || "D").charAt(0)}
-                      </div>
-                    )}
+                    <DecoratedAvatar
+                      src={userDetail?.image}
+                      alt={userDetail?.name || "Driver"}
+                      fallbackText={(userDetail?.name || "D").charAt(0)}
+                      decorationId={userDetail?.avatarDecoration || null}
+                      isNismaraPlus={userDetail?.nismaraplus?.status === true}
+                      userRole={userDetail?.discordRole || userDetail?.role}
+                      topManager={userDetail?.topManager}
+                      sizeClass="w-12 h-12"
+                      frameClass="bg-card border-2 border-border/50 hover:border-primary transition-colors"
+                      fallbackBg="bg-primary/20 text-primary"
+                    />
                   </Link>
 
                   <div className="flex-1 min-w-0">

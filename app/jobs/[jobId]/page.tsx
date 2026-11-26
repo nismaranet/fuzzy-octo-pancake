@@ -4,6 +4,8 @@ import Link from "next/link";
 import { getTruckyFullJobData, getCompanyMembersMap } from "@/lib/trucky";
 import IncidentLogs from "@/components/IncidentLogs";
 import AppealButton from "./AppealButton";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
+import UserBadges from "@/components/icons/UserBadges";
 import {
   ArrowLeft,
   Truck,
@@ -201,6 +203,14 @@ export default async function JobDetailPage(props: {
 
   let driverName = `Driver #${discordId || truckyId}`;
   let driverAvatar = null;
+  let driverProfileTruckyId: string | number | null = truckyId || null;
+  let driverAvatarDecoration: string | null = null;
+  let driverIsNismaraPlus = false;
+  let driverNismaraPlusStartedAt: any = null;
+  let driverIsBooster = false;
+  let driverRole: string | null = null;
+  let driverTopManager: any = null;
+  let driverTruckyRank: string | null = null;
   let driverRank = "Driver";
   let rankColor = "#6b7280";
 
@@ -217,6 +227,14 @@ export default async function JobDetailPage(props: {
     if (mongoUser && mongoUser.name) {
       driverName = mongoUser.name;
       driverAvatar = mongoUser.image || null;
+      driverProfileTruckyId = mongoUser.truckyId || truckyId || null;
+      driverAvatarDecoration = mongoUser.avatarDecoration || null;
+      driverIsNismaraPlus = mongoUser.nismaraplus?.status === true;
+      driverNismaraPlusStartedAt = mongoUser.nismaraplus?.startedAt || null;
+      driverIsBooster = mongoUser.isBooster === true;
+      driverRole = mongoUser.discordRole || mongoUser.role || null;
+      driverTopManager = mongoUser.topManager || null;
+      driverTruckyRank = mongoUser.truckyRank || null;
       const membersMap = await getCompanyMembersMap(35643);
       const member = membersMap[Number(truckyId)];
       if (member) {
@@ -317,40 +335,85 @@ export default async function JobDetailPage(props: {
         {/* --- DRIVER & ROUTE INFO --- */}
         <div className="glass-panel p-8 lg:p-10 rounded-[3rem] border-primary/20 bg-card mb-8 relative overflow-hidden">
           <div className="flex items-center gap-4 mb-8 pb-8 border-b border-slate-200 dark:border-white/5">
-            <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-100 dark:bg-card border-2 border-slate-200 dark:border-white/10 shrink-0">
-              {driverAvatar ? (
-                <img
+            {driverProfileTruckyId ? (
+              <Link
+                href={`/profile/${driverProfileTruckyId}`}
+                className="inline-flex items-center gap-4 group"
+              >
+                <DecoratedAvatar
                   src={driverAvatar}
                   alt={driverName}
-                  className="w-full h-full object-cover"
+                  fallbackText={driverName.charAt(0)}
+                  decorationId={driverAvatarDecoration}
+                  isNismaraPlus={driverIsNismaraPlus}
+                  userRole={driverRole}
+                  topManager={driverTopManager}
+                  sizeClass="w-14 h-14"
+                  frameClass="bg-slate-100 dark:bg-card border-2 border-slate-200 dark:border-white/10 group-hover:border-primary/60 transition-colors"
                 />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-white/5">
-                  <User
-                    size={24}
-                    className="text-slate-400 dark:text-gray-500"
-                  />
+                <div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
+                    Assigned Driver
+                  </p>
+                  <h3 className="text-lg font-black text-foreground flex flex-wrap items-center gap-2">
+                    <span className="group-hover:text-primary transition-colors">
+                      {driverName}
+                    </span>
+                    <UserBadges
+                      role={driverRole || undefined}
+                      isBooster={driverIsBooster}
+                      isNismaraPlus={driverIsNismaraPlus}
+                      nismaraPlusStartedAt={driverNismaraPlusStartedAt}
+                      truckyRank={driverTruckyRank || undefined}
+                      topManager={driverTopManager}
+                      className="w-4 h-4"
+                    />
+                    <span
+                      className="text-[9px] px-2 py-0.5 rounded uppercase tracking-wider border"
+                      style={{
+                        color: rankColor,
+                        borderColor: `${rankColor}50`,
+                        backgroundColor: `${rankColor}10`,
+                      }}
+                    >
+                      {driverRank}
+                    </span>
+                  </h3>
                 </div>
-              )}
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
-                Assigned Driver
-              </p>
-              <h3 className="text-lg font-black text-foreground flex items-center gap-2">
-                {driverName}
-                <span
-                  className="text-[9px] px-2 py-0.5 rounded uppercase tracking-wider border"
-                  style={{
-                    color: rankColor,
-                    borderColor: `${rankColor}50`,
-                    backgroundColor: `${rankColor}10`,
-                  }}
-                >
-                  {driverRank}
-                </span>
-              </h3>
-            </div>
+              </Link>
+            ) : (
+              <>
+                <DecoratedAvatar
+                  src={driverAvatar}
+                  alt={driverName}
+                  fallbackText={driverName.charAt(0)}
+                  decorationId={driverAvatarDecoration}
+                  isNismaraPlus={driverIsNismaraPlus}
+                  userRole={driverRole}
+                  topManager={driverTopManager}
+                  sizeClass="w-14 h-14"
+                  frameClass="bg-slate-100 dark:bg-card border-2 border-slate-200 dark:border-white/10"
+                />
+                <div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
+                    Assigned Driver
+                  </p>
+                  <h3 className="text-lg font-black text-foreground flex flex-wrap items-center gap-2">
+                    {driverName}
+                    <span
+                      className="text-[9px] px-2 py-0.5 rounded uppercase tracking-wider border"
+                      style={{
+                        color: rankColor,
+                        borderColor: `${rankColor}50`,
+                        backgroundColor: `${rankColor}10`,
+                      }}
+                    >
+                      {driverRank}
+                    </span>
+                  </h3>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">

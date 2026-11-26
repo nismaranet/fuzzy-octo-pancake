@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import {
   Truck,
   Cpu,
@@ -92,9 +93,15 @@ export default function FleetOverviewUI({ session }: any) {
               <Bell size={20} />
             </button>
             <div className="flex items-center gap-3">
-              <img
+              <DecoratedAvatar
                 src={userImage}
-                className="w-12 h-12 rounded-full border-2 border-border object-cover"
+                alt={userName}
+                decorationId={session?.user?.avatarDecoration || null}
+                isNismaraPlus={session?.user?.nismaraplus?.status === true}
+                userRole={session?.user?.role}
+                topManager={session?.user?.topManager}
+                sizeClass="w-12 h-12"
+                frameClass="border-2 border-border"
               />
               <ChevronDown size={18} className="text-foreground/30" />
             </div>

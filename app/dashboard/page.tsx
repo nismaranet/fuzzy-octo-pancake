@@ -8,6 +8,7 @@ import DriverMonthlyJobAnalytics, {
   MonthlyJobStatItem,
 } from "@/components/dashboard/DriverMonthlyJobAnalytics";
 import DrivingScoreCard from "@/components/DrivingScoreCard";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import RewindPromoBanner from "@/components/rewind/RewindPromoBanner";
 import { getWebConfig, isRewind2026PubliclyLive } from "@/lib/webConfig";
 import {
@@ -97,7 +98,18 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     db.collection("users").findOne(
       { discordId: discordId },
-      { projection: { drivingScore: 1, truckyRank: 1, truckyRankColor: 1 } },
+      {
+        projection: {
+          drivingScore: 1,
+          truckyRank: 1,
+          truckyRankColor: 1,
+          avatarDecoration: 1,
+          nismaraplus: 1,
+          discordRole: 1,
+          role: 1,
+          topManager: 1,
+        },
+      },
     ),
     db.collection("points").findOne({
       userId: discordId,
@@ -351,16 +363,17 @@ export default async function DashboardPage() {
       {/* Header Profile Dashboard */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
         <div className="flex items-center gap-6">
-          <div
-            className="w-20 h-20 rounded-full border-4 overflow-hidden shadow-lg"
-            style={{ borderColor: stats.rankColor }}
-          >
-            <img
-              src={session.user.image!}
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <DecoratedAvatar
+            src={session.user.image || "/placeholder-avatar.png"}
+            alt={session.user.name || "Avatar"}
+            decorationId={userDoc?.avatarDecoration || null}
+            isNismaraPlus={userDoc?.nismaraplus?.status === true}
+            userRole={userDoc?.discordRole || userDoc?.role || session.user.role}
+            topManager={userDoc?.topManager}
+            sizeClass="w-20 h-20"
+            frameClass="border-4 shadow-lg"
+            borderColor={stats.rankColor}
+          />
           <div>
             <h1 className="text-3xl font-bold text-(-primary-foreground) mb-1">
               {session.user.name}

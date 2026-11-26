@@ -70,6 +70,48 @@ export default async function GiveawayPublicDetailPage({
     notFound();
   }
 
+  const rawWinners = Array.isArray(giveawayDoc.winners) ? giveawayDoc.winners : [];
+  const winnerDiscordIds = Array.from(
+    new Set(rawWinners.map((w: any) => w?.discordId).filter(Boolean).map(String)),
+  );
+  const winnerUsers =
+    winnerDiscordIds.length > 0
+      ? await db
+          .collection("users")
+          .find(
+            { discordId: { $in: winnerDiscordIds } },
+            {
+              projection: {
+                discordId: 1,
+                truckyId: 1,
+                image: 1,
+                avatarDecoration: 1,
+                nismaraplus: 1,
+                discordRole: 1,
+                role: 1,
+                topManager: 1,
+              },
+            },
+          )
+          .toArray()
+      : [];
+  const winnerUserMap = new Map(
+    winnerUsers.map((u: any) => [String(u.discordId), u]),
+  );
+
+  const enrichedWinners = rawWinners.map((w: any) => {
+    const u = w?.discordId ? winnerUserMap.get(String(w.discordId)) : null;
+    return {
+      ...w,
+      avatarUrl: u?.image || w.avatarUrl || null,
+      truckyId: u?.truckyId || w.truckyId || null,
+      avatarDecoration: u?.avatarDecoration || null,
+      isNismaraPlus: u?.nismaraplus?.status === true,
+      userRole: u?.discordRole || u?.role || null,
+      topManager: u?.topManager || null,
+    };
+  });
+
   const serialized = {
     _id: giveawayDoc._id.toString(),
     title: giveawayDoc.title,
@@ -90,7 +132,7 @@ export default async function GiveawayPublicDetailPage({
     ticketPriceNC: giveawayDoc.ticketPriceNC || 1000,
     maxPurchasableTickets: giveawayDoc.maxPurchasableTickets ?? 5,
     prizes: giveawayDoc.prizes || [],
-    winners: giveawayDoc.winners || [],
+    winners: enrichedWinners,
     stats: giveawayDoc.stats || { totalTickets: 0, totalParticipants: 0, totalNcBurned: 0 },
   };
 

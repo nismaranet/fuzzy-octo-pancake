@@ -32,6 +32,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { isWebOwner } from "@/lib/webConfig";
 import { getCompanyMembersMap } from "@/lib/trucky";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 export const metadata = {
   title: "Manager Hub",
@@ -141,6 +142,10 @@ export default async function ManageOverview() {
             "Unknown Driver",
           truckyId: link?.truckyId || "N/A",
           image: webData?.image || truckyData?.avatar_url || null,
+          avatarDecoration: webData?.avatarDecoration || null,
+          isNismaraPlus: webData?.nismaraplus?.status === true,
+          userRole: webData?.discordRole || webData?.role || null,
+          topManager: webData?.topManager || null,
           points: p.totalPoints,
         };
       });
@@ -791,13 +796,18 @@ export default async function ManageOverview() {
                     className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-transparent hover:border-border transition-all group"
                   >
                     <div className="flex items-center gap-3">
-                      <img
+                      <DecoratedAvatar
                         src={
                           sopir.image ||
                           `https://ui-avatars.com/api/?name=${encodeURIComponent(sopir.name)}&background=6D28D9&color=fff`
                         }
-                        className="w-10 h-10 rounded-full object-cover border border-border"
                         alt={sopir.name}
+                        decorationId={sopir.avatarDecoration}
+                        isNismaraPlus={sopir.isNismaraPlus}
+                        userRole={sopir.userRole}
+                        topManager={sopir.topManager}
+                        sizeClass="w-10 h-10"
+                        frameClass="border border-border"
                       />
                       <div>
                         <p className="text-xs font-black text-foreground uppercase group-hover:text-primary transition-colors leading-none">

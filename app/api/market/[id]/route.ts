@@ -41,6 +41,7 @@ export async function GET(
     if (seller) {
       itemWithSeller.sellerName = seller.name;
       itemWithSeller.sellerImage = seller.image;
+      itemWithSeller.sellerAvatarDecoration = seller.avatarDecoration || null;
       itemWithSeller.sellerTruckyId = seller.truckyId;
       itemWithSeller.sellerIsNismaraPlus = seller.nismaraplus?.status === true;
       itemWithSeller.sellerNismaraPlusStartedAt = seller.nismaraplus?.startedAt || null;

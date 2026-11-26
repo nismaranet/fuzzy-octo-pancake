@@ -4,6 +4,12 @@ import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import {
+  isUserStaffRole,
+  isUserTopManagerActive,
+  resolveActiveDecorationDef,
+} from "@/lib/avatarDecorations";
+import { getAvatarDecorationCatalogMap } from "@/lib/avatarDecorationsServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -71,24 +77,50 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
   const participants = event.participants || [];
   const participantIds = participants.map((p: any) => p.discordId);
 
-  // Ambil detail user untuk participants
-  const users = await db
-    .collection("users")
-    .find({ discordId: { $in: participantIds } })
-    .toArray();
+  // Ambil detail user untuk participants & katalog dekorasi avatar secara paralel
+  const [users, participantLinks, decorationCatalogMap] = await Promise.all([
+    db
+      .collection("users")
+      .find({ discordId: { $in: participantIds } })
+      .toArray(),
+    db
+      .collection("driverlinks")
+      .find(
+        { userId: { $in: participantIds } },
+        { projection: { userId: 1, truckyId: 1, truckyName: 1 } },
+      )
+      .toArray(),
+    getAvatarDecorationCatalogMap(),
+  ]);
 
   const enrichedParticipants = participants.map((p: any) => {
     const user = users.find((u) => u.discordId === p.discordId);
+    const link = participantLinks.find((l) => l.userId === p.discordId);
+    const roleVal = user?.discordRole || user?.role;
+    const isNismaraPlus = user?.nismaraplus?.status === true;
+    const avatarDecorationDef = user?.avatarDecoration
+      ? resolveActiveDecorationDef(
+          decorationCatalogMap.get(String(user.avatarDecoration)),
+          {
+            isNismaraPlus,
+            isStaff: isUserStaffRole(roleVal),
+            isTopManager: isUserTopManagerActive(user?.topManager),
+          },
+        )
+      : null;
+
     return {
       ...p,
-      name: user?.name || "Unknown Driver",
+      name: user?.name || link?.truckyName || "Unknown Driver",
       avatarUrl: user?.image || "https://i.imgur.com/6M5rN9n.png",
-      truckyId: user?.truckyId,
-      truckyRank: user?.truckyRank,
-      role: user?.discordRole || user?.role,
+      truckyId: user?.truckyId || link?.truckyId || null,
+      truckyRank: user?.truckyRank || null,
+      role: roleVal,
       isBooster: user?.isBooster,
-      isNismaraPlus: user?.nismaraplus?.status === true,
+      isNismaraPlus,
       nismaraPlusStartedAt: user?.nismaraplus?.startedAt,
+      avatarDecoration: user?.avatarDecoration || null,
+      avatarDecorationDef,
       topManager: user?.topManager || null,
     };
   });
@@ -97,7 +129,7 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
   const organizerUser = event.setBy
     ? await db.collection("users").findOne({ discordId: event.setBy })
     : null;
-  const organizerLink = (!organizerUser && event.setBy)
+  const organizerLink = (!organizerUser?.truckyId && event.setBy)
     ? await db.collection("driverlinks").findOne({ userId: event.setBy })
     : null;
 
@@ -106,10 +138,13 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
     name: organizerUser?.name || organizerUser?.global_name || organizerLink?.truckyName || "Management Nismara",
     avatarUrl: organizerUser?.image || null,
     truckyId: organizerUser?.truckyId || organizerLink?.truckyId || null,
+    truckyRank: organizerUser?.truckyRank || null,
     role: organizerUser?.discordRole || organizerUser?.role || null,
     isBooster: organizerUser?.isBooster || false,
     isNismaraPlus: organizerUser?.nismaraplus?.status === true,
     nismaraPlusStartedAt: organizerUser?.nismaraplus?.startedAt || null,
+    avatarDecoration: organizerUser?.avatarDecoration || null,
+    topManager: organizerUser?.topManager || null,
   };
 
   const session = await getServerSession(authOptions);
@@ -194,6 +229,8 @@ export default async function CurrencyBoostDetailPage({ params }: any) {
         isBooster: p.isBooster,
         isNismaraPlus: p.isNismaraPlus,
         nismaraPlusStartedAt: p.nismaraPlusStartedAt,
+        avatarDecoration: p.avatarDecoration || null,
+        avatarDecorationDef: p.avatarDecorationDef || null,
         topManager: p.topManager,
       }))
       .sort((a: any, b: any) => b.totalEarned - a.totalEarned),

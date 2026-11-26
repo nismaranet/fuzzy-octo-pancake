@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Search, Crown, ShieldAlert, Award, ChevronDown } from "lucide-react";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 interface DriverData {
   truckyId: number;
@@ -16,6 +17,9 @@ interface DriverData {
   rankColor: string;
   isNismaraPlus: boolean;
   nismaraPlusStartedAt?: string | Date | null;
+  discordRole?: string | null;
+  topManager?: { status?: boolean; expiredAt?: string | Date | null } | null;
+  avatarDecoration?: string | null;
 }
 
 interface DriversClientProps {
@@ -116,20 +120,20 @@ export default function DriversClient({ drivers }: DriversClientProps) {
               )}
               
               {/* Avatar */}
-              <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-primary/50 transition-colors z-10 relative bg-slate-800">
-                  <Image
-                    src={driver.image}
-                    alt={driver.name}
-                    width={96}
-                    height={96}
-                    className="object-cover w-full h-full"
-                    unoptimized
-                  />
-                </div>
+              <div className="relative mb-4 p-1">
+                <DecoratedAvatar
+                  src={driver.image}
+                  alt={driver.name}
+                  decorationId={driver.avatarDecoration || null}
+                  isNismaraPlus={driver.isNismaraPlus}
+                  userRole={driver.discordRole}
+                  topManager={driver.topManager}
+                  sizeClass="w-24 h-24"
+                  frameClass="border-2 border-white/10 group-hover:border-primary/50 transition-colors bg-slate-800"
+                />
                 {/* Nismara+ Crown Badge */}
                 {driver.isNismaraPlus && (
-                  <div className="absolute -top-3 -right-3 z-20 bg-gradient-to-br from-yellow-400 to-amber-600 p-1.5 rounded-full shadow-lg shadow-yellow-500/30 border-2 border-slate-900 animate-pulse">
+                  <div className="absolute -top-2 -right-2 z-20 bg-gradient-to-br from-yellow-400 to-amber-600 p-1.5 rounded-full shadow-lg shadow-yellow-500/30 border-2 border-slate-900 animate-pulse">
                     <Crown className="w-4 h-4 text-slate-900" />
                   </div>
                 )}

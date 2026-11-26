@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { fetchJobs } from "./actions";
 import { useRouter } from "next/navigation";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import {
   Truck,
   Bus,
@@ -129,19 +130,18 @@ export default function JobList({
 
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full border border-primary/30 overflow-hidden bg-card shrink-0">
-                            {job.avatarUrl ? (
-                              <img
-                                src={job.avatarUrl}
-                                alt={job.driverName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-primary/20 text-primary font-bold text-lg">
-                                {job.driverName?.charAt(0) || "?"}
-                              </div>
-                            )}
-                          </div>
+                          <DecoratedAvatar
+                            src={job.avatarUrl}
+                            alt={job.driverName || "Driver"}
+                            fallbackText={job.driverName?.charAt(0) || "?"}
+                            decorationId={job.avatarDecoration || null}
+                            isNismaraPlus={job.isNismaraPlus === true}
+                            userRole={job.userRole}
+                            topManager={job.topManager}
+                            sizeClass="w-10 h-10"
+                            frameClass="border border-primary/30 bg-card"
+                            fallbackBg="bg-primary/20 text-primary"
+                          />
                           <div>
                             <div className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">
                               {job.driverName}

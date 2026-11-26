@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react"; // Tambahkan useEffect
+import { useState, useEffect, useRef } from "react"; // Tambahkan useEffect
 import Link from "next/link";
 import {
   updateProfile,
@@ -35,10 +35,27 @@ import {
   Eye,
   EyeOff,
   Radio,
+  Move,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { compressImageToWebP } from "@/lib/imageUtils";
 import { showAlert, showConfirm } from "@/lib/dialog";
 import ActiveSessionsCard from "./ActiveSessionsCard";
+import AvatarDecorationPicker from "@/components/profile/AvatarDecorationPicker";
+import ProfileThemePicker from "@/components/profile/ProfileThemePicker";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
+import type { AvatarDecorationDef } from "@/lib/avatarDecorations";
+import {
+  sanitizeProfileTheme,
+  type UserProfileThemeConfig,
+} from "@/lib/profileThemes";
+import {
+  parseObjectPosition,
+  formatObjectPosition,
+  clampPercent,
+  type PositionXY,
+} from "@/lib/profilePosition";
 
 
 export default function SettingsClient() {
@@ -50,20 +67,25 @@ export default function SettingsClient() {
     text: string;
   } | null>(null);
 
-  // Tab State: "profile" | "sync" | "security"
-  const [activeTab, setActiveTab] = useState<"profile" | "sync" | "security">("profile");
+  // Tab State: "profile" | "decorations" | "sync" | "security"
+  const [activeTab, setActiveTab] = useState<"profile" | "decorations" | "sync" | "security">("profile");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam === "sync" || tabParam === "profile" || tabParam === "security") {
+      if (
+        tabParam === "sync" ||
+        tabParam === "profile" ||
+        tabParam === "decorations" ||
+        tabParam === "security"
+      ) {
         setActiveTab(tabParam);
       }
     }
   }, []);
 
-  const handleTabChange = (tab: "profile" | "sync" | "security") => {
+  const handleTabChange = (tab: "profile" | "decorations" | "sync" | "security") => {
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -99,6 +121,27 @@ export default function SettingsClient() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
   const [bgUrl, setBgUrl] = useState("");
+  const [bannerPos, setBannerPos] = useState<PositionXY>({ x: 50, y: 50 });
+  const [bgPos, setBgPos] = useState<PositionXY>({ x: 50, y: 50 });
+  const [avatarDecoration, setAvatarDecoration] = useState<string | null>(null);
+  const [profileTheme, setProfileTheme] = useState<UserProfileThemeConfig>({
+    preset: "default",
+  });
+  const [isNismaraPlusActive, setIsNismaraPlusActive] = useState(false);
+  const [isBoosterActive, setIsBoosterActive] = useState(false);
+  const [isStaffActive, setIsStaffActive] = useState(false);
+  const [isTopManagerActive, setIsTopManagerActive] = useState(false);
+  const [decorationsCatalog, setDecorationsCatalog] = useState<AvatarDecorationDef[]>([]);
+  const [draggingTarget, setDraggingTarget] = useState<"banner" | "background" | null>(null);
+  const posDragRef = useRef<{
+    target: "banner" | "background";
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bgFile, setBgFile] = useState<File | null>(null);
@@ -128,6 +171,19 @@ export default function SettingsClient() {
         setAvatarUrl(data.image);
         setBannerUrl(data.bannerUrl);
         setBgUrl(data.backgroundUrl);
+        setBannerPos(parseObjectPosition((data as any).bannerPosition));
+        setBgPos(parseObjectPosition((data as any).backgroundPosition));
+        setAvatarDecoration((data as any).avatarDecoration || null);
+        setProfileTheme(sanitizeProfileTheme((data as any).profileTheme));
+        setIsNismaraPlusActive(Boolean((data as any).isNismaraPlus));
+        setIsBoosterActive(Boolean((data as any).isBooster));
+        setIsStaffActive(Boolean((data as any).isStaff));
+        setIsTopManagerActive(Boolean((data as any).isTopManager));
+        setDecorationsCatalog(
+          Array.isArray((data as any).decorationsCatalog)
+            ? (data as any).decorationsCatalog
+            : [],
+        );
         if (data.social_media) {
           setSocialMedia({
             youtube: data.social_media.youtube || "",
@@ -336,10 +392,57 @@ export default function SettingsClient() {
     if (type === "banner") {
       setBannerUrl(previewUrl);
       setBannerFile(file);
+      setBannerPos({ x: 50, y: 50 });
     }
     if (type === "background") {
       setBgUrl(previewUrl);
       setBgFile(file);
+      setBgPos({ x: 50, y: 50 });
+    }
+  };
+
+  const handlePreviewPointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    target: "banner" | "background",
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cur = target === "banner" ? bannerPos : bgPos;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDraggingTarget(target);
+    posDragRef.current = {
+      target,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startX: cur.x,
+      startY: cur.y,
+      width: Math.max(rect.width, 160),
+      height: Math.max(rect.height, 120),
+    };
+  };
+
+  const handlePreviewPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = posDragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.startClientX;
+    const dy = e.clientY - drag.startClientY;
+    const nextX = clampPercent(drag.startX - (dx / drag.width) * 120);
+    const nextY = clampPercent(drag.startY - (dy / drag.height) * 120);
+    if (drag.target === "banner") {
+      setBannerPos({ x: nextX, y: nextY });
+    } else {
+      setBgPos({ x: nextX, y: nextY });
+    }
+  };
+
+  const handlePreviewPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (posDragRef.current) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      posDragRef.current = null;
+      setDraggingTarget(null);
     }
   };
 
@@ -433,23 +536,38 @@ export default function SettingsClient() {
         </div>
 
         {/* TAB NAVIGATION */}
-        <div className="flex items-center gap-2 p-1.5 bg-black/40 border border-white/10 rounded-2xl mb-8 w-full sm:w-fit backdrop-blur-md">
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-black/40 border border-white/10 rounded-2xl mb-8 w-full sm:w-fit backdrop-blur-md">
           <button
             type="button"
             onClick={() => handleTabChange("profile")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
               activeTab === "profile"
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                 : "text-gray-400 hover:text-foreground hover:bg-white/5"
             }`}
           >
             <User className="w-4 h-4" />
-            <span>Profil & Kustomisasi</span>
+            <span>Profil &amp; Kustomisasi</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("decorations")}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+              activeTab === "decorations"
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                : "text-gray-400 hover:text-foreground hover:bg-white/5"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Avatar Decoration</span>
+            {avatarDecoration && (
+              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block ring-2 ring-black" />
+            )}
           </button>
           <button
             type="button"
             onClick={() => handleTabChange("sync")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 relative ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 relative cursor-pointer ${
               activeTab === "sync"
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                 : "text-gray-400 hover:text-foreground hover:bg-white/5"
@@ -464,7 +582,7 @@ export default function SettingsClient() {
           <button
             type="button"
             onClick={() => handleTabChange("security")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
               activeTab === "security"
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                 : "text-gray-400 hover:text-foreground hover:bg-white/5"
@@ -527,16 +645,29 @@ export default function SettingsClient() {
                   <ImageIcon className="w-4 h-4" /> Avatar Profile
                 </label>
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full border-2 border-border/50 overflow-hidden bg-black/20 shrink-0">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon className="text-gray-500 w-5 h-5" />
-                    )}
-                  </div>
+                  <DecoratedAvatar
+                    src={avatarUrl || null}
+                    alt={name || "Avatar"}
+                    fallbackText={name?.charAt(0) || "?"}
+                    decoration={
+                      avatarDecoration
+                        ? decorationsCatalog.find((d) => d.id === avatarDecoration) || null
+                        : null
+                    }
+                    decorationId={avatarDecoration}
+                    isNismaraPlus={
+                      isNismaraPlusActive ||
+                      (session?.user as any)?.nismaraplus?.status === true
+                    }
+                    isStaff={
+                      isStaffActive ||
+                      session?.user?.role === "manager" ||
+                      session?.user?.role === "admin"
+                    }
+                    isTopManager={isTopManagerActive}
+                    sizeClass="w-14 h-14"
+                    frameClass="border-2 border-border/50 bg-black/20"
+                  />
                   <input
                     type="file"
                     id="avatarUpload"
@@ -554,6 +685,14 @@ export default function SettingsClient() {
                       "Ganti Avatar"
                     )}
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange("decorations")}
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary/10 border border-primary/25 text-primary text-xs font-bold rounded-xl hover:bg-primary/20 transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Atur Dekorasi</span>
+                  </button>
                 </div>
                 <input type="hidden" name="image" value={avatarUrl} />
               </div>
@@ -561,24 +700,109 @@ export default function SettingsClient() {
           </div>
 
           <div className="glass-panel p-8 rounded-[2rem] border-border/50">
-            <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground mb-2 flex items-center gap-2">
               <Layout className="text-accent-sky w-5 h-5" /> Kustomisasi Tema
             </h2>
+            <p className="text-xs text-muted-foreground mb-6">
+              Unggah banner dan wallpaper profil, lalu geser langsung pada pratinjau atau gunakan slider untuk mengatur posisinya.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Banner Section */}
-              <div className="space-y-2">
-                <div className="w-full h-24 rounded-xl border-2 border-border/50 overflow-hidden bg-black/20 mb-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Banner Profil
+                  </span>
+                  {bannerUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setBannerPos({ x: 50, y: 50 })}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset Tengah
+                    </button>
+                  )}
+                </div>
+                <div
+                  onPointerDown={(e) => bannerUrl && handlePreviewPointerDown(e, "banner")}
+                  onPointerMove={handlePreviewPointerMove}
+                  onPointerUp={handlePreviewPointerUp}
+                  onPointerCancel={handlePreviewPointerUp}
+                  className={`relative w-full h-32 rounded-xl border-2 border-border/50 overflow-hidden bg-black/20 ${
+                    bannerUrl
+                      ? `touch-none select-none ${
+                          draggingTarget === "banner" ? "cursor-grabbing border-primary" : "cursor-grab"
+                        }`
+                      : ""
+                  }`}
+                >
                   {bannerUrl ? (
-                    <img
-                      src={bannerUrl}
-                      className="w-full h-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={bannerUrl}
+                        alt="Pratinjau Banner"
+                        draggable={false}
+                        className="w-full h-full object-cover pointer-events-none"
+                        style={{
+                          objectPosition: formatObjectPosition(bannerPos.x, bannerPos.y),
+                        }}
+                      />
+                      <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/65 backdrop-blur-sm text-[10px] font-medium text-white/90 inline-flex items-center gap-1 pointer-events-none">
+                        <Move className="w-3 h-3" />
+                        Geser
+                      </div>
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
                       No Banner
                     </div>
                   )}
                 </div>
+
+                {bannerUrl && (
+                  <div className="grid grid-cols-2 gap-3 px-1">
+                    <label className="space-y-1 block">
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>Kiri-Kanan</span>
+                        <span className="font-mono tabular-nums text-foreground">{bannerPos.x}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={bannerPos.x}
+                        onChange={(e) =>
+                          setBannerPos((prev) => ({
+                            ...prev,
+                            x: clampPercent(Number(e.target.value)),
+                          }))
+                        }
+                        className="w-full accent-primary cursor-pointer h-1.5"
+                      />
+                    </label>
+                    <label className="space-y-1 block">
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>Atas-Bawah</span>
+                        <span className="font-mono tabular-nums text-foreground">{bannerPos.y}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={bannerPos.y}
+                        onChange={(e) =>
+                          setBannerPos((prev) => ({
+                            ...prev,
+                            y: clampPercent(Number(e.target.value)),
+                          }))
+                        }
+                        className="w-full accent-primary cursor-pointer h-1.5"
+                      />
+                    </label>
+                  </div>
+                )}
+
                 <input
                   type="file"
                   id="bannerUpload"
@@ -588,7 +812,7 @@ export default function SettingsClient() {
                 />
                 <label
                   htmlFor="bannerUpload"
-                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-foreground text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
+                  className="cursor-pointer flex justify-center py-2.5 bg-card border border-border text-foreground text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
                 >
                   {isUploading.banner ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -597,19 +821,109 @@ export default function SettingsClient() {
                   )}
                 </label>
                 <input type="hidden" name="bannerUrl" value={bannerUrl} />
+                <input
+                  type="hidden"
+                  name="bannerPosition"
+                  value={formatObjectPosition(bannerPos.x, bannerPos.y)}
+                />
               </div>
 
               {/* Background Section */}
-              <div className="space-y-2">
-                <div className="w-full h-24 rounded-xl border-2 border-border/50 overflow-hidden bg-black/20 mb-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Wallpaper Halaman
+                  </span>
+                  {bgUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setBgPos({ x: 50, y: 50 })}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset Tengah
+                    </button>
+                  )}
+                </div>
+                <div
+                  onPointerDown={(e) => bgUrl && handlePreviewPointerDown(e, "background")}
+                  onPointerMove={handlePreviewPointerMove}
+                  onPointerUp={handlePreviewPointerUp}
+                  onPointerCancel={handlePreviewPointerUp}
+                  className={`relative w-full h-32 rounded-xl border-2 border-border/50 overflow-hidden bg-black/20 ${
+                    bgUrl
+                      ? `touch-none select-none ${
+                          draggingTarget === "background" ? "cursor-grabbing border-primary" : "cursor-grab"
+                        }`
+                      : ""
+                  }`}
+                >
                   {bgUrl ? (
-                    <img src={bgUrl} className="w-full h-full object-cover" />
+                    <>
+                      <img
+                        src={bgUrl}
+                        alt="Pratinjau Wallpaper"
+                        draggable={false}
+                        className="w-full h-full object-cover pointer-events-none"
+                        style={{
+                          objectPosition: formatObjectPosition(bgPos.x, bgPos.y),
+                        }}
+                      />
+                      <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/65 backdrop-blur-sm text-[10px] font-medium text-white/90 inline-flex items-center gap-1 pointer-events-none">
+                        <Move className="w-3 h-3" />
+                        Geser
+                      </div>
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
                       No Background
                     </div>
                   )}
                 </div>
+
+                {bgUrl && (
+                  <div className="grid grid-cols-2 gap-3 px-1">
+                    <label className="space-y-1 block">
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>Kiri-Kanan</span>
+                        <span className="font-mono tabular-nums text-foreground">{bgPos.x}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={bgPos.x}
+                        onChange={(e) =>
+                          setBgPos((prev) => ({
+                            ...prev,
+                            x: clampPercent(Number(e.target.value)),
+                          }))
+                        }
+                        className="w-full accent-primary cursor-pointer h-1.5"
+                      />
+                    </label>
+                    <label className="space-y-1 block">
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>Atas-Bawah</span>
+                        <span className="font-mono tabular-nums text-foreground">{bgPos.y}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={bgPos.y}
+                        onChange={(e) =>
+                          setBgPos((prev) => ({
+                            ...prev,
+                            y: clampPercent(Number(e.target.value)),
+                          }))
+                        }
+                        className="w-full accent-primary cursor-pointer h-1.5"
+                      />
+                    </label>
+                  </div>
+                )}
+
                 <input
                   type="file"
                   id="bgUpload"
@@ -619,7 +933,7 @@ export default function SettingsClient() {
                 />
                 <label
                   htmlFor="bgUpload"
-                  className="cursor-pointer flex justify-center py-2 bg-card border border-border text-foreground text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
+                  className="cursor-pointer flex justify-center py-2.5 bg-card border border-border text-foreground text-sm font-bold rounded-xl hover:border-accent-sky/50 transition-colors"
                 >
                   {isUploading.background ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -628,9 +942,30 @@ export default function SettingsClient() {
                   )}
                 </label>
                 <input type="hidden" name="backgroundUrl" value={bgUrl} />
+                <input
+                  type="hidden"
+                  name="backgroundPosition"
+                  value={formatObjectPosition(bgPos.x, bgPos.y)}
+                />
               </div>
             </div>
           </div>
+
+          <ProfileThemePicker
+            value={profileTheme}
+            onChange={setProfileTheme}
+            bannerUrl={bannerUrl}
+            backgroundUrl={bgUrl}
+            avatarUrl={avatarUrl}
+            userName={name}
+            isNismaraPlus={
+              isNismaraPlusActive ||
+              (session?.user as any)?.nismaraplus?.status === true
+            }
+            isBooster={
+              isBoosterActive || (session?.user as any)?.isBooster === true
+            }
+          />
 
           <div className="glass-panel p-8 rounded-[2rem] border-border/50">
             <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
@@ -680,7 +1015,30 @@ export default function SettingsClient() {
         </form>
         )}
 
-        {/* TAB 2: SINKRONISASI AKUN */}
+        {/* TAB 2: AVATAR DECORATION */}
+        {activeTab === "decorations" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <AvatarDecorationPicker
+              avatarUrl={avatarUrl}
+              userName={name}
+              decorations={decorationsCatalog}
+              isNismaraPlus={
+                isNismaraPlusActive ||
+                (session?.user as any)?.nismaraplus?.status === true
+              }
+              isStaff={
+                isStaffActive ||
+                session?.user?.role === "manager" ||
+                session?.user?.role === "admin"
+              }
+              isTopManager={isTopManagerActive}
+              equippedId={avatarDecoration}
+              onChangeEquipped={setAvatarDecoration}
+            />
+          </div>
+        )}
+
+        {/* TAB 3: SINKRONISASI AKUN */}
         {activeTab === "sync" && (
           <div className="space-y-8 animate-in fade-in duration-200">
             {/* Info Notice */}

@@ -141,6 +141,10 @@ export default async function TeamDetailPage({ params }: PageProps) {
         _id: job._id.toString(),
         driverName: driver?.name || "Unknown Driver",
         driverImage: driver?.image || null,
+        driverAvatarDecoration: driver?.avatarDecoration || null,
+        driverIsNismaraPlus: driver?.nismaraplus?.status === true,
+        driverRole: driver?.discordRole || driver?.role || null,
+        driverTopManager: driver?.topManager || null,
         completedAt: job.completedAt ? job.completedAt.toISOString() : null,
       };
     });

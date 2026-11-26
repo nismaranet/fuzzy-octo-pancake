@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { getCompanyMembersMap } from "@/lib/trucky";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 export default async function ContractDetailPage(props: {
   params: Promise<{ slug: string }>;
@@ -123,6 +124,7 @@ export default async function ContractDetailPage(props: {
         truckyData?.name ||
         `Driver ${contributor.driverId.slice(-4)}`,
       avatarUrl: mongoUser?.image || truckyData?.avatar_url || null,
+      avatarDecoration: mongoUser?.avatarDecoration || null,
       nismaraplus: mongoUser?.nismaraplus || null,
       discordRole: mongoUser?.discordRole || null,
       role: mongoUser?.role || null,
@@ -333,24 +335,21 @@ export default async function ContractDetailPage(props: {
                           {isTop ? <Crown className="w-6 h-6" /> : index + 1}
                         </div>
 
-                        <div className="relative">
-                          <div
-                            className={`w-14 h-14 rounded-full border-2 overflow-hidden bg-card ${isTop ? "border-yellow-500" : "border-primary/20"}`}
-                          >
-                            {driver.avatarUrl ? (
-                              <img
-                                src={driver.avatarUrl}
-                                alt={driver.driverName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold">
-                                {driver.driverName.charAt(0)}
-                              </div>
-                            )}
-                          </div>
+                        <div className="relative shrink-0">
+                          <DecoratedAvatar
+                            src={driver.avatarUrl}
+                            alt={driver.driverName}
+                            fallbackText={driver.driverName.charAt(0)}
+                            decorationId={driver.avatarDecoration || null}
+                            isNismaraPlus={driver.nismaraplus?.status === true}
+                            userRole={driver.discordRole || driver.role}
+                            topManager={driver.topManager}
+                            sizeClass="w-14 h-14"
+                            frameClass={`border-2 bg-card ${isTop ? "border-yellow-500" : "border-primary/20"}`}
+                            fallbackBg="bg-primary/10 text-primary"
+                          />
                           {isTop && (
-                            <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1 shadow-lg z-10">
+                            <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1 shadow-lg z-20">
                               <Sparkles className="w-3 h-3 text-black" />
                             </div>
                           )}

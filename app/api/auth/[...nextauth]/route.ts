@@ -643,6 +643,7 @@ export const authOptions: NextAuthOptions = {
       session.user.isBooster = isBooster;
       session.user.nismaraplus = nismaraplus;
       session.user.topManager = dbUser?.topManager || { status: false };
+      (session.user as any).avatarDecoration = dbUser?.avatarDecoration || null;
       session.user.test_participation = Boolean(dbUser?.test_participation);
       session.user.xp = dbUser?.xp || 0;
       session.user.level = dbUser?.level || 1;
@@ -660,6 +661,7 @@ export const authOptions: NextAuthOptions = {
           isBooster,
           nismaraplus,
           topManager: session.user.topManager,
+          avatarDecoration: dbUser?.avatarDecoration || null,
           test_participation: session.user.test_participation,
           xp: session.user.xp,
           level: session.user.level,

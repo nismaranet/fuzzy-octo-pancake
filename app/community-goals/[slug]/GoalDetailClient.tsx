@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import { showAlert, showConfirm } from "@/lib/dialog";
 import { donateToGoal, optInKmGoal } from "../actions";
 import { useRouter } from "next/navigation";
@@ -301,12 +302,19 @@ export default function GoalDetailClient({ goal, userBalance, currentUserId }: {
                 {goal.participants.slice(0, 20).map((p: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between p-4 bg-background/50 rounded-xl border border-border/50 hover:border-primary/30 transition-colors shadow-sm">
                     <div className="flex items-center gap-4">
-                      <Link href={`/profile/${p.truckyId || p.discordId || ""}`} className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0 hover:ring-2 hover:ring-primary transition-all">
-                        {p.avatarUrl ? (
-                          <img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center font-bold text-primary bg-primary/10">{p.name[0]}</div>
-                        )}
+                      <Link href={`/profile/${p.truckyId || p.discordId || ""}`} className="flex-shrink-0 transition-transform hover:scale-105">
+                        <DecoratedAvatar
+                          src={p.avatarUrl}
+                          alt={p.name}
+                          fallbackText={p.name?.[0] || "?"}
+                          decorationId={p.avatarDecoration || null}
+                          isNismaraPlus={p.nismaraplus?.status === true}
+                          userRole={p.discordRole}
+                          topManager={p.topManager}
+                          sizeClass="w-12 h-12"
+                          frameClass="bg-muted"
+                          fallbackBg="bg-primary/10 text-primary"
+                        />
                       </Link>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">

@@ -78,12 +78,32 @@ export async function GET(request: Request) {
       .collection("users")
       .find(
         { discordId: { $in: allDiscordIds } },
-        { projection: { discordId: 1, name: 1, image: 1 } },
+        {
+          projection: {
+            discordId: 1,
+            truckyId: 1,
+            name: 1,
+            image: 1,
+            avatarDecoration: 1,
+            nismaraplus: 1,
+            discordRole: 1,
+            role: 1,
+            topManager: 1,
+          },
+        },
       )
       .toArray();
 
     const userMap: any = users.reduce((acc: any, u) => {
-      acc[u.discordId] = { name: u.name, image: u.image };
+      acc[u.discordId] = {
+        name: u.name,
+        image: u.image,
+        truckyId: u.truckyId || null,
+        avatarDecoration: u.avatarDecoration || null,
+        isNismaraPlus: u.nismaraplus?.status === true,
+        role: u.discordRole || u.role || null,
+        topManager: u.topManager || null,
+      };
       return acc;
     }, {});
 

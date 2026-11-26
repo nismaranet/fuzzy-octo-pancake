@@ -104,6 +104,7 @@ export default async function GlobalGalleryPage() {
             isBooster: "$uploader.isBooster",
             role: "$uploader.discordRole",
             topManager: "$uploader.topManager",
+            avatarDecoration: "$uploader.avatarDecoration",
           },
         },
       },

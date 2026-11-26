@@ -17,6 +17,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ShareButton from "./ShareButton";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 export async function generateMetadata({
   params,
@@ -269,10 +270,15 @@ export default async function PublicFleetProfilePage({
                 href={`/profile/${fleet.ownerInfo.truckyId}`}
                 className="flex items-center gap-3 bg-background/60 backdrop-blur-sm border border-border/50 rounded-full pl-2 pr-5 py-1.5 shadow-sm hover:bg-card hover:border-primary/50 transition-colors group/owner"
               >
-                <img
+                <DecoratedAvatar
                   src={fleet.ownerInfo.image || "/img/default_avatar.jpg"}
                   alt={fleet.ownerInfo.name}
-                  className="w-8 h-8 rounded-full border border-primary/30 object-cover group-hover/owner:border-primary transition-colors"
+                  decorationId={fleet.ownerInfo.avatarDecoration || null}
+                  isNismaraPlus={fleet.ownerInfo.nismaraplus?.status === true}
+                  userRole={fleet.ownerInfo.discordRole || fleet.ownerInfo.role}
+                  topManager={fleet.ownerInfo.topManager}
+                  sizeClass="w-8 h-8"
+                  frameClass="border border-primary/30 group-hover/owner:border-primary transition-colors"
                 />
                 <div className="flex flex-col">
                   <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest leading-none">

@@ -98,13 +98,21 @@ import GlobalPopupAd from "@/components/GlobalPopupAd";
 import HalloweenDecorations from "@/components/halloween/HalloweenDecorations";
 import ChristmasNewYearDecorations from "@/components/holiday/ChristmasNewYearDecorations";
 import { getWebConfig } from "@/lib/webConfig";
+import { getAvatarDecorationsCatalog } from "@/lib/avatarDecorationsServer";
+import { STARTER_AVATAR_DECORATIONS } from "@/lib/avatarDecorations";
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const webConfig = await getWebConfig();
+  const [webConfig, decoCatalog] = await Promise.all([
+    getWebConfig(),
+    getAvatarDecorationsCatalog({ includeInactive: false }).catch(() => ({
+      items: STARTER_AVATAR_DECORATIONS,
+      isSeeded: false,
+    })),
+  ]);
   const seasonTheme = webConfig.features.seasonTheme;
   return (
     <html
@@ -124,7 +132,7 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         {/* Navbar akan selalu ada di paling atas */}
-        <Providers>
+        <Providers avatarDecorations={decoCatalog.items}>
           <Navbar />
           <div className="flex-1 w-full max-w-full overflow-x-clip">
             {children}

@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import Link from "next/link";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import { Modal } from "@/components/ui/Modal";
 import { showAlert, showConfirm } from "@/lib/dialog";
 import EditPostDialog from "./EditPostDialog";
@@ -16,7 +17,7 @@ interface Comment {
   _id: string;
   text: string;
   createdAt: string;
-  user: { name: string; avatarUrl: string; discordId: string; truckyId?: string; truckyRank?: string; isNismaraPlus?: boolean; nismaraPlusStartedAt?: string | null; isBooster?: boolean; isManager?: boolean; topManager?: any };
+  user: { name: string; avatarUrl: string; discordId: string; truckyId?: string; truckyRank?: string; isNismaraPlus?: boolean; nismaraPlusStartedAt?: string | null; isBooster?: boolean; isManager?: boolean; avatarDecoration?: string | null; topManager?: any };
   likes?: string[];
   parentId?: string;
   replyToUser?: string;
@@ -35,6 +36,7 @@ export default function GalleryModal({
   profileIsBooster,
   profileRole,
   profileTopManager,
+  profileAvatarDecoration,
   isManager,
   onPostUpdate,
 }: {
@@ -50,9 +52,12 @@ export default function GalleryModal({
   profileIsBooster?: boolean;
   profileRole?: string;
   profileTopManager?: any;
+  profileAvatarDecoration?: string | null;
   isManager?: boolean;
   onPostUpdate?: (post: any) => void;
 }) {
+  const effectiveProfileDecoration =
+    profileAvatarDecoration ?? post?.user?.avatarDecoration ?? null;
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isLiking, setIsLiking] = useState(false);
@@ -319,10 +324,15 @@ export default function GalleryModal({
           <div className="flex items-center gap-3">
             {profileTruckyId ? (
               <Link href={`/profile/${profileTruckyId}`} className="flex items-center gap-3 hover:opacity-80 transition">
-                <img
+                <DecoratedAvatar
                   src={profileAvatar}
                   alt={profileName}
-                  className="w-10 h-10 rounded-full object-cover border border-border/50"
+                  decorationId={effectiveProfileDecoration}
+                  isNismaraPlus={profileIsNismaraPlus === true}
+                  userRole={profileRole}
+                  topManager={profileTopManager || post.user?.topManager}
+                  sizeClass="w-10 h-10"
+                  frameClass="border border-border/50"
                 />
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -341,10 +351,15 @@ export default function GalleryModal({
               </Link>
             ) : (
               <div className="flex items-center gap-3">
-                <img
+                <DecoratedAvatar
                   src={profileAvatar}
                   alt={profileName}
-                  className="w-10 h-10 rounded-full object-cover border border-border/50"
+                  decorationId={effectiveProfileDecoration}
+                  isNismaraPlus={profileIsNismaraPlus === true}
+                  userRole={profileRole}
+                  topManager={profileTopManager || post.user?.topManager}
+                  sizeClass="w-10 h-10"
+                  frameClass="border border-border/50"
                 />
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -393,17 +408,27 @@ export default function GalleryModal({
               <div className="flex gap-3 mb-6 group">
                 {profileTruckyId ? (
                   <Link href={`/profile/${profileTruckyId}`} className="shrink-0 group/avatar">
-                    <img
+                    <DecoratedAvatar
                       src={profileAvatar}
                       alt={profileName}
-                      className="w-8 h-8 rounded-full object-cover border border-border/50 group-hover/avatar:border-primary transition-colors"
+                      decorationId={effectiveProfileDecoration}
+                      isNismaraPlus={profileIsNismaraPlus === true}
+                      userRole={profileRole}
+                      topManager={profileTopManager || post.user?.topManager}
+                      sizeClass="w-8 h-8"
+                      frameClass="border border-border/50 group-hover/avatar:border-primary transition-colors"
                     />
                   </Link>
                 ) : (
-                  <img
+                  <DecoratedAvatar
                     src={profileAvatar}
                     alt={profileName}
-                    className="w-8 h-8 rounded-full object-cover shrink-0 border border-border/50"
+                    decorationId={effectiveProfileDecoration}
+                    isNismaraPlus={profileIsNismaraPlus === true}
+                    userRole={profileRole}
+                    topManager={profileTopManager || post.user?.topManager}
+                    sizeClass="w-8 h-8"
+                    frameClass="border border-border/50"
                   />
                 )}
                 <div>
@@ -446,24 +471,28 @@ export default function GalleryModal({
                 <div className="flex gap-3">
                   {comment.user.truckyId ? (
                     <Link href={`/profile/${comment.user.truckyId}`} className="shrink-0 group/avatar">
-                      <div className="w-8 h-8 rounded-full overflow-hidden border border-border/50 group-hover/avatar:border-primary transition-colors">
-                        <img
-                          src={comment.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user.name)}&background=random`}
-                          alt={comment.user.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      <DecoratedAvatar
+                        src={comment.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user.name)}&background=random`}
+                        alt={comment.user.name}
+                        decorationId={comment.user.avatarDecoration || null}
+                        isNismaraPlus={comment.user.isNismaraPlus === true}
+                        isStaff={comment.user.isManager === true}
+                        topManager={comment.user.topManager}
+                        sizeClass="w-8 h-8"
+                        frameClass="border border-border/50 group-hover/avatar:border-primary transition-colors"
+                      />
                     </Link>
                   ) : (
-                    <div className="shrink-0">
-                      <div className="w-8 h-8 rounded-full overflow-hidden border border-border/50">
-                        <img
-                          src={comment.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user.name)}&background=random`}
-                          alt={comment.user.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    </div>
+                    <DecoratedAvatar
+                      src={comment.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user.name)}&background=random`}
+                      alt={comment.user.name}
+                      decorationId={comment.user.avatarDecoration || null}
+                      isNismaraPlus={comment.user.isNismaraPlus === true}
+                      isStaff={comment.user.isManager === true}
+                      topManager={comment.user.topManager}
+                      sizeClass="w-8 h-8"
+                      frameClass="border border-border/50"
+                    />
                   )}
                   
                   <div className="flex-1">
@@ -556,20 +585,28 @@ export default function GalleryModal({
                       <div key={reply._id} className="flex gap-3 group/reply">
                         {reply.user.truckyId ? (
                           <Link href={`/profile/${reply.user.truckyId}`} className="shrink-0 group-hover/reply:opacity-80 transition-opacity">
-                            <img
+                            <DecoratedAvatar
                               src={reply.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user.name)}&background=random`}
                               alt={reply.user.name}
-                              className="w-6 h-6 rounded-full object-cover border border-border/50"
+                              decorationId={reply.user.avatarDecoration || null}
+                              isNismaraPlus={reply.user.isNismaraPlus === true}
+                              isStaff={reply.user.isManager === true}
+                              topManager={reply.user.topManager}
+                              sizeClass="w-6 h-6"
+                              frameClass="border border-border/50"
                             />
                           </Link>
                         ) : (
-                          <div className="shrink-0">
-                            <img
-                              src={reply.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user.name)}&background=random`}
-                              alt={reply.user.name}
-                              className="w-6 h-6 rounded-full object-cover border border-border/50"
-                            />
-                          </div>
+                          <DecoratedAvatar
+                            src={reply.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user.name)}&background=random`}
+                            alt={reply.user.name}
+                            decorationId={reply.user.avatarDecoration || null}
+                            isNismaraPlus={reply.user.isNismaraPlus === true}
+                            isStaff={reply.user.isManager === true}
+                            topManager={reply.user.topManager}
+                            sizeClass="w-6 h-6"
+                            frameClass="border border-border/50"
+                          />
                         )}
                         
                         <div className="flex-1">

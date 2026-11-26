@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { Metadata } from "next";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 export const revalidate = 86400; // Cache 24 jam untuk hemat resource
 
@@ -207,17 +208,23 @@ export default async function AchievementDetailPage({
                   className="relative z-10 hover:z-50 flex items-center justify-between p-4 bg-card/40 backdrop-blur-sm border border-border/50 rounded-2xl hover:border-primary/40 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-background border border-border/50 rounded-xl overflow-hidden shrink-0 flex items-center justify-center relative">
+                    <div className="relative shrink-0">
+                      <DecoratedAvatar
+                        src={p.userInfo?.image || "/placeholder-avatar.png"}
+                        alt={p.userInfo?.name || "Avatar"}
+                        fallbackText={p.userInfo?.name?.charAt(0) || "?"}
+                        decorationId={p.userInfo?.avatarDecoration || null}
+                        isNismaraPlus={p.userInfo?.nismaraplus?.status === true}
+                        userRole={p.userInfo?.discordRole || p.userInfo?.role}
+                        topManager={p.userInfo?.topManager}
+                        sizeClass="w-12 h-12"
+                        frameClass="bg-background border border-border/50"
+                      />
                       {p.count > 1 && (
-                        <div className="absolute -top-1 -right-1 z-10 text-[9px] bg-primary text-primary-foreground border-2 border-background px-1.5 py-0.5 rounded-full font-black shadow-md">
+                        <div className="absolute -top-1 -right-1 z-20 text-[9px] bg-primary text-primary-foreground border-2 border-background px-1.5 py-0.5 rounded-full font-black shadow-md">
                           x{p.count}
                         </div>
                       )}
-                      <img
-                        src={p.userInfo?.image || "/placeholder-avatar.png"}
-                        alt="Avatar"
-                        className="w-full h-full object-cover"
-                      />
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground flex items-center gap-1.5">

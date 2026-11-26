@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const period = searchParams.get("period") || "all";
 
     // Cek cache Redis (berlaku 15 menit)
-    const cacheKey = `timezone:leaderboard:${period}`;
+    const cacheKey = `timezone:leaderboard:v2:${period}`;
     const cachedData = await redis.get(cacheKey);
 
     if (cachedData) {
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
     
     const users = await db.collection("users").find(
       { discordId: { $in: userIdsToFetch } },
-      { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, nismaraplus: 1, role: 1, discordRole: 1, truckyRank: 1, topManager: 1 } }
+      { projection: { discordId: 1, name: 1, image: 1, avatarUrl: 1, nismaraplus: 1, role: 1, discordRole: 1, truckyRank: 1, topManager: 1, avatarDecoration: 1 } }
     ).toArray();
 
     const userMap = users.reduce((acc, u) => {
@@ -95,6 +95,7 @@ export async function GET(req: Request) {
         isManager: u.role === "manager" || u.role === "admin" || u.discordRole === "manager" || u.discordRole === "admin",
         truckyRank: u.truckyRank,
         topManager: u.topManager,
+        avatarDecoration: u.avatarDecoration || null,
       };
       return acc;
     }, {} as Record<string, any>);

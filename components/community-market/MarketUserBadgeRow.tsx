@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { Star, ShoppingBag } from "lucide-react";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 export interface MarketUserInfo {
   discordId: string;
@@ -15,6 +16,7 @@ export interface MarketUserInfo {
   isBooster?: boolean;
   isNismaraPlus?: boolean;
   nismaraPlusStartedAt?: string | null;
+  avatarDecoration?: string | null;
   topManager?: {
     status?: boolean;
     month?: string | null;
@@ -39,22 +41,19 @@ export default function MarketUserBadgeRow({
 
   return (
     <div className="flex items-center gap-2.5 min-w-0">
-      <div
-        className={`${
-          compact ? "w-7 h-7 text-xs" : "w-9 h-9 text-sm"
-        } rounded-full bg-primary/15 border border-border/60 overflow-hidden shrink-0 flex items-center justify-center font-bold text-primary`}
-      >
-        {user?.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.image}
-            alt={displayName}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          displayName.charAt(0).toUpperCase()
-        )}
-      </div>
+      <DecoratedAvatar
+        src={
+          user?.image ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=312e81&color=fff`
+        }
+        alt={displayName}
+        decorationId={user?.avatarDecoration || null}
+        isNismaraPlus={user?.isNismaraPlus === true}
+        userRole={user?.role}
+        topManager={user?.topManager}
+        sizeClass={compact ? "w-7 h-7" : "w-9 h-9"}
+        frameClass="border border-border/60 bg-primary/15"
+      />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">

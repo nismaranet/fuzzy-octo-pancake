@@ -30,6 +30,7 @@ export interface UserComment {
     isBooster?: boolean;
     isManager?: boolean;
     truckyRank?: string;
+    avatarDecoration?: string | null;
     topManager?: {
       status?: boolean;
       month?: string | null;
@@ -56,6 +57,7 @@ export default function GalleryGrid({
   loggedInUserTruckyId,
   profileName,
   profileAvatar,
+  profileAvatarDecoration,
   profileDiscordId,
   profileIsNismaraPlus,
   profileIsBooster,
@@ -69,6 +71,7 @@ export default function GalleryGrid({
   loggedInUserTruckyId?: string | null;
   profileName: string;
   profileAvatar: string;
+  profileAvatarDecoration?: string | null;
   profileDiscordId: string;
   profileIsNismaraPlus?: boolean;
   profileIsBooster?: boolean;
@@ -255,6 +258,7 @@ export default function GalleryGrid({
           loggedInUserTruckyId={loggedInUserTruckyId}
           profileName={profileName}
           profileAvatar={profileAvatar}
+          profileAvatarDecoration={profileAvatarDecoration}
           profileTruckyId={truckyId}
           profileIsNismaraPlus={profileIsNismaraPlus}
           profileIsBooster={profileIsBooster}

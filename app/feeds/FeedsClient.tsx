@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Heart, MessageCircle, Share2, Loader2, MonitorPlay, Home, Hash, Users, Bell, Plus } from "lucide-react";
 import Link from "next/link";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import GalleryModal from "@/components/gallery/GalleryModal";
@@ -178,17 +179,27 @@ export default function FeedsClient({
                 <div className="p-4 flex items-center gap-3">
                   {post.user?.truckyId ? (
                     <Link href={`/profile/${post.user.truckyId}`} className="shrink-0">
-                      <img 
-                        src={post.user.avatarUrl || "/placeholder-avatar.png"} 
-                        alt={post.user.name} 
-                        className="w-10 h-10 rounded-full object-cover border border-border"
+                      <DecoratedAvatar
+                        src={post.user.avatarUrl || "/placeholder-avatar.png"}
+                        alt={post.user.name}
+                        decorationId={post.user.avatarDecoration || null}
+                        isNismaraPlus={post.user.isNismaraPlus === true}
+                        userRole={post.user.role}
+                        topManager={post.user.topManager}
+                        sizeClass="w-10 h-10"
+                        frameClass="border border-border"
                       />
                     </Link>
                   ) : (
-                    <img 
-                      src={post.user?.avatarUrl || "/placeholder-avatar.png"} 
-                      alt={post.user?.name || "Driver"} 
-                      className="w-10 h-10 rounded-full object-cover border border-border shrink-0"
+                    <DecoratedAvatar
+                      src={post.user?.avatarUrl || "/placeholder-avatar.png"}
+                      alt={post.user?.name || "Driver"}
+                      decorationId={post.user?.avatarDecoration || null}
+                      isNismaraPlus={post.user?.isNismaraPlus === true}
+                      userRole={post.user?.role}
+                      topManager={post.user?.topManager}
+                      sizeClass="w-10 h-10"
+                      frameClass="border border-border"
                     />
                   )}
                   <div className="flex-1 flex flex-col justify-center">
@@ -357,11 +368,13 @@ export default function FeedsClient({
           loggedInUserTruckyId={loggedInUserTruckyId}
           profileName={selectedPost.user?.name || "Driver"}
           profileAvatar={selectedPost.user?.avatarUrl || "/placeholder-avatar.png"}
+          profileAvatarDecoration={selectedPost.user?.avatarDecoration || null}
           profileTruckyId={selectedPost.user?.truckyId}
           profileIsNismaraPlus={selectedPost.user?.isNismaraPlus}
           profileNismaraPlusStartedAt={selectedPost.user?.nismaraPlusStartedAt}
           profileIsBooster={selectedPost.user?.isBooster}
           profileRole={selectedPost.user?.role}
+          profileTopManager={selectedPost.user?.topManager}
           isManager={isManager}
           onPostUpdate={(updated) => {
             // Keep the user info when updating post from modal

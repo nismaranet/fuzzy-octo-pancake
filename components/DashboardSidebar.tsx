@@ -218,6 +218,11 @@ export default function DashboardSidebar({
                 href: "/dashboard/manage/data/achievement",
                 icon: Award,
               },
+              {
+                name: "Avatar Decorations",
+                href: "/dashboard/manage/data/avatar-decorations",
+                icon: Sparkles,
+              },
               { name: "Quiz & Ujian", href: "/dashboard/manage/data/quiz", icon: FileQuestion },
               { name: "Knowledge Base", href: "/dashboard/manage/kb", icon: BookOpen },
               {
@@ -333,7 +338,7 @@ export default function DashboardSidebar({
             name: "Staff, Support & Audit",
             icon: ShieldCheck,
             children: [
-              { name: "Payroll & KPI", href: "/dashboard/manage/payroll", icon: Coins },
+              { name: "Payroll & KPI", href: "/dashboard/manage/payroll", icon: Coins, exact: true },
               { name: "Manage Tickets", href: "/dashboard/manage/tickets", icon: FileText },
               { name: "Audit Center", href: "/dashboard/manage/audit", icon: ShieldCheck },
               { name: "Security Alerts", href: "/dashboard/manage/security", icon: Shield },
@@ -359,6 +364,11 @@ export default function DashboardSidebar({
                 name: "Changelog Hub",
                 href: "/dashboard/manage/changelog",
                 icon: ScrollText,
+              },
+              {
+                name: "Payroll Templates",
+                href: "/dashboard/manage/payroll/templates",
+                icon: Coins,
               },
               {
                 name: "Owner Voucher Lab",

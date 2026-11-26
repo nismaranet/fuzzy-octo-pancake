@@ -3,6 +3,7 @@ import clientPromise from "@/lib/mongodb";
 import { getCompanyMembersMap } from "@/lib/trucky";
 import CargoMarketChart from "@/app/cargo-market/[game_id]/[in_game_id]/CargoMarketChart";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
@@ -510,17 +511,18 @@ export default async function CoachTerminalPage() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        {driver.avatar ? (
-                          <img
-                            src={driver.avatar}
-                            alt={driver.name}
-                            className="w-10 h-10 rounded-full object-cover border border-sky-500/30 shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-sky-500/15 text-sky-400 font-bold flex items-center justify-center shrink-0">
-                            {driver.name.charAt(0)}
-                          </div>
-                        )}
+                        <DecoratedAvatar
+                          src={driver.avatar}
+                          alt={driver.name}
+                          fallbackText={driver.name.charAt(0)}
+                          decorationId={driver.dbUser?.avatarDecoration || null}
+                          isNismaraPlus={driver.dbUser?.nismaraplus?.status === true}
+                          userRole={driver.dbUser?.discordRole || driver.dbUser?.role}
+                          topManager={driver.dbUser?.topManager}
+                          sizeClass="w-10 h-10"
+                          frameClass="border border-sky-500/30"
+                          fallbackBg="bg-sky-500/15 text-sky-400"
+                        />
                         <div className="min-w-0">
                           <p className="font-bold text-sm text-foreground truncate group-hover:text-sky-400 transition-colors">
                             {driver.name}
@@ -656,20 +658,18 @@ export default async function CoachTerminalPage() {
                             href={`/jobs/${job.jobId || job._id}`}
                             className="flex items-center gap-3 group"
                           >
-                            {driver.avatar ? (
-                              <img
-                                src={driver.avatar}
-                                alt={driver.name}
-                                className="w-9 h-9 rounded-full object-cover border border-border/50"
-                              />
-                            ) : (
-                              <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center border border-border/50">
-                                <UserIcon
-                                  size={14}
-                                  className="text-muted-foreground"
-                                />
-                              </div>
-                            )}
+                            <DecoratedAvatar
+                              src={driver.avatar}
+                              alt={driver.name}
+                              fallbackText={driver.name.charAt(0)}
+                              decorationId={driver.dbUser?.avatarDecoration || null}
+                              isNismaraPlus={driver.dbUser?.nismaraplus?.status === true}
+                              userRole={driver.dbUser?.discordRole || driver.dbUser?.role}
+                              topManager={driver.dbUser?.topManager}
+                              sizeClass="w-9 h-9"
+                              frameClass="border border-border/50"
+                              fallbackBg="bg-muted text-muted-foreground"
+                            />
                             <div>
                               <div className="font-bold text-foreground group-hover:text-sky-400 transition-colors flex items-center gap-1">
                                 {driver.name}

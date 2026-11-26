@@ -92,7 +92,8 @@ export async function GET(request: Request) {
               isBooster: "$uploader.isBooster",
               role: "$uploader.discordRole",
               truckyRank: "$uploader.truckyRank",
-              topManager: "$uploader.topManager"
+              topManager: "$uploader.topManager",
+              avatarDecoration: "$uploader.avatarDecoration",
             }
           }
         },

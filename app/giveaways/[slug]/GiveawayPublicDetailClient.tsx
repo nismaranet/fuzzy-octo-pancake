@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { showAlert, showConfirm } from "@/lib/dialog";
 import { resolveQuestDescription } from "@/lib/giveawayUtils";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 interface GiveawayPublicDetailClientProps {
   giveaway: any;
@@ -270,20 +271,55 @@ export default function GiveawayPublicDetailClient({
                   className="p-5 rounded-2xl bg-black/40 border border-amber-500/20 flex flex-col justify-between space-y-4 hover:border-amber-500/40 transition-all"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={w.avatarUrl || "/avatar-default.png"}
-                        alt={w.name}
-                        className="w-12 h-12 rounded-full border-2 border-amber-400/50 object-cover"
-                      />
-                      <div>
-                        <h4 className="text-sm font-black text-foreground">{w.name}</h4>
-                        <span className="text-xs font-mono font-bold text-amber-400">
-                          Tiket #{w.ticketNumber}
-                        </span>
+                    {w.truckyId ? (
+                      <Link
+                        href={`/profile/${w.truckyId}`}
+                        className="flex items-center gap-3 group min-w-0"
+                      >
+                        <DecoratedAvatar
+                          src={w.avatarUrl || null}
+                          alt={w.name || "Winner"}
+                          fallbackText={(w.name || "?").charAt(0)}
+                          decorationId={w.avatarDecoration || null}
+                          isNismaraPlus={w.isNismaraPlus === true}
+                          userRole={w.userRole}
+                          topManager={w.topManager}
+                          sizeClass="w-12 h-12"
+                          frameClass="border-2 border-amber-400/50"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-black text-foreground truncate group-hover:text-amber-400 transition-colors">
+                            {w.name}
+                          </h4>
+                          <span className="text-xs font-mono font-bold text-amber-400">
+                            Tiket #{w.ticketNumber}
+                          </span>
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-3 min-w-0">
+                        <DecoratedAvatar
+                          src={w.avatarUrl || null}
+                          alt={w.name || "Winner"}
+                          fallbackText={(w.name || "?").charAt(0)}
+                          decorationId={w.avatarDecoration || null}
+                          isNismaraPlus={w.isNismaraPlus === true}
+                          userRole={w.userRole}
+                          topManager={w.topManager}
+                          sizeClass="w-12 h-12"
+                          frameClass="border-2 border-amber-400/50"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-black text-foreground truncate">
+                            {w.name}
+                          </h4>
+                          <span className="text-xs font-mono font-bold text-amber-400">
+                            Tiket #{w.ticketNumber}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-400 font-black text-xs uppercase tracking-wider">
+                    )}
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-400 font-black text-xs uppercase tracking-wider shrink-0">
                       {w.tierTitle || `Tier ${w.tier}`}
                     </span>
                   </div>

@@ -14,6 +14,7 @@ export interface LeaderboardDriver {
   score: number;
   isCurrentUser?: boolean;
   isBooster?: boolean;
+  avatarDecoration?: string | null;
   topManager?: {
     status?: boolean;
     month?: string | null;

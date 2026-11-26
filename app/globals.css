@@ -298,3 +298,86 @@ html[data-season-theme="halloween"] .loading-season-halloween {
 html[data-season-theme="halloween"] .loading-season-default {
   display: none;
 }
+
+/* Avatar Decoration Micro-Animations */
+@keyframes avd-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes avd-spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes avd-twinkle {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes avd-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-2.5px) rotate(6deg);
+  }
+}
+
+.avd-spin-slow {
+  transform-origin: center;
+  animation: avd-spin-slow 16s linear infinite;
+}
+
+.avd-spin-medium {
+  transform-origin: center;
+  animation: avd-spin-slow 10s linear infinite;
+}
+
+.avd-spin-reverse {
+  transform-origin: center;
+  animation: avd-spin-reverse 20s linear infinite;
+}
+
+.avd-twinkle {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: avd-twinkle 2.8s ease-in-out infinite;
+}
+
+.avd-twinkle-delay {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: avd-twinkle 3.4s ease-in-out 1.2s infinite;
+}
+
+.avd-float {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: avd-float 4.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avd-spin-slow,
+  .avd-spin-medium,
+  .avd-spin-reverse,
+  .avd-twinkle,
+  .avd-twinkle-delay,
+  .avd-float {
+    animation: none !important;
+  }
+}

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import PaginationControls from "./PaginationControls";
 import UserBadges from "@/components/icons/UserBadges";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 import ClaimButton from "./ClaimButton";
 
 import { Metadata } from "next";
@@ -172,6 +173,7 @@ export default async function CouponDetailPage(props: DetailPageProps) {
           name: 1,
           image: 1,
           avatarUrl: 1,
+          avatarDecoration: 1,
           truckyId: 1,
           role: 1,
           discordRole: 1,
@@ -360,19 +362,18 @@ export default async function CouponDetailPage(props: DetailPageProps) {
                     className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:bg-muted/30 transition-colors"
                   >
                     <div className="flex items-center gap-4 flex-1">
-                      <div className="w-12 h-12 rounded-full bg-muted overflow-hidden border border-border flex-shrink-0 relative">
-                        {avatar ? (
-                          <img
-                            src={avatar}
-                            alt={claim.user?.name || "User"}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-lg">
-                            {(claim.user?.name || "?")[0]}
-                          </div>
-                        )}
-                      </div>
+                      <DecoratedAvatar
+                        src={avatar}
+                        alt={claim.user?.name || "User"}
+                        fallbackText={(claim.user?.name || "?")[0]}
+                        decorationId={claim.user?.avatarDecoration || null}
+                        isNismaraPlus={claim.user?.nismaraplus?.status === true}
+                        userRole={claim.user?.discordRole || claim.user?.role}
+                        topManager={claim.user?.topManager}
+                        sizeClass="w-12 h-12"
+                        frameClass="bg-muted border border-border"
+                        fallbackBg="bg-primary/10 text-primary"
+                      />
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-foreground text-lg">

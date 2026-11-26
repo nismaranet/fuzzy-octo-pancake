@@ -6,6 +6,7 @@ import { joinTeamAction } from "@/app/actions/teamHqActions";
 import ReactMarkdown from "react-markdown";
 import { showAlert } from "@/lib/dialog";
 import { useSession } from "next-auth/react";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 interface TeamProfileUIProps {
   team: any;
@@ -221,10 +222,15 @@ export default function TeamProfileUI({
                   key={member._id}
                   className="flex items-center gap-4 p-4 rounded-xl glass-panel border border-border hover:border-primary/50 transition-all"
                 >
-                  <img
-                    src={member.image}
+                  <DecoratedAvatar
+                    src={member.image || "/placeholder-avatar.png"}
                     alt={member.name}
-                    className="w-14 h-14 rounded-full border border-primary/30 object-cover"
+                    decorationId={member.avatarDecoration || null}
+                    isNismaraPlus={member.nismaraplus?.status === true}
+                    userRole={member.discordRole || member.role}
+                    topManager={member.topManager}
+                    sizeClass="w-14 h-14"
+                    frameClass="border border-primary/30"
                   />
                   <div>
                     <h3 className="text-foreground font-semibold">
@@ -252,10 +258,15 @@ export default function TeamProfileUI({
                   className={`p-4 sm:p-6 hover:bg-foreground/5 transition-colors ${index !== recentJobs.length - 1 ? "border-b border-border" : ""}`}
                 >
                   <div className="flex gap-4">
-                    <img
-                      src={job.driverImage}
+                    <DecoratedAvatar
+                      src={job.driverImage || "/placeholder-avatar.png"}
                       alt={job.driverName}
-                      className="w-12 h-12 rounded-full border border-accent-sky/30 object-cover"
+                      decorationId={job.driverAvatarDecoration || null}
+                      isNismaraPlus={job.driverIsNismaraPlus === true}
+                      userRole={job.driverRole}
+                      topManager={job.driverTopManager}
+                      sizeClass="w-12 h-12"
+                      frameClass="border border-accent-sky/30"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">

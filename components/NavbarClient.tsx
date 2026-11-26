@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "@/components/ui/NotificationBell";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
+import UserBadges from "@/components/icons/UserBadges";
 import { getCurrencyData } from "@/app/dashboard/currency/actions";
 import {
   getSeasonPassSummary,
@@ -48,6 +50,8 @@ import {
   Bus,
   BarChart3,
   Store,
+  Settings,
+  ArrowUpRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -649,214 +653,293 @@ export default function NavbarClient({
                   render={
                     <Button
                       variant="ghost"
-                      className="relative h-10 w-10 rounded-full focus-visible:ring-0"
+                      className="relative h-10 w-10 p-0 rounded-full focus-visible:ring-0 overflow-visible"
                     />
                   }
                 >
-                  <Avatar className="h-9 w-9 border-2 border-primary/30 shadow-sm bg-card">
-                    <AvatarImage
-                      src={session.user?.image || ""}
-                      alt={session.user?.name || "User"}
-                    />
-                    <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                      {session.user?.name?.charAt(0) || "U"}
-                    </AvatarFallback>
-                  </Avatar>
+                  <DecoratedAvatar
+                    src={session.user?.image || "/placeholder-avatar.png"}
+                    alt={session.user?.name || "User"}
+                    decorationId={(session.user as any)?.avatarDecoration || null}
+                    isNismaraPlus={(session.user as any)?.nismaraplus?.status === true}
+                    userRole={session.user?.role}
+                    topManager={(session.user as any)?.topManager}
+                    sizeClass="h-9 w-9"
+                    frameClass="border-2 border-primary/30 shadow-sm bg-card"
+                  />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="w-72 mt-2 p-2 rounded-2xl bg-card border border-border/50 shadow-xl"
+                  className="w-80 mt-2 p-2.5 rounded-2xl bg-card/95 backdrop-blur-xl border border-border/60 shadow-2xl"
                   align="end"
                 >
-                  <div className="bg-muted/80 backdrop-blur-md rounded-xl p-3 flex items-center gap-3 mb-2 border border-white/5">
-                    <Avatar className="h-12 w-12 border border-primary/20 bg-primary/10 shrink-0">
-                      <AvatarImage
-                        src={session.user?.image || ""}
+                  {/* PROFILE IDENTITY MINI-CARD */}
+                  <div
+                    className={`relative rounded-xl p-3 mb-2.5 border overflow-visible ${
+                      session.user?.nismaraplus?.status
+                        ? "bg-linear-to-br from-amber-500/12 via-muted/70 to-card border-amber-500/25"
+                        : "bg-linear-to-br from-primary/12 via-muted/70 to-card border-white/10"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <DecoratedAvatar
+                        src={session.user?.image || "/placeholder-avatar.png"}
                         alt={session.user?.name || "User"}
-                        className="object-cover"
+                        decorationId={
+                          (session.user as any)?.avatarDecoration || null
+                        }
+                        isNismaraPlus={
+                          (session.user as any)?.nismaraplus?.status === true
+                        }
+                        userRole={session.user?.role}
+                        topManager={(session.user as any)?.topManager}
+                        sizeClass="h-12 w-12"
+                        frameClass="border border-primary/30 bg-primary/10"
                       />
-                      <AvatarFallback className="bg-red-500 text-white font-bold">
-                        {session.user?.name?.charAt(0) || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-sm text-foreground truncate block">
-                        {session.user?.name}
+                      <div className="flex flex-col min-w-0 flex-1 pr-7">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-bold text-sm text-foreground truncate">
+                            {session.user?.name}
+                          </span>
+                          <UserBadges
+                            role={session.user?.role}
+                            isBooster={(session.user as any)?.isBooster === true}
+                            isNismaraPlus={
+                              (session.user as any)?.nismaraplus?.status === true
+                            }
+                            nismaraPlusStartedAt={
+                              (session.user as any)?.nismaraplus?.startedAt
+                            }
+                            truckyRank={(session.user as any)?.truckyRank}
+                            topManager={(session.user as any)?.topManager}
+                            className="w-3.5 h-3.5 shrink-0"
+                          />
+                        </div>
+                        <span className="text-[11px] text-muted-foreground capitalize truncate">
+                          {session.user?.role || "Driver"} • Level{" "}
+                          {session.user?.level || 1}
+                        </span>
+                      </div>
+
+                      <DropdownMenuItem
+                        className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-background/60 hover:bg-background border border-border/50 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                        title="Pengaturan Profil"
+                        render={<Link href="/dashboard/settings" />}
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                      </DropdownMenuItem>
+                    </div>
+
+                    {/* COMPACT BALANCE BAR */}
+                    <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Coins className="h-3.5 w-3.5 text-amber-400" />
+                        Saldo Nismara Coin
                       </span>
-                      <span className="text-xs text-muted-foreground truncate block capitalize">
-                        {session.user?.role || "Driver"}
-                      </span>
-                      <span className="text-xs text-primary font-medium truncate block mt-0.5">
-                        Level {session.user?.level || 1} •{" "}
+                      <span className="text-xs font-black text-primary tabular-nums">
                         {currency !== null
-                          ? currency.toLocaleString("id-ID")
-                          : "..."}{" "}
-                        NC
+                          ? `${currency.toLocaleString("id-ID", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })} NC`
+                          : "..."}
                       </span>
                     </div>
                   </div>
 
-                  <div className="px-1 py-1 space-y-1">
-                    <DropdownMenuItem
-                      className="cursor-pointer rounded-lg hover:bg-white/5 focus:bg-white/5"
-                      render={
-                        <Link
-                          href="/dashboard"
-                          className="flex items-center w-full"
-                        />
-                      }
-                    >
-                      <LayoutDashboard className="mr-3 h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Dashboard</span>
-                    </DropdownMenuItem>
+                  {/* SECTION 1: AKUN SAYA (2x2 COMPACT TILES) */}
+                  <div className="px-0.5 mb-2.5">
+                    <div className="flex items-center justify-between px-1.5 mb-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
+                        Akun Saya
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <DropdownMenuItem
+                        className="cursor-pointer rounded-xl px-2.5 py-2 bg-white/[0.03] hover:bg-white/[0.08] focus:bg-white/[0.08] border border-white/5 hover:border-primary/30 transition-all"
+                        render={
+                          <Link
+                            href="/dashboard"
+                            className="flex items-center gap-2.5 w-full"
+                          />
+                        }
+                      >
+                        <span className="p-1.5 rounded-lg bg-primary/15 text-primary shrink-0">
+                          <LayoutDashboard className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="text-xs font-bold text-foreground truncate">
+                          Dashboard
+                        </span>
+                      </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      className="cursor-pointer rounded-lg hover:bg-white/5 focus:bg-white/5"
-                      render={
-                        <Link
-                          href={`/profile/${session.user?.truckyId || session.user?.driverData?.truckyId}`}
-                          className="flex items-center w-full"
-                        />
-                      }
-                    >
-                      <User className="mr-3 h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Public Profile</span>
-                    </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="cursor-pointer rounded-xl px-2.5 py-2 bg-white/[0.03] hover:bg-white/[0.08] focus:bg-white/[0.08] border border-white/5 hover:border-primary/30 transition-all"
+                        render={
+                          <Link
+                            href={`/profile/${session.user?.truckyId || session.user?.driverData?.truckyId}`}
+                            className="flex items-center gap-2.5 w-full"
+                          />
+                        }
+                      >
+                        <span className="p-1.5 rounded-lg bg-sky-500/15 text-sky-400 shrink-0">
+                          <User className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="text-xs font-bold text-foreground truncate">
+                          Profil Publik
+                        </span>
+                      </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      className="cursor-pointer rounded-lg hover:bg-white/5 focus:bg-white/5"
-                      render={
-                        <Link
-                          href="/teams"
-                          className="flex items-center w-full"
-                        />
-                      }
-                    >
-                      <Users className="mr-3 h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Teams</span>
-                    </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="cursor-pointer rounded-xl px-2.5 py-2 bg-white/[0.03] hover:bg-white/[0.08] focus:bg-white/[0.08] border border-white/5 hover:border-primary/30 transition-all"
+                        render={
+                          <Link
+                            href="/dashboard/garage"
+                            className="flex items-center gap-2.5 w-full"
+                          />
+                        }
+                      >
+                        <span className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 shrink-0">
+                          <Truck className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="text-xs font-bold text-foreground truncate">
+                          Garasi
+                        </span>
+                      </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      className="cursor-pointer rounded-lg hover:bg-white/5 focus:bg-white/5"
-                      render={
-                        <Link
-                          href="/dashboard/ticket"
-                          className="flex items-center w-full"
-                        />
-                      }
-                    >
-                      <FileText className="mr-3 h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Tickets</span>
-                    </DropdownMenuItem>
-
-                    {(session.user?.role === "manager" ||
-                      session.user?.role === "admin") && (
                       <DropdownMenuItem
-                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
+                        className="cursor-pointer rounded-xl px-2.5 py-2 bg-white/[0.03] hover:bg-white/[0.08] focus:bg-white/[0.08] border border-white/5 hover:border-primary/30 transition-all"
                         render={
                           <Link
-                            href="/dashboard/manage/payroll"
-                            className="flex items-center w-full"
+                            href="/dashboard/ticket"
+                            className="flex items-center gap-2.5 w-full"
                           />
                         }
                       >
-                        <Coins className="mr-3 h-4 w-4 text-red-400" />
-                        <span className="font-medium text-red-400">
-                          Payroll & KPI
+                        <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 shrink-0">
+                          <FileText className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="text-xs font-bold text-foreground truncate">
+                          Tiket
                         </span>
                       </DropdownMenuItem>
-                    )}
-
-                    {(session.user?.role === "manager" ||
-                      session.user?.role === "admin") && (
-                      <DropdownMenuItem
-                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
-                        render={
-                          <Link
-                            href="/dashboard/manage/tickets"
-                            className="flex items-center w-full"
-                          />
-                        }
-                      >
-                        <FileText className="mr-3 h-4 w-4 text-red-400" />
-                        <span className="font-medium text-red-400">
-                          Manage Tiket
-                        </span>
-                      </DropdownMenuItem>
-                    )}
-                    {(session.user?.role === "manager" ||
-                      session.user?.role === "admin") && (
-                      <DropdownMenuItem
-                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
-                        render={
-                          <Link
-                            href="/dashboard/manage/fleet"
-                            className="flex items-center w-full"
-                          />
-                        }
-                      >
-                        <Truck className="mr-3 h-4 w-4 text-red-400" />
-                        <span className="font-medium text-red-400">
-                          Manage Fleet
-                        </span>
-                      </DropdownMenuItem>
-                    )}
-                    {(session.user?.role === "manager" ||
-                      session.user?.role === "admin") && (
-                      <DropdownMenuItem
-                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
-                        render={
-                          <Link
-                            href="/dashboard/manage/events"
-                            className="flex items-center w-full"
-                          />
-                        }
-                      >
-                        <Sparkle className="mr-3 h-4 w-4 text-red-400" />
-                        <span className="font-medium text-red-400">
-                          Manage Events
-                        </span>
-                      </DropdownMenuItem>
-                    )}
-                    {(session.user?.role === "manager" ||
-                      session.user?.role === "admin") && (
-                      <DropdownMenuItem
-                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
-                        render={
-                          <Link
-                            href="/dashboard/manage/season-pass"
-                            className="flex items-center w-full"
-                          />
-                        }
-                      >
-                        <Trophy className="mr-3 h-4 w-4 text-red-400" />
-                        <span className="font-medium text-red-400">
-                          Manage Season Pass
-                        </span>
-                      </DropdownMenuItem>
-                    )}
-                    {(session.user?.role === "manager" ||
-                      session.user?.role === "admin") && (
-                      <DropdownMenuItem
-                        className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10"
-                        render={
-                          <Link
-                            href="/dashboard/manage/data"
-                            className="flex items-center w-full"
-                          />
-                        }
-                      >
-                        <User2 className="mr-3 h-4 w-4 text-red-400" />
-                        <span className="font-medium text-red-400">
-                          Manage Data
-                        </span>
-                      </DropdownMenuItem>
-                    )}
+                    </div>
                   </div>
 
-                  <div className="h-px bg-border my-2 mx-2" />
+                  {/* SECTION 2: MANAGER PORTAL (2x3 COMPACT GRID, REFINED ACCENT) */}
+                  {(session.user?.role === "manager" ||
+                    session.user?.role === "admin") && (
+                    <div className="px-0.5 mb-2.5 pt-2 border-t border-border/60">
+                      <div className="flex items-center justify-between px-1.5 mb-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-accent-lilac flex items-center gap-1">
+                          <Shield className="h-3 w-3" /> Manager Portal
+                        </span>
+                        <DropdownMenuItem
+                          className="p-0 h-auto bg-transparent hover:bg-transparent focus:bg-transparent cursor-pointer"
+                          render={
+                            <Link
+                              href="/dashboard/manage"
+                              className="text-[10px] font-bold text-muted-foreground hover:text-accent-lilac inline-flex items-center gap-0.5 transition-colors"
+                            />
+                          }
+                        >
+                          Buka Hub <ArrowUpRight className="h-3 w-3" />
+                        </DropdownMenuItem>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-xl px-2.5 py-1.5 bg-accent-lilac/[0.06] hover:bg-accent-lilac/15 focus:bg-accent-lilac/15 border border-accent-lilac/15 transition-all"
+                          render={
+                            <Link
+                              href="/dashboard/manage/payroll"
+                              className="flex items-center gap-2 w-full"
+                            />
+                          }
+                        >
+                          <Coins className="h-3.5 w-3.5 text-accent-lilac shrink-0" />
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            Payroll & KPI
+                          </span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-xl px-2.5 py-1.5 bg-accent-lilac/[0.06] hover:bg-accent-lilac/15 focus:bg-accent-lilac/15 border border-accent-lilac/15 transition-all"
+                          render={
+                            <Link
+                              href="/dashboard/manage/tickets"
+                              className="flex items-center gap-2 w-full"
+                            />
+                          }
+                        >
+                          <FileText className="h-3.5 w-3.5 text-accent-lilac shrink-0" />
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            Kelola Tiket
+                          </span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-xl px-2.5 py-1.5 bg-accent-lilac/[0.06] hover:bg-accent-lilac/15 focus:bg-accent-lilac/15 border border-accent-lilac/15 transition-all"
+                          render={
+                            <Link
+                              href="/dashboard/manage/fleet"
+                              className="flex items-center gap-2 w-full"
+                            />
+                          }
+                        >
+                          <Truck className="h-3.5 w-3.5 text-accent-lilac shrink-0" />
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            Kelola Fleet
+                          </span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-xl px-2.5 py-1.5 bg-accent-lilac/[0.06] hover:bg-accent-lilac/15 focus:bg-accent-lilac/15 border border-accent-lilac/15 transition-all"
+                          render={
+                            <Link
+                              href="/dashboard/manage/events"
+                              className="flex items-center gap-2 w-full"
+                            />
+                          }
+                        >
+                          <Sparkle className="h-3.5 w-3.5 text-accent-lilac shrink-0" />
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            Kelola Events
+                          </span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-xl px-2.5 py-1.5 bg-accent-lilac/[0.06] hover:bg-accent-lilac/15 focus:bg-accent-lilac/15 border border-accent-lilac/15 transition-all"
+                          render={
+                            <Link
+                              href="/dashboard/manage/season-pass"
+                              className="flex items-center gap-2 w-full"
+                            />
+                          }
+                        >
+                          <Trophy className="h-3.5 w-3.5 text-accent-lilac shrink-0" />
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            Season Pass
+                          </span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-xl px-2.5 py-1.5 bg-accent-lilac/[0.06] hover:bg-accent-lilac/15 focus:bg-accent-lilac/15 border border-accent-lilac/15 transition-all"
+                          render={
+                            <Link
+                              href="/dashboard/manage/data"
+                              className="flex items-center gap-2 w-full"
+                            />
+                          }
+                        >
+                          <User2 className="h-3.5 w-3.5 text-accent-lilac shrink-0" />
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            Kelola Data
+                          </span>
+                        </DropdownMenuItem>
+                      </div>
+                    </div>
+                  )}
 
                   {/* EXCLUSIVE MEMBERSHIP & PASS SECTION */}
-                  <div className="px-1 py-1 space-y-1.5">
+                  <div className="px-0.5 pt-2 border-t border-border/60 space-y-1.5">
                     {/* SEASON PASS EXCLUSIVE CARD */}
                     {isSeasonPassEnabled && (
                       <DropdownMenuItem
@@ -994,14 +1077,13 @@ export default function NavbarClient({
                     </DropdownMenuItem>
                   </div>
 
-                  <div className="h-px bg-border my-2 mx-2" />
-
-                  <div className="px-1 pb-1">
+                  <div className="mt-2 pt-2 border-t border-border/60 px-0.5">
                     <DropdownMenuItem
-                      className="text-red-400 hover:text-red-300 focus:text-red-300 focus:bg-red-500/10 cursor-pointer flex items-center justify-center rounded-lg font-bold py-2.5 transition-colors"
+                      className="text-red-400 hover:text-red-300 focus:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer flex items-center justify-center gap-2 rounded-xl font-bold text-xs py-2.5 border border-transparent hover:border-red-500/20 transition-all"
                       onClick={() => signOut()}
                     >
-                      Logout
+                      <LogOut className="h-3.5 w-3.5" />
+                      Keluar dari Akun
                     </DropdownMenuItem>
                   </div>
                 </DropdownMenuContent>

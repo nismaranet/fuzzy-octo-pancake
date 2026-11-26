@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Ticket, Plus, Star, CheckCircle, XCircle, AlertCircle, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react";
 import { showAlert } from "@/lib/dialog";
 import TurnstileWidget from "@/components/ui/TurnstileWidget";
+import DecoratedAvatar from "@/components/profile/DecoratedAvatar";
 
 
 export default function TicketPage() {
@@ -405,17 +407,50 @@ export default function TicketPage() {
                   
                   {t.managerInfo && (
                     <div className="bg-black/30 p-4 rounded-xl border border-border/30 mb-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {t.managerInfo.image ? (
-                          <img src={t.managerInfo.image} alt="Manager Avatar" className="w-10 h-10 rounded-full border-2 border-accent-lilac/30" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center font-bold text-white border-2 border-accent-lilac/30">?</div>
-                        )}
-                        <div>
-                          <div className="text-xs text-gray-500 font-bold mb-0.5">Diurus oleh:</div>
-                          <span className="text-sm text-white font-bold">{t.managerInfo.name || t.managerId}</span>
+                      {t.managerInfo.truckyId ? (
+                        <Link
+                          href={`/profile/${t.managerInfo.truckyId}`}
+                          className="flex items-center gap-3 group"
+                        >
+                          <DecoratedAvatar
+                            src={t.managerInfo.image || null}
+                            alt={t.managerInfo.name || "Manager Avatar"}
+                            fallbackText={(t.managerInfo.name || "?").charAt(0)}
+                            decorationId={t.managerInfo.avatarDecoration || null}
+                            isNismaraPlus={t.managerInfo.isNismaraPlus === true}
+                            userRole={t.managerInfo.role}
+                            topManager={t.managerInfo.topManager}
+                            sizeClass="w-10 h-10"
+                            frameClass="border-2 border-accent-lilac/30"
+                            fallbackBg="bg-gray-700 text-white"
+                          />
+                          <div>
+                            <div className="text-xs text-gray-500 font-bold mb-0.5">Diurus oleh:</div>
+                            <span className="text-sm text-white font-bold group-hover:text-primary transition-colors">
+                              {t.managerInfo.name || t.managerId}
+                            </span>
+                          </div>
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <DecoratedAvatar
+                            src={t.managerInfo.image || null}
+                            alt={t.managerInfo.name || "Manager Avatar"}
+                            fallbackText={(t.managerInfo.name || "?").charAt(0)}
+                            decorationId={t.managerInfo.avatarDecoration || null}
+                            isNismaraPlus={t.managerInfo.isNismaraPlus === true}
+                            userRole={t.managerInfo.role}
+                            topManager={t.managerInfo.topManager}
+                            sizeClass="w-10 h-10"
+                            frameClass="border-2 border-accent-lilac/30"
+                            fallbackBg="bg-gray-700 text-white"
+                          />
+                          <div>
+                            <div className="text-xs text-gray-500 font-bold mb-0.5">Diurus oleh:</div>
+                            <span className="text-sm text-white font-bold">{t.managerInfo.name || t.managerId}</span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                       
                       {t.managerInfo.stats && (
                         <div className="flex gap-4 text-right">
