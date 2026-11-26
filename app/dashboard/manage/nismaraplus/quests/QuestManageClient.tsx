@@ -29,6 +29,8 @@ import {
   Loader2,
   RefreshCw,
   Globe,
+  Bus,
+  Users,
 } from "lucide-react";
 import {
   createQuestTemplateAction,
@@ -214,9 +216,36 @@ export default function QuestManageClient({
         return <Globe className="w-4 h-4 text-purple-400" />;
       case "HAULMP_JOB":
         return <Truck className="w-4 h-4 text-emerald-400" />;
+      case "COACH_JOB":
+      case "COACH_INTERCITY_JOB":
+      case "COACH_TOURIST_JOB":
+        return <Bus className="w-4 h-4 text-sky-400" />;
+      case "COACH_PASSENGERS":
+        return <Users className="w-4 h-4 text-teal-400" />;
       default:
         return <Truck className="w-4 h-4 text-blue-400" />;
     }
+  };
+
+  const getQuestTypeLabel = (type: string) => {
+    switch (type) {
+      case "COACH_JOB":
+        return "Bus / Coach (Semua)";
+      case "COACH_INTERCITY_JOB":
+        return "Coach Intercity";
+      case "COACH_TOURIST_JOB":
+        return "Coach Tourist";
+      case "COACH_PASSENGERS":
+        return "Penumpang Coach";
+      default:
+        return null;
+    }
+  };
+
+  const getTargetUnitLabel = (type?: string) => {
+    if (type === "TOTAL_DISTANCE") return "KM";
+    if (type === "COACH_PASSENGERS") return "Penumpang (Pax)";
+    return "Job";
   };
 
   const getRewardBadge = (reward: any) => {
@@ -328,7 +357,14 @@ export default function QuestManageClient({
             {preview?.currentWeek?.activeDoc?.quests?.map((q: any, idx: number) => (
               <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-border/40 last:border-0">
                 <span className="font-bold text-foreground truncate max-w-[180px]">{q.title}</span>
-                <span className="text-muted-foreground font-semibold">{q.target}x Target</span>
+                <span className="text-muted-foreground font-semibold">
+                  {q.target?.toLocaleString("id-ID")}{" "}
+                  {q.type === "COACH_PASSENGERS"
+                    ? "Pax"
+                    : q.type === "TOTAL_DISTANCE"
+                    ? "KM"
+                    : "x Target"}
+                </span>
               </div>
             )) || <p className="text-xs text-muted-foreground">Belum ada data aktif.</p>}
           </div>
@@ -383,6 +419,10 @@ export default function QuestManageClient({
             <option value="TOTAL_DISTANCE">Akumulasi Jarak (KM)</option>
             <option value="PERFECT_DELIVERY">Zero Damage (0%)</option>
             <option value="HARDCORE_JOB">Hardcore Mode</option>
+            <option value="COACH_JOB">Bus / Coach (Semua Layanan)</option>
+            <option value="COACH_INTERCITY_JOB">Coach Intercity Transit</option>
+            <option value="COACH_TOURIST_JOB">Coach Tourist Charter</option>
+            <option value="COACH_PASSENGERS">Total Penumpang Coach (Pax)</option>
           </select>
 
           <select
@@ -435,8 +475,17 @@ export default function QuestManageClient({
                     <td className="py-4 px-6">
                       <div className="font-bold text-foreground text-xs">
                         Target: {template.target.toLocaleString("id-ID")}{" "}
-                        {template.type === "TOTAL_DISTANCE" ? "KM" : "Job"}
+                        {template.type === "TOTAL_DISTANCE"
+                          ? "KM"
+                          : template.type === "COACH_PASSENGERS"
+                          ? "Pax"
+                          : "Job"}
                       </div>
+                      {getQuestTypeLabel(template.type) && (
+                        <p className="text-[11px] text-sky-400">
+                          {getQuestTypeLabel(template.type)}
+                        </p>
+                      )}
                       {template.minCargoMass > 0 && (
                         <p className="text-[11px] text-amber-400">Min. {template.minCargoMass} Ton</p>
                       )}
@@ -585,12 +634,16 @@ export default function QuestManageClient({
                     <option value="TOTAL_DISTANCE">⚡ Akumulasi Jarak (KM)</option>
                     <option value="PERFECT_DELIVERY">🛡️ Perfect Delivery (0% Damage)</option>
                     <option value="HARDCORE_JOB">🎯 Hardcore Mode</option>
+                    <option value="COACH_JOB">🚌 Bus / Coach (Semua Layanan)</option>
+                    <option value="COACH_INTERCITY_JOB">🚌 Coach Intercity Transit (Job)</option>
+                    <option value="COACH_TOURIST_JOB">🚌 Coach Tourist Charter (Job)</option>
+                    <option value="COACH_PASSENGERS">👥 Penumpang Bus Diangkut (Pax)</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-foreground">
-                    Target Angka * ({formData.type === "TOTAL_DISTANCE" ? "KM" : "Jumlah Job"})
+                    Target Angka * ({getTargetUnitLabel(formData.type)})
                   </label>
                   <input
                     type="number"

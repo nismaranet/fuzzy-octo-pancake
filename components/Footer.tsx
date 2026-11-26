@@ -1,4 +1,5 @@
 import Link from "next/link";
+import pkg from "@/package.json";
 import {
   DiscordIcon,
   InstagramIcon,
@@ -104,6 +105,7 @@ export default function Footer() {
                 { name: "Cookie Policy", href: "/cookies" },
                 { name: "Frequently Asked Questions", href: "/faq" },
                 { name: "Knowledge Base", href: "/kb" },
+                { name: "Catatan Perubahan", href: "/changelog" },
               ].map((link) => (
                 <li key={link.name}>
                   <Link
@@ -166,12 +168,20 @@ export default function Footer() {
 
         {/* BOTTOM BAR */}
         <div className="pt-10 border-t border-border/30 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-[10px] font-black text-foreground/20 uppercase tracking-[0.2em] flex items-center gap-4">
+          <div className="text-[10px] font-black text-foreground/20 uppercase tracking-[0.2em] flex flex-wrap items-center justify-center md:justify-start gap-4">
             <span>&copy; {currentYear} NISMARA GROUP</span>
             <span className="hidden md:block w-1 h-1 bg-border rounded-full"></span>
             <span className="hidden md:block italic">
               More than just a Transport
             </span>
+            <Link
+              href="/changelog"
+              title="Lihat Catatan Perubahan"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/25 text-[10px] font-bold tracking-normal normal-case text-primary hover:bg-primary/20 transition-colors"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+              <span>v{pkg.version}</span>
+            </Link>
           </div>
 
           <div className="flex items-center gap-6">

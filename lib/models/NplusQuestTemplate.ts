@@ -14,11 +14,40 @@ export interface IQuestReward {
   description?: string;
 }
 
+export type NplusQuestType =
+  | "TOTAL_JOBS"
+  | "HEAVY_CARGO"
+  | "LONG_HAUL"
+  | "TOTAL_DISTANCE"
+  | "PERFECT_DELIVERY"
+  | "HARDCORE_JOB"
+  | "TRUCKERSMP_JOB"
+  | "HAULMP_JOB"
+  | "COACH_JOB"
+  | "COACH_INTERCITY_JOB"
+  | "COACH_TOURIST_JOB"
+  | "COACH_PASSENGERS";
+
+export const NPLUS_QUEST_TYPE_ENUM: NplusQuestType[] = [
+  "TOTAL_JOBS",
+  "HEAVY_CARGO",
+  "LONG_HAUL",
+  "TOTAL_DISTANCE",
+  "PERFECT_DELIVERY",
+  "HARDCORE_JOB",
+  "TRUCKERSMP_JOB",
+  "HAULMP_JOB",
+  "COACH_JOB",
+  "COACH_INTERCITY_JOB",
+  "COACH_TOURIST_JOB",
+  "COACH_PASSENGERS",
+];
+
 export interface INplusQuestTemplate {
   _id?: mongoose.Types.ObjectId;
   title: string;
   description: string;
-  type: "TOTAL_JOBS" | "HEAVY_CARGO" | "LONG_HAUL" | "TOTAL_DISTANCE" | "PERFECT_DELIVERY" | "HARDCORE_JOB" | "TRUCKERSMP_JOB" | "HAULMP_JOB";
+  type: NplusQuestType;
   target: number;
   minCargoMass?: number; // Ton (misal 20)
   minDistanceKm?: number; // KM (misal 1000)
@@ -63,7 +92,7 @@ const nplusQuestTemplateSchema = new mongoose.Schema(
     description: { type: String, required: true },
     type: {
       type: String,
-      enum: ["TOTAL_JOBS", "HEAVY_CARGO", "LONG_HAUL", "TOTAL_DISTANCE", "PERFECT_DELIVERY", "HARDCORE_JOB", "TRUCKERSMP_JOB", "HAULMP_JOB"],
+      enum: NPLUS_QUEST_TYPE_ENUM,
       required: true,
       index: true,
     },

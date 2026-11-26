@@ -270,6 +270,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/achievements",
     "/community-goals",
     "/kb",
+    "/changelog",
   ];
 
   const staticRoutes = routePaths.map((path) => ({

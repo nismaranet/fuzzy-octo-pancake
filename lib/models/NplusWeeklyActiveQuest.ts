@@ -1,11 +1,15 @@
 import mongoose from "mongoose";
-import { IQuestReward } from "./NplusQuestTemplate";
+import {
+  IQuestReward,
+  NPLUS_QUEST_TYPE_ENUM,
+  type NplusQuestType,
+} from "./NplusQuestTemplate";
 
 export interface IActiveQuestItem {
   templateId?: mongoose.Types.ObjectId | string;
   title: string;
   description: string;
-  type: "TOTAL_JOBS" | "HEAVY_CARGO" | "LONG_HAUL" | "TOTAL_DISTANCE" | "PERFECT_DELIVERY" | "HARDCORE_JOB" | "TRUCKERSMP_JOB" | "HAULMP_JOB";
+  type: NplusQuestType;
   target: number;
   minCargoMass?: number;
   minDistanceKm?: number;
@@ -33,7 +37,7 @@ const activeQuestItemSchema = new mongoose.Schema(
     description: { type: String, required: true },
     type: {
       type: String,
-      enum: ["TOTAL_JOBS", "HEAVY_CARGO", "LONG_HAUL", "TOTAL_DISTANCE", "PERFECT_DELIVERY", "HARDCORE_JOB", "TRUCKERSMP_JOB", "HAULMP_JOB"],
+      enum: NPLUS_QUEST_TYPE_ENUM,
       required: true,
     },
     target: { type: Number, required: true },

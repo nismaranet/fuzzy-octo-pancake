@@ -6,6 +6,22 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id/
 
 ---
 
+## [1.5.3] - 2026-11-26
+
+### Added
+- **Dynamic Multi-Product Changelog Hub (`/changelog` & `/dashboard/manage/changelog`):**
+  - Halaman publik `/changelog` bergaya timeline dengan tab multi-produk (**Web Transport**, **Bot Natasya**, **Nismara Tracker**), tombol **Salin Markdown**, kontrol **Luaskan semua / Ciutkan semua**, accordion kategori (*Fitur Baru*, *Peningkatan*, *Perbaikan*), panel kanan sticky **Di halaman ini** (*scroll spy*), serta metadata SEO/OpenGraph dan entri `app/sitemap.ts`.
+  - Panel CMS khusus **Web Owner** (`/dashboard/manage/changelog`) dengan tabel padat, pagination (`10 / 20 / 50`), slide-over drawer editor + pratinjau langsung, toggle Draft/Published, serta tombol **Impor Riwayat Awal** idempoten berbahasa non-teknis.
+  - Integrasi tautan **Catatan Perubahan** dan pill versi (`v{pkg.version}`) pada `components/Footer.tsx`, shortcut khusus Owner di `app/dashboard/manage/page.tsx`, serta anonimisasi `authorDiscordId` / `updatedByDiscordId` pada endpoint purge user (`/api/manage/users/[discordId]/purge`).
+- **Quest Mingguan Nismara+ Divisi Coaches / Bus (`/dashboard/manage/nismaraplus/quests`):**
+  - Menambahkan 4 tipe quest baru: **`COACH_JOB`** (semua layanan bus), **`COACH_INTERCITY_JOB`** (Intercity Transit), **`COACH_TOURIST_JOB`** (Tourist Charter), dan **`COACH_PASSENGERS`** (total penumpang diangkut / Pax) lengkap dengan deteksi `JobHistory` selaras Bot Natasya, aturan anti-tumpang tindih rotasi mingguan, filter & form Manage Quests, serta tampilan progres di `/dashboard/nismaraplus`.
+
+### Changed
+- **Rework Navigasi Dashboard Sidebar (`components/DashboardSidebar.tsx`, `app/dashboard/layout.tsx`):**
+  - Mengubah daftar flat panjang menjadi sistem **Parent & Child (expandable)** untuk **Driver Menu** (memisahkan jelas **Nismara+** dan **Season Pass**), **Management Portal** (mencakup akses langsung sub-menu `Manage Data`, `Manage Events`, dan `Manage Fleets`), serta grup **Owner Tools** khusus **Web Owner** dengan auto-expand grup aktif dan slide-over drawer untuk mobile.
+
+---
+
 ## [1.5.2] - 2026-11-26
 
 ### Fixed

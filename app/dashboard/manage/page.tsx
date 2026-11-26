@@ -651,6 +651,11 @@ export default async function ManageOverview() {
                 ...(canAccessOwnerLab
                   ? [
                       {
+                        name: "Owner Changelog Hub",
+                        href: "/dashboard/manage/changelog",
+                        desc: "Khusus Web Owner: kelola catatan perubahan Web, Bot Natasya & Tracker",
+                      },
+                      {
                         name: "Owner Voucher Lab (Testing)",
                         href: "/dashboard/manage/vouchers",
                         desc: "Khusus Developer & Owner: buat voucher manual + Audit Log",

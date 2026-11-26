@@ -1,6 +1,7 @@
 import DashboardSidebar from "@/components/DashboardSidebar";
 import DriverAccessBlocker from "@/components/DriverAccessBlocker";
 import { getSeasonPassFeatureStatus } from "@/lib/seasonPass";
+import { isWebOwner } from "@/lib/webConfig";
 
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -43,7 +44,10 @@ export default async function DashboardLayout({
     );
   }
 
-  const featureStatus = await getSeasonPassFeatureStatus();
+  const [featureStatus, isOwner] = await Promise.all([
+    getSeasonPassFeatureStatus(),
+    isWebOwner(session.user?.discordId),
+  ]);
 
   return (
     <>
@@ -51,6 +55,7 @@ export default async function DashboardLayout({
         {/* Sidebar Navigation */}
         <DashboardSidebar
           userRole={session.user?.role}
+          isOwner={isOwner}
           isSeasonPassEnabled={featureStatus.isEnabled}
           isTrackerEnabled={Boolean(session.user?.test_participation)}
         />

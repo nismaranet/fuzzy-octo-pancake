@@ -534,6 +534,20 @@ export async function DELETE(
       ),
     );
 
+    // 7.7 Anonimkan jejak penulis di koleksi Changelogs tanpa menghapus dokumen rilis bersama
+    deletePromises.push(
+      db.collection("changelogs").updateMany(
+        { authorDiscordId: discordId },
+        { $set: { authorDiscordId: null } },
+      ),
+    );
+    deletePromises.push(
+      db.collection("changelogs").updateMany(
+        { updatedByDiscordId: discordId },
+        { $set: { updatedByDiscordId: null } },
+      ),
+    );
+
     // Jalankan seluruh operasi delete & update paralel
     await Promise.all(deletePromises);
 

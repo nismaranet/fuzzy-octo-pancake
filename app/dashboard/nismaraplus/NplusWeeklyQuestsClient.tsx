@@ -23,6 +23,8 @@ import {
   Loader2,
   Calendar,
   Globe,
+  Bus,
+  Users,
 } from "lucide-react";
 import { claimWeeklyQuestAction, getWeeklyQuestsAction } from "@/app/actions/nplusQuestActions";
 import { showAlert } from "@/lib/dialog";
@@ -125,6 +127,14 @@ export default function NplusWeeklyQuestsClient({ initialData }: NplusWeeklyQues
         return <Flame className="w-5 h-5 text-rose-400" />;
       case "TRUCKERSMP_JOB":
         return <Globe className="w-5 h-5 text-purple-400" />;
+      case "HAULMP_JOB":
+        return <Truck className="w-5 h-5 text-emerald-400" />;
+      case "COACH_JOB":
+      case "COACH_INTERCITY_JOB":
+      case "COACH_TOURIST_JOB":
+        return <Bus className="w-5 h-5 text-sky-400" />;
+      case "COACH_PASSENGERS":
+        return <Users className="w-5 h-5 text-teal-400" />;
       default:
         return <Truck className="w-5 h-5 text-blue-400" />;
     }
@@ -144,20 +154,36 @@ export default function NplusWeeklyQuestsClient({ initialData }: NplusWeeklyQues
     }
   };
 
-  const formatUnit = (type: string, val: number, target: number) => {
+  const formatUnit = (
+    type: string,
+    val: number,
+    target: number,
+    minCargoMass?: number,
+    minDistanceKm?: number
+  ) => {
     switch (type) {
       case "TOTAL_DISTANCE":
         return `${val.toLocaleString("id-ID")} / ${target.toLocaleString("id-ID")} KM`;
       case "HEAVY_CARGO":
-        return `${val} / ${target} Job (≥ 20T)`;
+        return `${val} / ${target} Job (≥ ${minCargoMass || 20}T)`;
       case "LONG_HAUL":
-        return `${val} / ${target} Job (≥ 1.000 KM)`;
+        return `${val} / ${target} Job (≥ ${(minDistanceKm || 1000).toLocaleString("id-ID")} KM)`;
       case "PERFECT_DELIVERY":
         return `${val} / ${target} Job (0% Damage)`;
       case "HARDCORE_JOB":
         return `${val} / ${target} Job Hardcore`;
       case "TRUCKERSMP_JOB":
         return `${val} / ${target} Job (TruckersMP)`;
+      case "HAULMP_JOB":
+        return `${val} / ${target} Job (HaulMP)`;
+      case "COACH_JOB":
+        return `${val} / ${target} Job Bus/Coach`;
+      case "COACH_INTERCITY_JOB":
+        return `${val} / ${target} Job Intercity`;
+      case "COACH_TOURIST_JOB":
+        return `${val} / ${target} Job Tourist`;
+      case "COACH_PASSENGERS":
+        return `${val.toLocaleString("id-ID")} / ${target.toLocaleString("id-ID")} Penumpang`;
       default:
         return `${val} / ${target} Job`;
     }
@@ -284,7 +310,13 @@ export default function NplusWeeklyQuestsClient({ initialData }: NplusWeeklyQues
                   <div className="flex justify-between text-xs font-bold">
                     <span className="text-muted-foreground">Progres Job</span>
                     <span className={quest.isCompleted ? "text-emerald-400 font-extrabold" : "text-foreground font-black"}>
-                      {formatUnit(quest.type, quest.currentValue, quest.target)}
+                      {formatUnit(
+                        quest.type,
+                        quest.currentValue,
+                        quest.target,
+                        quest.minCargoMass,
+                        quest.minDistanceKm
+                      )}
                     </span>
                   </div>
                   <div className="w-full h-2.5 bg-secondary rounded-full overflow-hidden border border-border/50">

@@ -212,7 +212,69 @@ const INCOMPATIBLE_TYPE_PAIRS: [string, string][] = [
   ["TOTAL_JOBS", "TRUCKERSMP_JOB"],
   ["TOTAL_JOBS", "HAULMP_JOB"],
   ["TRUCKERSMP_JOB", "HAULMP_JOB"],
+  // Quest divisi Coaches yang tumpang tindih tidak muncul bersamaan dalam 1 minggu
+  ["COACH_JOB", "COACH_INTERCITY_JOB"],
+  ["COACH_JOB", "COACH_TOURIST_JOB"],
+  ["COACH_JOB", "COACH_PASSENGERS"],
+  ["COACH_INTERCITY_JOB", "COACH_PASSENGERS"],
+  ["COACH_TOURIST_JOB", "COACH_PASSENGERS"],
 ];
+
+const COACH_CARGO_IDS = ["Passengers", "bus_company_job", "bus_tourist_job"];
+
+/**
+ * Menentukan apakah dokumen JobHistory merupakan job divisi Bus / Coaches.
+ */
+export function isCoachJobDoc(job: any): boolean {
+  if (!job) return false;
+  if (job.jobCategory === "coach") return true;
+
+  const market = String(job.marketType || "").toLowerCase();
+  const statsType = String(job.statsType || "").toLowerCase();
+  const cargoId = String(job.cargoId || "");
+
+  return (
+    market.startsWith("bus_") ||
+    market.startsWith("bus ") ||
+    market.includes("coach") ||
+    statsType.startsWith("coaches_") ||
+    statsType.startsWith("coaches ") ||
+    COACH_CARGO_IDS.includes(cargoId)
+  );
+}
+
+/**
+ * Membedakan layanan Bus Tourist Charter vs Bus Intercity Transit (selaras dengan coachHelper Bot Natasya).
+ */
+export function getCoachServiceType(job: any): "intercity" | "tourist" {
+  const market = String(job?.marketType || "").toLowerCase();
+  const cargoId = String(job?.cargoId || "").toLowerCase();
+  if (
+    market === "bus_tourist_job" ||
+    market === "bus tourist job" ||
+    market.includes("tourist") ||
+    cargoId === "bus_tourist_job"
+  ) {
+    return "tourist";
+  }
+  return "intercity";
+}
+
+/**
+ * Menghitung jumlah penumpang yang diangkut pada sebuah Coach job.
+ */
+export function getJobPassengerCount(job: any): number {
+  if (!isCoachJobDoc(job)) return 0;
+  const direct = Number(job.totalPassengers || 0);
+  if (direct > 0) return direct;
+  if (Array.isArray(job.stops) && job.stops.length > 0) {
+    return job.stops.reduce(
+      (sum: number, s: any) => sum + Number(s?.passengersIn || 0),
+      0
+    );
+  }
+  return 0;
+}
 
 function isTypeCompatibleWithSelected(type: string, usedTypes: Set<string>): boolean {
   for (const [typeA, typeB] of INCOMPATIBLE_TYPE_PAIRS) {
@@ -429,6 +491,12 @@ export async function getUserWeeklyQuestProgress(
           isHardcore: 1,
           hardcoreRating: 1,
           gameMode: 1,
+          jobCategory: 1,
+          marketType: 1,
+          statsType: 1,
+          cargoId: 1,
+          totalPassengers: 1,
+          stops: 1,
           completedAt: 1,
         },
       }
@@ -491,6 +559,22 @@ export async function getUserWeeklyQuestProgress(
         currentValue = userJobs.filter(
           (j) => j.isHardcore === true || (j.hardcoreRating && j.hardcoreRating >= 4)
         ).length;
+        break;
+      case "COACH_JOB":
+        currentValue = userJobs.filter((j) => isCoachJobDoc(j)).length;
+        break;
+      case "COACH_INTERCITY_JOB":
+        currentValue = userJobs.filter(
+          (j) => isCoachJobDoc(j) && getCoachServiceType(j) === "intercity"
+        ).length;
+        break;
+      case "COACH_TOURIST_JOB":
+        currentValue = userJobs.filter(
+          (j) => isCoachJobDoc(j) && getCoachServiceType(j) === "tourist"
+        ).length;
+        break;
+      case "COACH_PASSENGERS":
+        currentValue = userJobs.reduce((sum, j) => sum + getJobPassengerCount(j), 0);
         break;
       default:
         currentValue = 0;
