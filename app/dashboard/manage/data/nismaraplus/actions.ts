@@ -9,6 +9,24 @@ import Transaction from "@/lib/models/Transaction";
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongoose";
 import { getWebConfig, isWebOwner } from "@/lib/webConfig";
+import { redis } from "@/lib/redis";
+
+const FALLBACK_GUILD_ID =
+  process.env.DISCORD_GUILD_ID ||
+  process.env.GUILD_ID ||
+  "863959415702028318";
+
+async function invalidateSessionProfileCache(userId?: any, discordId?: string) {
+  if (!process.env.REDIS_URL?.trim()) return;
+  try {
+    const keys: string[] = [];
+    if (userId) keys.push(`session:profile:${String(userId)}`);
+    if (discordId) keys.push(`session:profile:${String(discordId)}`);
+    if (keys.length > 0) await redis.del(...keys);
+  } catch {
+    // non-fatal
+  }
+}
 
 export async function searchUsers(query: string) {
   try {
@@ -97,23 +115,36 @@ export async function grantOrExtendNismaraPlus(
 
     // Discord Bot Integration (Grant Role)
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const guildId = process.env.DISCORD_GUILD_ID;
+    const guildId = FALLBACK_GUILD_ID;
     const webConfig = await getWebConfig();
     const plusRoleId = webConfig.discordRoles.nismaraPlusRoleId;
 
     if (botToken && guildId && plusRoleId) {
-      await fetch(
-        `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${plusRoleId}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bot ${botToken}`,
-            "X-Audit-Log-Reason": "Nismara+ Subscription (Manual Grant)",
+      try {
+        const roleRes = await fetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${plusRoleId}`,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: `Bot ${botToken}`,
+              "X-Audit-Log-Reason": encodeURIComponent(
+                "Nismara+ Subscription (Manual Grant)",
+              ),
+            },
           },
-        },
-      ).catch((e) => console.error("Discord Role Error:", e));
+        );
+        if (!roleRes.ok && roleRes.status !== 204) {
+          console.error(
+            `[Nismara+ Manual Grant] Discord role PUT failed (HTTP ${roleRes.status}):`,
+            (await roleRes.text().catch(() => "")).slice(0, 300),
+          );
+        }
+      } catch (e) {
+        console.error("Discord Role Error:", e);
+      }
     }
 
+    await invalidateSessionProfileCache(user._id, discordId);
     revalidatePath("/dashboard/manage/data/nismaraplus");
     return {
       success: true,
@@ -153,23 +184,34 @@ export async function revokeNismaraPlus(discordId: string) {
 
     // Discord Bot Integration (Revoke Role)
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const guildId = process.env.DISCORD_GUILD_ID;
+    const guildId = FALLBACK_GUILD_ID;
     const webConfig = await getWebConfig();
     const plusRoleId = webConfig.discordRoles.nismaraPlusRoleId;
 
     if (botToken && guildId && plusRoleId) {
-      await fetch(
-        `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${plusRoleId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bot ${botToken}`,
-            "X-Audit-Log-Reason": "Nismara+ Revoked",
+      try {
+        const roleRes = await fetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${plusRoleId}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bot ${botToken}`,
+              "X-Audit-Log-Reason": encodeURIComponent("Nismara+ Revoked"),
+            },
           },
-        },
-      ).catch((e) => console.error("Discord Role Revoke Error:", e));
+        );
+        if (!roleRes.ok && roleRes.status !== 204 && roleRes.status !== 404) {
+          console.error(
+            `[Nismara+ Manual Revoke] Discord role DELETE failed (HTTP ${roleRes.status}):`,
+            (await roleRes.text().catch(() => "")).slice(0, 300),
+          );
+        }
+      } catch (e) {
+        console.error("Discord Role Revoke Error:", e);
+      }
     }
 
+    await invalidateSessionProfileCache(user._id, discordId);
     revalidatePath("/dashboard/manage/data/nismaraplus");
     return {
       success: true,
@@ -266,24 +308,35 @@ export async function confirmOrder(orderId: string) {
 
     // 4. Discord Bot Integration (Grant Role & Send Message)
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const guildId = process.env.DISCORD_GUILD_ID;
+    const guildId = FALLBACK_GUILD_ID;
     const webConfig = await getWebConfig();
     const plusRoleId = webConfig.discordRoles.nismaraPlusRoleId;
 
     if (botToken && guildId) {
       // a. Grant Role Nismara+ (Cek jika belum punya)
       if (plusRoleId) {
-        // Asumsi API Discord PUT idempotent, jika sudah punya tidak error
-        await fetch(
-          `https://discord.com/api/v10/guilds/${guildId}/members/${order.discordId}/roles/${plusRoleId}`,
-          {
-            method: "PUT",
-            headers: {
-              Authorization: `Bot ${botToken}`,
-              "X-Audit-Log-Reason": "Nismara+ Subscription",
+        try {
+          const roleRes = await fetch(
+            `https://discord.com/api/v10/guilds/${guildId}/members/${order.discordId}/roles/${plusRoleId}`,
+            {
+              method: "PUT",
+              headers: {
+                Authorization: `Bot ${botToken}`,
+                "X-Audit-Log-Reason": encodeURIComponent(
+                  "Nismara+ Subscription",
+                ),
+              },
             },
-          },
-        ).catch((e) => console.error("Discord Role Error:", e));
+          );
+          if (!roleRes.ok && roleRes.status !== 204) {
+            console.error(
+              `[Nismara+ Confirm Order] Discord role PUT failed (HTTP ${roleRes.status}):`,
+              (await roleRes.text().catch(() => "")).slice(0, 300),
+            );
+          }
+        } catch (e) {
+          console.error("Discord Role Error:", e);
+        }
       }
 
       // b. Send Message to the Ticket Channel
@@ -312,6 +365,7 @@ export async function confirmOrder(orderId: string) {
       }
     }
 
+    await invalidateSessionProfileCache(user._id, order.discordId);
     revalidatePath("/dashboard/manage/data/nismaraplus");
     revalidatePath("/dashboard/transactions");
     return {

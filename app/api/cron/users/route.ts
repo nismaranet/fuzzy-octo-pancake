@@ -10,7 +10,169 @@ import { refreshStaleActiveDrivingScores } from "@/lib/drivingScore";
 import { getWebConfig } from "@/lib/webConfig";
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const GUILD_ID = process.env.DISCORD_GUILD_ID;
+const GUILD_ID =
+  process.env.DISCORD_GUILD_ID ||
+  process.env.GUILD_ID ||
+  "863959415702028318";
+
+async function removeDiscordNismaraPlusRole(
+  discordId: string,
+  plusRoleId: string,
+  reason: string,
+): Promise<"removed" | "not_in_guild" | "failed"> {
+  if (!DISCORD_BOT_TOKEN || !GUILD_ID || !plusRoleId || !discordId) {
+    return "failed";
+  }
+
+  try {
+    const roleRes = await fetch(
+      `https://discord.com/api/v10/guilds/${GUILD_ID}/members/${discordId}/roles/${plusRoleId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+          "X-Audit-Log-Reason": encodeURIComponent(reason),
+        },
+      },
+    );
+
+    if (roleRes.ok || roleRes.status === 204) {
+      return "removed";
+    }
+    if (roleRes.status === 404) {
+      return "not_in_guild";
+    }
+
+    const errText = await roleRes.text().catch(() => "");
+    console.error(
+      `[Cron Users] Failed removing Nismara+ role for ${discordId} (HTTP ${roleRes.status}):`,
+      errText.slice(0, 300),
+    );
+    return "failed";
+  } catch (err) {
+    console.error(
+      `[Cron Users] Exception removing Nismara+ role for ${discordId}:`,
+      err,
+    );
+    return "failed";
+  }
+}
+
+async function reconcileStaleNismaraPlusRoles(
+  now: Date,
+  force = false,
+): Promise<{ skipped: boolean; checked: number; removed: number; failed: number }> {
+  const result = { skipped: false, checked: 0, removed: 0, failed: 0 };
+  if (!DISCORD_BOT_TOKEN || !GUILD_ID) {
+    return { ...result, skipped: true };
+  }
+
+  const plusRoleId = (await getWebConfig()).discordRoles.nismaraPlusRoleId?.trim();
+  if (!plusRoleId) {
+    return { ...result, skipped: true };
+  }
+
+  // Throttle 1 jam via Redis agar tidak membebani Discord Guild Members API tiap 5 menit
+  if (!force && process.env.REDIS_URL?.trim()) {
+    try {
+      const lock = await redis.set(
+        "cron:nismaraplus:role-reconcile:v1",
+        "1",
+        "EX",
+        3600,
+        "NX",
+      );
+      if (!lock) {
+        return { ...result, skipped: true };
+      }
+    } catch {
+      // Lanjutkan jika Redis sementara tidak tersedia
+    }
+  }
+
+  // 1. Ambil seluruh member server Discord yang masih memegang role Nismara+
+  const holdersDiscordIds: string[] = [];
+  let after = "0";
+  const MAX_PAGES = 5;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await fetch(
+      `https://discord.com/api/v10/guilds/${GUILD_ID}/members?limit=1000&after=${after}`,
+      {
+        headers: {
+          Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+        },
+        cache: "no-store",
+      },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error(
+        `[Cron Users] Role reconcile failed fetching guild members (HTTP ${res.status}):`,
+        errText.slice(0, 300),
+      );
+      return result;
+    }
+
+    const members = (await res.json()) as any[];
+    if (!Array.isArray(members) || members.length === 0) break;
+
+    for (const m of members) {
+      if (m?.user?.bot) continue;
+      const roles: string[] = Array.isArray(m?.roles) ? m.roles : [];
+      if (roles.includes(plusRoleId) && m?.user?.id) {
+        holdersDiscordIds.push(String(m.user.id));
+      }
+    }
+
+    if (members.length < 1000) break;
+    const lastId = members[members.length - 1]?.user?.id;
+    if (!lastId) break;
+    after = String(lastId);
+  }
+
+  result.checked = holdersDiscordIds.length;
+  if (holdersDiscordIds.length === 0) return result;
+
+  // 2. Bandingkan dengan daftar user yang benar-benar aktif Nismara+ di MongoDB
+  const activeUsers = await User.find({
+    "nismaraplus.status": true,
+    $or: [
+      { "nismaraplus.expiredAt": null },
+      { "nismaraplus.expiredAt": { $gt: now } },
+    ],
+  })
+    .select("discordId")
+    .lean();
+
+  const activeSet = new Set(
+    activeUsers.map((u: any) => String(u.discordId || "")).filter(Boolean),
+  );
+
+  const staleHolders = holdersDiscordIds.filter((id) => !activeSet.has(id));
+  const MAX_REVOKES_PER_RUN = 25;
+
+  for (const discordId of staleHolders.slice(0, MAX_REVOKES_PER_RUN)) {
+    const status = await removeDiscordNismaraPlusRole(
+      discordId,
+      plusRoleId,
+      "Nismara+ Role Sync (Expired/Inactive)",
+    );
+    if (status === "removed") {
+      result.removed++;
+      console.log(`[Cron Users] Reconciled & removed stale Nismara+ role from ${discordId}`);
+    } else if (status === "failed") {
+      result.failed++;
+    }
+    // Jeda ringan agar ramah terhadap Discord rate limit
+    if (staleHolders.length > 1) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+
+  return result;
+}
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -133,25 +295,11 @@ export async function GET(request: Request) {
           nismaraPlusCount++;
 
           const plusRoleId = (await getWebConfig()).discordRoles.nismaraPlusRoleId;
-          if (
-            DISCORD_BOT_TOKEN &&
-            GUILD_ID &&
-            plusRoleId &&
-            user.discordId
-          ) {
-            await fetch(
-              `https://discord.com/api/v10/guilds/${GUILD_ID}/members/${user.discordId}/roles/${plusRoleId}`,
-              {
-                method: "DELETE",
-                headers: {
-                  Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
-                },
-              },
-            ).catch((err) =>
-              console.error(
-                `Failed to remove Nismara+ role for ${user.discordId}`,
-                err,
-              ),
+          if (plusRoleId && user.discordId) {
+            await removeDiscordNismaraPlusRole(
+              String(user.discordId),
+              plusRoleId,
+              "Nismara+ Subscription Expired",
             );
           }
 
@@ -379,6 +527,16 @@ export async function GET(request: Request) {
       console.error("[Cron Users] Failed refreshing driving scores:", dsErr);
     }
 
+    // 7. Auto-Reconciliation Role Nismara+ (cabut role yang nyangkut dari expiry lama / gagal API, throttled 1 jam)
+    let nismaraPlusRoleSync = { skipped: true, checked: 0, removed: 0, failed: 0 };
+    try {
+      const urlObj = new URL(request.url);
+      const forceRoleSync = urlObj.searchParams.get("forceRoleSync") === "1";
+      nismaraPlusRoleSync = await reconcileStaleNismaraPlusRoles(now, forceRoleSync);
+    } catch (syncErr) {
+      console.error("[Cron Users] Failed reconciling Nismara+ Discord roles:", syncErr);
+    }
+
     return jsonNoCache({
       success: true,
       processed: {
@@ -389,6 +547,7 @@ export async function GET(request: Request) {
         accountHoldReminders,
         accountHoldPurged,
         drivingScoresRefreshed,
+        nismaraPlusRoleSync,
       },
     });
   } catch (error: any) {

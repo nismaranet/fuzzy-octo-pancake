@@ -265,3 +265,44 @@ Proyek ini menggunakan dua layer akses MongoDB secara bersamaan: native driver `
    ```
 2. **Konsistensi Layer dalam Satu Alur:** Usahakan tetap konsisten menggunakan satu layer (sepenuhnya Mongoose Model atau sepenuhnya `db.collection(...)`) dalam satu endpoint/Server Action. Jika harus membuat helper yang menerima `doc` atau `_id` dari pemanggil luar lalu memanggil `db.collection(...)`, selalu lakukan normalisasi defensif `new ObjectId(String(doc._id))`.
 3. **Jangan Gunakan `Model.collection.*` dengan `ObjectId` Native:** Driver internal Mongoose menggunakan BSON 7.x, sedangkan `mongodb` (`clientPromise`) menggunakan BSON 6.x. Hindari memanggil raw `Model.collection.*`; gunakan metode Mongoose standar (`Model.findOne`, `Model.updateOne`, dll.) atau `db.collection(...)` dengan konversi `ObjectId` dari `"mongodb"`.
+
+## 20. Penamaan Publik Bot Discord (Bot Natasya — BUKAN Silvia)
+
+- Untuk seluruh tampilan publik, halaman website, changelog, notifikasi, artikel, dan teks yang dilihat driver, bot Discord resmi Nismara Transport **WAJIB disebut sebagai `Bot Natasya`**.
+- `Silvia` hanyalah nama lama / nama repository internal dan **DILARANG** dipakai pada salinan teks publik untuk pengguna atau driver.
+
+## 21. Standar Rilis Versi & Pengisian Changelog Hub (`/dashboard/manage/changelog`)
+
+Setiap kali merilis versi baru untuk **Web Transport**, **Bot Natasya**, atau **Nismara Tracker**:
+- Agent **WAJIB langsung menyiapkan paket isian siap salin untuk form Changelog Hub** (`/dashboard/manage/changelog`) tanpa perlu diminta ulang, mencakup:
+  - `Produk` (`Web Transport` / `Bot Natasya` / `Nismara Tracker`)
+  - `Nomor Versi`
+  - `Judul Rilis`
+  - `Ringkasan Singkat` (2–3 kalimat non-teknis)
+  - Poin `Fitur Baru`, `Peningkatan`, dan/atau `Perbaikan` dalam bahasa orang umum (non-teknis, tanpa istilah kode, database, atau server)
+  - Opsional `Tautan Fitur` dan `Label Tombol Fitur`
+- Seluruh teks wajib mengikuti `.agents/skills/antislop-copywriting/SKILL.md` (bebas em dash `—`, en dash `–`, emoji hiasan, dan buzzword AI).
+
+<!-- antislop:start -->
+## 22. Standar Anti-Slop & Skill Desain Wajib untuk Semua Pekerjaan UI, Copy & Mobile
+
+Untuk setiap pekerjaan desain, pembuatan, atau perombakan UI/UX, copywriting, aksesibilitas, layout mobile, atau komentar kode, agent **WAJIB** membaca `.agents/skills/antislop/SKILL.md` (core) lalu skill yang relevan sebelum mulai menulis kode:
+- **Referensi & Desain UI (digabung dengan `antislop-ui`):** Gunakan skill **`ui-design`**, **`ui-radar`**, **`ui-styling`**, dan **`ui-ux-pro-max`** untuk riset pola UI nyata, sistem desain, komponen, serta interaksi, lalu saring hasilnya dengan `antislop-ui` agar tidak generik.
+- **UI / Visual:** `.agents/skills/antislop-ui/SKILL.md` (hindari *Default Dashboard Shell*, kartu berlebihan, dan dekorasi tanpa fungsi)
+- **Mobile / Responsif:** `.agents/skills/antislop-layoutmobile/SKILL.md` (reflow mobile terencana, nol horizontal overflow, tap target ≥ 44px)
+- **Aksesibilitas & Manusia:** `.agents/skills/antislop-human/SKILL.md` (kontras WCAG AA, dukungan keyboard & `Escape`, `:focus-visible`, status non-color-only, state loading/error/empty)
+- **Copy & Teks:** `.agents/skills/antislop-copywriting/SKILL.md` (bahasa alami non-teknis, tanpa em/en dash dan tanpa buzzword AI)
+- **Komentar Kode:** `.agents/skills/antislop-code/SKILL.md`
+<!-- antislop:end -->
+
+## 23. Standar MongoDB, Mongoose 9 & Skill Database Wajib
+
+Setiap kali merancang skema/koleksi baru, menulis aggregation pipeline, mengoptimalkan performa query, atau mengubah konfigurasi koneksi MongoDB, agent **WAJIB** menggunakan skill MongoDB yang sesuai:
+- **Perancangan Skema & Index:** **`mongodb-schema-design`** (embed vs reference, hindari unbounded arrays, TTL, lifecycle data, validasi skema).
+- **Optimasi Query & Indexing:** **`mongodb-query-optimizer`** (saat meninjau query lambat, menambahkan compound index, atau merapikan aggregation).
+- **Koneksi & Pooling:** **`mongodb-connection`** (saat mengubah `lib/mongodb.ts`, `lib/mongoose.ts`, connection pool, atau timeout).
+- **Penyusunan Query & Agregasi:** **`mongodb-natural-language-querying`** (untuk menyusun query `find`/agregasi presisi sesuai skema aktual) dan **`mongodb-search-and-ai`** (jika membangun pencarian teks lanjutan / Atlas Search).
+
+### Aturan Kritis Mongoose 9 (`mongoose@^9.5.0`):
+1. **Update Pipeline Wajib `{ updatePipeline: true }`:** Setiap pemanggilan `Model.findOneAndUpdate`, `Model.updateOne`, atau `Model.updateMany` milik **Mongoose** yang menggunakan array *aggregation pipeline* `[ ... ]` **WAJIB** menyertakan `{ updatePipeline: true }` di opsi. Tanpa opsi ini, Mongoose 9 akan melempar error runtime: `Cannot pass an array to query updates unless the 'updatePipeline' option is set.`
+2. **Konflik `timestamps: true` pada `bulkWrite`:** Jangan menyertakan `createdAt` atau `updatedAt` manual di dalam `$setOnInsert` pada `Model.bulkWrite()` jika schema memakai `{ timestamps: true }`, karena Mongoose otomatis menyisipkan `$set.updatedAt` yang akan memicu error konflik path `updatedAt`.
