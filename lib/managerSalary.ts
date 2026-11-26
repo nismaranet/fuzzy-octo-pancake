@@ -2,10 +2,13 @@ import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import dbConnect from "@/lib/mongoose";
 import ManagerSalaryRecord from "@/lib/models/ManagerSalaryRecord";
+import PayrollRewardTemplate from "@/lib/models/PayrollRewardTemplate";
+import PayrollMonthlySnapshot from "@/lib/models/PayrollMonthlySnapshot";
 import User from "@/lib/models/User";
 import UserVoucher from "@/lib/models/UserVoucher";
 import { grantVoucher } from "@/lib/voucher";
 import { sendPersonalNotification } from "@/lib/services/NotificationService";
+import { pickRotationTemplate } from "@/lib/payrollTemplates";
 
 const GUILD_ID = process.env.DISCORD_GUILD_ID || "863959415702028318";
 
@@ -14,7 +17,9 @@ export interface VoucherRewardTemplate {
   category: "FLEET_MAINTENANCE" | "FLEET_BUY" | "MARKET_MOD" | "GARAGE_RENT" | "GARAGE_UPGRADE" | "NC_BOOSTER";
   discountType: "percentage" | "fixed";
   discountValue: number;
+  maxDiscount?: number;
   durationHours?: number;
+  expireDays?: number;
 }
 
 export interface MilestoneTierConfig {
@@ -22,7 +27,21 @@ export interface MilestoneTierConfig {
   label: string;
   bonusNc: number;
   penaltyTickets: number;
+  fuelLiters?: number;
   vouchers: VoucherRewardTemplate[];
+}
+
+export interface MonthlyPayrollConfig {
+  month: string;
+  templateId: string | null;
+  templateSlug: string;
+  templateName: string;
+  isManualOverride: boolean;
+  baseSalary: number;
+  infiniteLoopStep: number;
+  infiniteLoopBonusNc: number;
+  infiniteLoopPenaltyTickets: number;
+  tiers: MilestoneTierConfig[];
 }
 
 /**
@@ -203,30 +222,187 @@ export function getCurrentAndPreviousMonthWib(): { currentMonth: string; previou
 }
 
 /**
- * Kalkulasi total reward berdasarkan perolehan total poin
+ * Mengambil atau mengunci snapshot konfigurasi template payroll untuk bulan tertentu (YYYY-MM).
+ * - Bulan historis sebelum fitur aktif (tanpa snapshot): memakai MILESTONE_TIERS legacy agar adil.
+ * - Bulan berjalan / mendatang: jika ada template aktif, otomatis rotasi deterministik & dikunci atomik di DB.
  */
-export function calculateRewardsFromPoints(totalPoints: number, baseSalary: number = 10000) {
+export async function getOrCreateMonthlyPayrollSnapshot(
+  month: string
+): Promise<MonthlyPayrollConfig> {
+  await dbConnect();
+
+  const existing = await PayrollMonthlySnapshot.findOne({ month }).lean();
+  if (existing) {
+    return {
+      month: existing.month,
+      templateId: existing.templateId ? String(existing.templateId) : null,
+      templateSlug: existing.templateSlug,
+      templateName: existing.templateName,
+      isManualOverride: Boolean(existing.isManualOverride),
+      baseSalary: Number(existing.baseSalary ?? 10000),
+      infiniteLoopStep: Number(existing.infiniteLoopStep ?? INFINITE_LOOP_STEP),
+      infiniteLoopBonusNc: Number(existing.infiniteLoopBonusNc ?? INFINITE_LOOP_BONUS_NC),
+      infiniteLoopPenaltyTickets: Number(
+        existing.infiniteLoopPenaltyTickets ?? INFINITE_LOOP_PENALTY_TICKETS
+      ),
+      tiers: (existing.tiers || []).map((t) => ({
+        tier: Number(t.tier),
+        label: t.label,
+        bonusNc: Number(t.bonusNc || 0),
+        penaltyTickets: Number(t.penaltyTickets || 0),
+        fuelLiters: Math.floor(Number(t.fuelLiters || 0)),
+        vouchers: Array.isArray(t.vouchers)
+          ? t.vouchers.map((v) => ({
+              title: v.title,
+              category: v.category,
+              discountType: v.discountType || "percentage",
+              discountValue: Number(v.discountValue || 0),
+              maxDiscount: Number(v.maxDiscount || 0),
+              durationHours: Number(v.durationHours || 0),
+              expireDays: Number(v.expireDays || 60),
+            }))
+          : [],
+      })),
+    };
+  }
+
+  const legacyConfig: MonthlyPayrollConfig = {
+    month,
+    templateId: null,
+    templateSlug: "legacy-default",
+    templateName: "Paket Standar (Legacy)",
+    isManualOverride: false,
+    baseSalary: 10000,
+    infiniteLoopStep: INFINITE_LOOP_STEP,
+    infiniteLoopBonusNc: INFINITE_LOOP_BONUS_NC,
+    infiniteLoopPenaltyTickets: INFINITE_LOOP_PENALTY_TICKETS,
+    tiers: MILESTONE_TIERS.map((t) => ({ ...t, fuelLiters: t.fuelLiters || 0 })),
+  };
+
+  const { currentMonth } = getCurrentAndPreviousMonthWib();
+  if (month < currentMonth) {
+    return legacyConfig;
+  }
+
+  const activeTemplates = await PayrollRewardTemplate.find({ isActive: true })
+    .sort({ rotationOrder: 1, slug: 1 })
+    .lean();
+
+  const picked = pickRotationTemplate(activeTemplates, month);
+  if (!picked) {
+    return legacyConfig;
+  }
+
+  const locked = await PayrollMonthlySnapshot.findOneAndUpdate(
+    { month },
+    {
+      $setOnInsert: {
+        month,
+        templateId: picked._id,
+        templateSlug: picked.slug,
+        templateName: picked.name,
+        isManualOverride: false,
+        baseSalary: Number(picked.baseSalary ?? 10000),
+        infiniteLoopStep: Number(picked.infiniteLoopStep ?? INFINITE_LOOP_STEP),
+        infiniteLoopBonusNc: Number(picked.infiniteLoopBonusNc ?? INFINITE_LOOP_BONUS_NC),
+        infiniteLoopPenaltyTickets: Number(
+          picked.infiniteLoopPenaltyTickets ?? INFINITE_LOOP_PENALTY_TICKETS
+        ),
+        tiers: picked.tiers,
+        lockedAt: new Date(),
+      },
+    },
+    { upsert: true, returnDocument: "after" }
+  ).lean();
+
+  if (!locked) return legacyConfig;
+
+  return {
+    month: locked.month,
+    templateId: locked.templateId ? String(locked.templateId) : null,
+    templateSlug: locked.templateSlug,
+    templateName: locked.templateName,
+    isManualOverride: Boolean(locked.isManualOverride),
+    baseSalary: Number(locked.baseSalary ?? 10000),
+    infiniteLoopStep: Number(locked.infiniteLoopStep ?? INFINITE_LOOP_STEP),
+    infiniteLoopBonusNc: Number(locked.infiniteLoopBonusNc ?? INFINITE_LOOP_BONUS_NC),
+    infiniteLoopPenaltyTickets: Number(
+      locked.infiniteLoopPenaltyTickets ?? INFINITE_LOOP_PENALTY_TICKETS
+    ),
+    tiers: (locked.tiers || []).map((t) => ({
+      tier: Number(t.tier),
+      label: t.label,
+      bonusNc: Number(t.bonusNc || 0),
+      penaltyTickets: Number(t.penaltyTickets || 0),
+      fuelLiters: Math.floor(Number(t.fuelLiters || 0)),
+      vouchers: Array.isArray(t.vouchers)
+        ? t.vouchers.map((v) => ({
+            title: v.title,
+            category: v.category,
+            discountType: v.discountType || "percentage",
+            discountValue: Number(v.discountValue || 0),
+            maxDiscount: Number(v.maxDiscount || 0),
+            durationHours: Number(v.durationHours || 0),
+            expireDays: Number(v.expireDays || 60),
+          }))
+        : [],
+    })),
+  };
+}
+
+/**
+ * Kalkulasi total reward berdasarkan perolehan total poin & konfigurasi snapshot bulan terkait
+ */
+export function calculateRewardsFromPoints(
+  totalPoints: number,
+  configOrBaseSalary: number | Partial<MonthlyPayrollConfig> = 10000
+) {
+  const isConfigObj =
+    typeof configOrBaseSalary === "object" && configOrBaseSalary !== null;
+  const baseSalary = isConfigObj
+    ? Number(configOrBaseSalary.baseSalary ?? 10000)
+    : Number(configOrBaseSalary ?? 10000);
+  const tiers =
+    isConfigObj && Array.isArray(configOrBaseSalary.tiers)
+      ? configOrBaseSalary.tiers
+      : MILESTONE_TIERS;
+  const loopStep = isConfigObj
+    ? Number(configOrBaseSalary.infiniteLoopStep ?? INFINITE_LOOP_STEP)
+    : INFINITE_LOOP_STEP;
+  const loopBonusNc = isConfigObj
+    ? Number(configOrBaseSalary.infiniteLoopBonusNc ?? INFINITE_LOOP_BONUS_NC)
+    : INFINITE_LOOP_BONUS_NC;
+  const loopTickets = isConfigObj
+    ? Number(
+        configOrBaseSalary.infiniteLoopPenaltyTickets ?? INFINITE_LOOP_PENALTY_TICKETS
+      )
+    : INFINITE_LOOP_PENALTY_TICKETS;
+
   let totalBonusNc = 0;
   let totalPenaltyTickets = 0;
+  let totalFuelLiters = 0;
   const unlockedTiers: number[] = [];
   const vouchers: VoucherRewardTemplate[] = [];
 
-  for (const t of MILESTONE_TIERS) {
+  for (const t of tiers) {
     if (totalPoints >= t.tier) {
       unlockedTiers.push(t.tier);
-      totalBonusNc += t.bonusNc;
-      totalPenaltyTickets += t.penaltyTickets;
-      vouchers.push(...t.vouchers);
+      totalBonusNc += Number(t.bonusNc || 0);
+      totalPenaltyTickets += Number(t.penaltyTickets || 0);
+      totalFuelLiters += Math.floor(Number(t.fuelLiters || 0));
+      if (Array.isArray(t.vouchers)) {
+        vouchers.push(...t.vouchers);
+      }
     }
   }
 
   // Infinite loop (> 100 points)
   let infiniteLoops = 0;
-  if (totalPoints > 100) {
-    infiniteLoops = Math.floor((totalPoints - 100) / INFINITE_LOOP_STEP);
+  if (totalPoints > 100 && loopStep > 0) {
+    infiniteLoops = Math.floor((totalPoints - 100) / loopStep);
     if (infiniteLoops > 0) {
-      totalBonusNc += infiniteLoops * INFINITE_LOOP_BONUS_NC;
-      totalPenaltyTickets += infiniteLoops * INFINITE_LOOP_PENALTY_TICKETS;
+      totalBonusNc += infiniteLoops * loopBonusNc;
+      totalPenaltyTickets += infiniteLoops * loopTickets;
     }
   }
 
@@ -237,6 +413,7 @@ export function calculateRewardsFromPoints(totalPoints: number, baseSalary: numb
     bonusNc: totalBonusNc,
     totalNc: finalTotalNc,
     penaltyTickets: totalPenaltyTickets,
+    fuelLiters: totalFuelLiters,
     vouchers,
     unlockedTiers,
     infiniteLoops,
@@ -394,12 +571,24 @@ export async function calculateManagerPerformance(managerId: string, month: stri
     internPromotionPoints +
     internEvaluationPoints;
 
-  const rewards = calculateRewardsFromPoints(totalPoints, 10000);
+  const monthlyConfig = await getOrCreateMonthlyPayrollSnapshot(month);
+  const rewards = calculateRewardsFromPoints(totalPoints, monthlyConfig);
 
   return {
     month,
     managerId,
     totalPoints,
+    templateInfo: {
+      templateId: monthlyConfig.templateId,
+      templateSlug: monthlyConfig.templateSlug,
+      templateName: monthlyConfig.templateName,
+      isManualOverride: monthlyConfig.isManualOverride,
+      baseSalary: monthlyConfig.baseSalary,
+      infiniteLoopStep: monthlyConfig.infiniteLoopStep,
+      infiniteLoopBonusNc: monthlyConfig.infiniteLoopBonusNc,
+      infiniteLoopPenaltyTickets: monthlyConfig.infiniteLoopPenaltyTickets,
+    },
+    tiers: monthlyConfig.tiers,
     breakdown: {
       ticketsHandled,
       ticketPoints: ticketsHandled,
@@ -515,6 +704,7 @@ export async function claimManagerSalary(managerId: string, month: string) {
   const createdVoucherIds: any[] = [];
   let ncCredited = false;
   let safeboxCredited = false;
+  let fuelCredited = false;
   let topManagerAwarded = false;
   const trxId = `SALARY-${month.replace("-", "")}-${String(managerId).slice(-4)}-${Date.now()
     .toString()
@@ -541,46 +731,57 @@ export async function claimManagerSalary(managerId: string, month: string) {
       ncCredited = true;
     }
 
-    // 6. Distribusi Tiket Safebox (Penghapus Penalti)
-    if (perf.rewards.penaltyTickets > 0) {
+    // 6. Distribusi Tiket Safebox & Fuel Garasi secara atomik
+    const penaltyTickets = Number(perf.rewards.penaltyTickets || 0);
+    const fuelLiters = Math.floor(Number(perf.rewards.fuelLiters || 0));
+    if (penaltyTickets > 0 || fuelLiters > 0) {
       const nextPaymentDate = new Date();
       nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
+      const garageInc: Record<string, number> = {};
+      if (penaltyTickets > 0) garageInc.safeboxStock = penaltyTickets;
+      if (fuelLiters > 0) garageInc.fuelStock = fuelLiters;
+
+      const garageSetOnInsert: Record<string, any> = {
+        // Konversi ObjectId Mongoose (bson 7) ke ObjectId driver mongodb native (bson 6)
+        userId: new ObjectId(String(user._id)),
+        discordId: String(managerId),
+        fleetSlot: 1,
+        fleetSlotUsed: 0,
+        fleetSlotLevel: 1,
+        safeboxLevel: 1,
+        fuelCapacity: 2000,
+        fuelTankLevel: 1,
+        operational_cost: 0,
+        fleet_operational_cost: 0,
+        fuel_operational_cost: 0,
+        safebox_operational_cost: 0,
+        next_payment_date: nextPaymentDate,
+        mechanics: {
+          umum: null,
+          ban: null,
+          mesin: null,
+        },
+        status: "operational",
+        createdAt: new Date(),
+      };
+      if (!garageInc.safeboxStock) garageSetOnInsert.safeboxStock = 0;
+      if (!garageInc.fuelStock) garageSetOnInsert.fuelStock = 0;
+
       await db.collection("garages").updateOne(
         { discordId: String(managerId) },
-        { 
-          $inc: { safeboxStock: perf.rewards.penaltyTickets },
-          $setOnInsert: {
-            // Konversi ObjectId Mongoose (bson 7) ke ObjectId driver mongodb native (bson 6)
-            userId: new ObjectId(String(user._id)),
-            discordId: String(managerId),
-            fleetSlot: 1,
-            fleetSlotUsed: 0,
-            fleetSlotLevel: 1,
-            safeboxLevel: 1,
-            fuelCapacity: 2000,
-            fuelTankLevel: 1,
-            fuelStock: 0,
-            operational_cost: 0,
-            fleet_operational_cost: 0,
-            fuel_operational_cost: 0,
-            safebox_operational_cost: 0,
-            next_payment_date: nextPaymentDate,
-            mechanics: {
-              umum: null,
-              ban: null,
-              mesin: null,
-            },
-            status: "operational",
-            createdAt: new Date(),
-          }
+        {
+          $inc: garageInc,
+          $setOnInsert: garageSetOnInsert,
         },
         { upsert: true }
       );
-      safeboxCredited = true;
+      if (penaltyTickets > 0) safeboxCredited = true;
+      if (fuelLiters > 0) fuelCredited = true;
     }
 
     // 7. Distribusi Vouchers
     for (const vTemplate of perf.rewards.vouchers) {
+      const isBooster = vTemplate.category === "NC_BOOSTER";
       const createdVoucher = await grantVoucher({
         userId: user._id,
         discordId: managerId,
@@ -590,10 +791,12 @@ export async function claimManagerSalary(managerId: string, month: string) {
         category: vTemplate.category,
         discountType: vTemplate.discountType,
         discountValue: vTemplate.discountValue,
-        durationHours: vTemplate.durationHours || 0,
+        maxDiscount: isBooster ? 0 : Number(vTemplate.maxDiscount || 0),
+        durationHours: isBooster ? Number(vTemplate.durationHours || 6) : 0,
         source: `MANAGER_SALARY_${month}`,
         tradable: false,
-        expiresInDays: 60, // Masa berlaku voucher 60 hari
+        expiresInDays:
+          vTemplate.expireDays && vTemplate.expireDays > 0 ? vTemplate.expireDays : 60,
       });
 
       if (createdVoucher?._id) {
@@ -631,21 +834,31 @@ export async function claimManagerSalary(managerId: string, month: string) {
     lockedRecord.status = "CLAIMED";
     lockedRecord.claimedAt = new Date();
     lockedRecord.claimedTrxId = trxId;
+    lockedRecord.templateSnapshot = {
+      templateId: perf.templateInfo?.templateId || null,
+      templateSlug: perf.templateInfo?.templateSlug || null,
+      templateName: perf.templateInfo?.templateName || null,
+    };
     lockedRecord.rewardsGranted = {
       ncAmount,
       vouchers: generatedVouchers,
-      penaltyTickets: perf.rewards.penaltyTickets,
+      penaltyTickets,
+      fuelLiters,
     };
     await lockedRecord.save();
 
-    // 9. Kirim notifikasi konfirmasi personal (non-fatal, ditangani tersendiri agar kegagalan notifikasi tidak membatalkan klaim yang sudah sah)
+    // 9. Kirim notifikasi konfirmasi personal (non-fatal)
     try {
+      const extras: string[] = [];
+      if (penaltyTickets > 0) extras.push(`${penaltyTickets} Tiket Safebox`);
+      if (fuelLiters > 0) extras.push(`${fuelLiters.toLocaleString("id-ID")} L Fuel`);
+      if (generatedVouchers.length > 0) extras.push(`${generatedVouchers.length} Voucher`);
+      const extraText = extras.length > 0 ? ` serta ${extras.join(", ")}` : "";
+
       await sendPersonalNotification(
         String(managerId),
-        "Gaji & Bonus Manager Berhasil Diklaim! 🎉",
-        `Gaji periode ${month} sebesar ${ncAmount.toLocaleString("id-ID")} NC dan ${
-          perf.rewards.penaltyTickets
-        } Tiket Safebox telah berhasil dicairkan ke akun Anda.`,
+        "Gaji & Bonus Manager Berhasil Diklaim!",
+        `Gaji periode ${month} sebesar ${ncAmount.toLocaleString("id-ID")} NC${extraText} telah berhasil dicairkan ke akun Anda.`,
         "success",
         "/dashboard/manage/payroll"
       );
@@ -660,8 +873,10 @@ export async function claimManagerSalary(managerId: string, month: string) {
         trxId,
         totalPoints: perf.totalPoints,
         ncAmount,
-        penaltyTickets: perf.rewards.penaltyTickets,
+        penaltyTickets,
+        fuelLiters,
         vouchers: generatedVouchers,
+        templateName: perf.templateInfo?.templateName || null,
         claimedAt: lockedRecord.claimedAt,
       },
     };
@@ -677,15 +892,22 @@ export async function claimManagerSalary(managerId: string, month: string) {
       }
     }
 
-    // Rollback Tiket Safebox
-    if (safeboxCredited && perf.rewards.penaltyTickets > 0) {
+    // Rollback Tiket Safebox & Fuel Garasi
+    if ((safeboxCredited && perf.rewards.penaltyTickets > 0) || (fuelCredited && perf.rewards.fuelLiters > 0)) {
       try {
+        const rbInc: Record<string, number> = {};
+        if (safeboxCredited && perf.rewards.penaltyTickets > 0) {
+          rbInc.safeboxStock = -perf.rewards.penaltyTickets;
+        }
+        if (fuelCredited && perf.rewards.fuelLiters > 0) {
+          rbInc.fuelStock = -Math.floor(perf.rewards.fuelLiters);
+        }
         await db.collection("garages").updateOne(
           { discordId: String(managerId) },
-          { $inc: { safeboxStock: -perf.rewards.penaltyTickets } }
+          { $inc: rbInc }
         );
-      } catch (rbSafeboxErr) {
-        console.error("Rollback safebox failed:", rbSafeboxErr);
+      } catch (rbGarageErr) {
+        console.error("Rollback garage safebox/fuel failed:", rbGarageErr);
       }
     }
 

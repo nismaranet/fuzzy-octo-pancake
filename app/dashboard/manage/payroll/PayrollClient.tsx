@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Coins,
   Award,
@@ -29,6 +29,8 @@ import {
   HelpCircle,
   GraduationCap,
   ClipboardCheck,
+  Fuel,
+  Sliders,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,13 +41,28 @@ interface MilestoneTier {
   label: string;
   bonusNc: number;
   penaltyTickets: number;
+  fuelLiters?: number;
   vouchers: Array<{
     title: string;
     category: string;
     discountType: string;
     discountValue: number;
+    maxDiscount?: number;
     durationHours?: number;
+    expireDays?: number;
   }>;
+}
+
+interface CurrentTemplateInfo {
+  templateId?: string | null;
+  templateSlug?: string;
+  templateName?: string;
+  isManualOverride?: boolean;
+  isLegacyFallback?: boolean;
+  baseSalary?: number;
+  infiniteLoopStep?: number;
+  infiniteLoopBonusNc?: number;
+  infiniteLoopPenaltyTickets?: number;
 }
 
 interface PayrollClientProps {
@@ -55,6 +72,7 @@ interface PayrollClientProps {
     currentMonthPerf: any;
     previousMonthData: any;
     historyRecords: any[];
+    currentTemplate?: CurrentTemplateInfo | null;
     milestoneTiers: MilestoneTier[];
   };
   currentUser: {
@@ -63,11 +81,13 @@ interface PayrollClientProps {
     role: string;
     image?: string | null;
   };
+  isOwner?: boolean;
 }
 
 export default function PayrollClient({
   initialData,
   currentUser,
+  isOwner = false,
 }: PayrollClientProps) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
@@ -75,21 +95,35 @@ export default function PayrollClient({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
 
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
   const {
     currentMonth,
     previousMonth,
     currentMonthPerf,
     previousMonthData,
     historyRecords,
+    currentTemplate,
     milestoneTiers,
   } = data;
 
+  const activeTemplate = currentTemplate || currentMonthPerf?.templateInfo || null;
+  const activeBaseSalary = activeTemplate?.baseSalary ?? currentMonthPerf?.rewards?.baseSalary ?? 10000;
+  const activeLoopStep = activeTemplate?.infiniteLoopStep ?? 10;
+  const activeLoopBonusNc = activeTemplate?.infiniteLoopBonusNc ?? 5000;
+  const activeLoopTickets = activeTemplate?.infiniteLoopPenaltyTickets ?? 1;
+
   const currentPoints = currentMonthPerf?.totalPoints || 0;
   const currentRewards = currentMonthPerf?.rewards || {
-    totalNc: 10000,
+    baseSalary: activeBaseSalary,
+    totalNc: activeBaseSalary,
     bonusNc: 0,
     penaltyTickets: 0,
+    fuelLiters: 0,
   };
+  const currentFuelLiters = Math.floor(currentRewards.fuelLiters || 0);
   const currentBreakdown = currentMonthPerf?.breakdown || {};
 
   // Find next milestone tier
@@ -139,12 +173,20 @@ export default function PayrollClient({
   const handleClaimSalary = async () => {
     if (!previousMonthData || previousMonthData.isClaimed) return;
 
+    const prevRewards = previousMonthData.performance?.rewards || {};
+    const prevFuelLiters = Math.floor(prevRewards.fuelLiters || 0);
+    const fuelLine =
+      prevFuelLiters > 0
+        ? `• Bahan Bakar Garasi: +${prevFuelLiters.toLocaleString("id-ID")} L\n`
+        : "";
+
     const confirmed = await showConfirm(
       `Klaim gaji dan insentif performa periode ${formatMonthLabel(previousMonth)}?\n\n` +
         `• Total Poin: ${previousMonthData.performance?.totalPoints || 0} Poin\n` +
-        `• Total Cair: ${(previousMonthData.performance?.rewards?.totalNc || 10000).toLocaleString("id-ID")} NC\n` +
-        `• Tiket Safebox: +${previousMonthData.performance?.rewards?.penaltyTickets || 0} Tiket\n` +
-        `• Voucher: ${previousMonthData.performance?.rewards?.vouchers?.length || 0} Voucher\n\n` +
+        `• Total Cair: ${(prevRewards.totalNc || 10000).toLocaleString("id-ID")} NC\n` +
+        `• Tiket Safebox: +${prevRewards.penaltyTickets || 0} Tiket\n` +
+        fuelLine +
+        `• Voucher: ${prevRewards.vouchers?.length || 0} Voucher\n\n` +
         `Seluruh reward akan langsung dicairkan ke saldo dan garasi akun Anda. Lanjutkan?`,
       "Konfirmasi Pencairan Gaji",
     );
@@ -214,6 +256,15 @@ export default function PayrollClient({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {isOwner && (
+              <Link
+                href="/dashboard/manage/payroll/templates"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 text-sm font-semibold border border-amber-500/30 transition shadow-sm"
+              >
+                <Sliders className="w-4 h-4" />
+                Kelola Template
+              </Link>
+            )}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
@@ -239,27 +290,29 @@ export default function PayrollClient({
         <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-border">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/70">
             <Calendar className="w-5 h-5 text-amber-500 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                 Periode Berjalan
               </div>
-              <div className="text-sm font-bold text-foreground">
+              <div className="text-sm font-bold text-foreground truncate">
                 {formatMonthLabel(currentMonth)}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/70">
             <Coins className="w-5 h-5 text-yellow-500 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                 Base Gaji Pokok
               </div>
-              <div className="text-sm font-bold text-foreground">10.000 NC</div>
+              <div className="text-sm font-bold text-foreground tabular-nums">
+                {activeBaseSalary.toLocaleString("id-ID")} NC
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/70">
             <Clock className="w-5 h-5 text-indigo-500 dark:text-indigo-400 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                 Siklus Evaluasi
               </div>
@@ -270,12 +323,12 @@ export default function PayrollClient({
           </div>
           <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/70">
             <ShieldAlert className="w-5 h-5 text-emerald-500 dark:text-emerald-400 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Proteksi Manipulasi
+                Paket Bulan Ini
               </div>
-              <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                Anti-Abuse Active
+              <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 truncate">
+                {activeTemplate?.templateName || "Standar Bulanan"}
               </div>
             </div>
           </div>
@@ -319,6 +372,18 @@ export default function PayrollClient({
                         <Ticket className="w-4 h-4" />+
                         {previousMonthData.performance?.rewards?.penaltyTickets}{" "}
                         Tiket Safebox
+                      </div>
+                    )}
+                    {Math.floor(
+                      previousMonthData.performance?.rewards?.fuelLiters || 0,
+                    ) > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/90 border border-sky-500/30 text-sky-600 dark:text-sky-400 font-bold text-sm shadow-sm">
+                        <Fuel className="w-4 h-4" />+
+                        {Math.floor(
+                          previousMonthData.performance?.rewards?.fuelLiters ||
+                            0,
+                        ).toLocaleString("id-ID")}{" "}
+                        L Fuel
                       </div>
                     )}
                     {previousMonthData.performance?.rewards?.vouchers?.length >
@@ -426,26 +491,36 @@ export default function PayrollClient({
               <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
                 Estimasi Total Cair
               </div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
-                <Coins className="w-6 h-6" />
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 flex items-center gap-2 tabular-nums">
+                <Coins className="w-6 h-6 shrink-0" />
                 {currentRewards.totalNc.toLocaleString("id-ID")} NC
               </div>
               <div className="text-[11px] text-muted-foreground mt-1">
-                Base 10.000 NC + Bonus{" "}
+                Base {activeBaseSalary.toLocaleString("id-ID")} NC + Bonus{" "}
                 {currentRewards.bonusNc.toLocaleString("id-ID")} NC
               </div>
             </div>
 
             <div className="p-4 rounded-xl bg-muted/30 border border-border/70">
               <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
-                Bonus Tiket Safebox
+                Bonus Aset Garasi
               </div>
-              <div className="text-2xl font-black text-red-600 dark:text-red-400 flex items-center gap-2">
-                <Ticket className="w-6 h-6" />+{currentRewards.penaltyTickets}{" "}
-                Tiket
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <div className="text-2xl font-black text-red-600 dark:text-red-400 flex items-center gap-1.5 tabular-nums">
+                  <Ticket className="w-5 h-5 shrink-0" />+
+                  {currentRewards.penaltyTickets} Tiket
+                </div>
+                {currentFuelLiters > 0 && (
+                  <div className="text-lg font-black text-sky-600 dark:text-sky-400 flex items-center gap-1 tabular-nums">
+                    <Fuel className="w-4 h-4 shrink-0" />+
+                    {currentFuelLiters.toLocaleString("id-ID")} L
+                  </div>
+                )}
               </div>
               <div className="text-[11px] text-muted-foreground mt-1">
-                Otomatis masuk ke Safebox Stock garasi
+                {currentFuelLiters > 0
+                  ? "Safebox & stok bahan bakar otomatis masuk ke garasi"
+                  : "Otomatis masuk ke Safebox Stock garasi"}
               </div>
             </div>
 
@@ -456,7 +531,7 @@ export default function PayrollClient({
               {nextTier ? (
                 <div>
                   <div className="text-2xl font-black text-foreground flex items-center gap-2">
-                    <Award className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
+                    <Award className="w-6 h-6 text-indigo-500 dark:text-indigo-400 shrink-0" />
                     Tier {nextTier.tier} Poin
                   </div>
                   <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium mt-1">
@@ -466,11 +541,13 @@ export default function PayrollClient({
               ) : (
                 <div>
                   <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                    <Flame className="w-6 h-6" />
+                    <Flame className="w-6 h-6 shrink-0" />
                     Master Tier!
                   </div>
                   <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 font-medium mt-1">
-                    Infinite Loop Aktif (+5.000 NC & +1 Safebox / 10 Poin)
+                    Infinite Loop Aktif (+
+                    {activeLoopBonusNc.toLocaleString("id-ID")} NC &amp; +
+                    {activeLoopTickets} Safebox / {activeLoopStep} Poin)
                   </div>
                 </div>
               )}
@@ -854,6 +931,15 @@ export default function PayrollClient({
                               +{r.rewardsGranted?.penaltyTickets} Tiket Safebox
                             </span>
                           )}
+                          {Math.floor(r.rewardsGranted?.fuelLiters || 0) > 0 && (
+                            <span className="text-sky-600 dark:text-sky-400 font-semibold">
+                              +
+                              {Math.floor(
+                                r.rewardsGranted.fuelLiters,
+                              ).toLocaleString("id-ID")}{" "}
+                              L Fuel
+                            </span>
+                          )}
                           {r.rewardsGranted?.vouchers?.length > 0 && (
                             <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
                               +{r.rewardsGranted?.vouchers?.length} Voucher
@@ -861,6 +947,7 @@ export default function PayrollClient({
                             </span>
                           )}
                           {!r.rewardsGranted?.penaltyTickets &&
+                            !Math.floor(r.rewardsGranted?.fuelLiters || 0) &&
                             !r.rewardsGranted?.vouchers?.length && (
                               <span className="text-muted-foreground">-</span>
                             )}
@@ -971,6 +1058,14 @@ export default function PayrollClient({
                       : "-"}
                   </span>
                 </div>
+                {selectedReceipt.templateSnapshot?.templateName && (
+                  <div className="col-span-2 pt-2 border-t border-border/60">
+                    <span className="text-muted-foreground block">Paket Reward Periode:</span>
+                    <span className="font-semibold text-foreground">
+                      {selectedReceipt.templateSnapshot.templateName}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Rincian Poin & Nilai */}
@@ -992,9 +1087,10 @@ export default function PayrollClient({
                   <div className="flex justify-between text-muted-foreground">
                     <span>Bonus Tambahan Poin:</span>
                     <span className="font-bold text-foreground">
-                      {(
+                      {Math.max(
+                        0,
                         (selectedReceipt.rewardsGranted?.ncAmount || 10000) -
-                        10000
+                          10000,
                       ).toLocaleString("id-ID")}{" "}
                       NC
                     </span>
@@ -1013,6 +1109,7 @@ export default function PayrollClient({
 
               {/* Item Tambahan */}
               {(selectedReceipt.rewardsGranted?.penaltyTickets > 0 ||
+                Math.floor(selectedReceipt.rewardsGranted?.fuelLiters || 0) > 0 ||
                 (selectedReceipt.rewardsGranted?.vouchers &&
                   selectedReceipt.rewardsGranted.vouchers.length > 0)) && (
                 <div className="space-y-2">
@@ -1022,10 +1119,23 @@ export default function PayrollClient({
                   <div className="p-3 rounded-xl bg-muted/20 border border-border/60 space-y-2 text-xs">
                     {selectedReceipt.rewardsGranted?.penaltyTickets > 0 && (
                       <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-bold">
-                        <Ticket className="w-4 h-4" />
+                        <Ticket className="w-4 h-4 shrink-0" />
                         <span>
                           +{selectedReceipt.rewardsGranted.penaltyTickets} Tiket
                           Penghapus Penalti (Safebox)
+                        </span>
+                      </div>
+                    )}
+                    {Math.floor(selectedReceipt.rewardsGranted?.fuelLiters || 0) >
+                      0 && (
+                      <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-bold">
+                        <Fuel className="w-4 h-4 shrink-0" />
+                        <span>
+                          +
+                          {Math.floor(
+                            selectedReceipt.rewardsGranted.fuelLiters,
+                          ).toLocaleString("id-ID")}{" "}
+                          L Bahan Bakar Garasi
                         </span>
                       </div>
                     )}

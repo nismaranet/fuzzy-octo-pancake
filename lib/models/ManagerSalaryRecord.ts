@@ -34,6 +34,12 @@ export interface IManagerSalaryRecord extends Document {
       discountType: string;
     }>;
     penaltyTickets: number;
+    fuelLiters?: number;
+  };
+  templateSnapshot?: {
+    templateId?: string | null;
+    templateSlug?: string | null;
+    templateName?: string | null;
   };
   claimedAt?: Date | null;
   claimedTrxId?: string | null;
@@ -83,6 +89,12 @@ const managerSalaryRecordSchema = new Schema<IManagerSalaryRecord>(
         },
       ],
       penaltyTickets: { type: Number, default: 0 },
+      fuelLiters: { type: Number, default: 0 },
+    },
+    templateSnapshot: {
+      templateId: { type: String, default: null },
+      templateSlug: { type: String, default: null },
+      templateName: { type: String, default: null },
     },
     claimedAt: { type: Date, default: null },
     claimedTrxId: { type: String, default: null },

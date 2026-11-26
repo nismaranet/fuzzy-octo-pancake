@@ -6,8 +6,8 @@ import ManagerSalaryRecord from "@/lib/models/ManagerSalaryRecord";
 import {
   calculateManagerPerformance,
   getCurrentAndPreviousMonthWib,
-  MILESTONE_TIERS,
 } from "@/lib/managerSalary";
+import { isWebOwner } from "@/lib/webConfig";
 import PayrollClient from "./PayrollClient";
 
 export const metadata = {
@@ -68,6 +68,7 @@ export default async function ManagerPayrollPage() {
     .lean();
 
   const historyRecords = JSON.parse(JSON.stringify(historyRecordsRaw));
+  const isOwner = await isWebOwner(discordId);
 
   const initialData = {
     currentMonth,
@@ -75,7 +76,8 @@ export default async function ManagerPayrollPage() {
     currentMonthPerf,
     previousMonthData,
     historyRecords,
-    milestoneTiers: MILESTONE_TIERS,
+    currentTemplate: currentMonthPerf.templateInfo,
+    milestoneTiers: currentMonthPerf.tiers,
   };
 
   const currentUser = {
@@ -87,7 +89,11 @@ export default async function ManagerPayrollPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      <PayrollClient initialData={initialData} currentUser={currentUser} />
+      <PayrollClient
+        initialData={initialData}
+        currentUser={currentUser}
+        isOwner={isOwner}
+      />
     </div>
   );
 }
