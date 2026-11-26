@@ -184,7 +184,7 @@ export async function POST(
           },
         },
       ],
-      { returnDocument: "after" }
+      { returnDocument: "after", updatePipeline: true }
     );
 
     if (!lockedListing) {

@@ -6,7 +6,31 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id/
 
 ---
 
+## [1.5.2] - 2026-11-26
+
+### Fixed
+- **Community Market Update Pipeline Error Mongoose 9 (`listings/[id]/buy`, `buy-orders/[id]/fulfill`):**
+  - Menambahkan opsi `{ updatePipeline: true }` pada `findOneAndUpdate()` dengan aggregation pipeline di endpoint pembelian listing dan pemenuhan Buy Order agar kompatibel dengan aturan strict Mongoose 9.
+
+---
+
 ## [1.5.1] - 2026-11-26
+
+### Added
+- **Perlindungan Sesi Login & Anti-Stolen Session (`lib/sessionSecurity.ts`, `app/api/auth/[...nextauth]/route.ts`):**
+  - Mengikat sesi database NextAuth dengan fingerprint perangkat dan browser (`OS`, `Browser Family`, `Device Type`, `Accept-Language`, dan `Sec-CH-UA-Platform`) yang tetap stabil saat browser melakukan auto-update versi minor.
+  - Memutus sesi secara otomatis (*auto-revoke*), mencatat `SecurityAlert` (`STOLEN_SESSION_DETECTED`), dan mengirim peringatan via DM Discord serta notifikasi web (dengan dedup Redis 5 menit) apabila cookie sesi dipakai dari perangkat/browser yang berbeda.
+  - Menerapkan batas masa aktif absolut **48 jam** (`STAFF_SESSION_MAX_AGE_MS`) serta *auto-revoke* saat terjadi perubahan negara Cloudflare (`cf-ipcountry`) khusus untuk akun **Manager, Admin, dan Owner**. Untuk driver reguler, perubahan negara diperbarui secara senyap agar ramah terhadap IP dinamis dan VPN/WARP tanpa spam DM.
+- **Manajemen Sesi Aktif & Cabut Sesi Darurat (`/dashboard/settings?tab=security`, `/api/auth/sessions`, `/api/manage/users/[discordId]/revoke-sessions`):**
+  - Menambahkan tab **Keamanan & Sesi** (`ActiveSessionsCard.tsx`) agar pengguna dapat melihat daftar perangkat yang sedang login (browser/OS, negara, IP tersamar, waktu aktif WIB) serta memutus sesi per perangkat, keluar dari semua perangkat lain, atau keluar dari seluruh perangkat.
+  - Menambahkan tombol darurat **Cabut Sesi Login** pada halaman manajemen user (`/dashboard/manage/data/users/[truckyId]`) bagi Staff/Owner untuk memutus seluruh sesi aktif akun bermasalah beserta notifikasi DM ke pemilik akun.
+
+### Changed
+- **Hardening Autentikasi, Security Dashboard & HTTP Headers (`app/api/auth/[...nextauth]/route.ts`, `app/dashboard/settings/actions.ts`, `app/dashboard/manage/security`, `next.config.ts`):**
+  - Menghapus penyimpanan `access_token`, `refresh_token`, dan `id_token` Discord di koleksi `accounts` serta menghapus `allowDangerousEmailAccountLinking` dan pencocokan akun berbasis email.
+  - Memigrasikan seluruh query profil di `app/dashboard/settings/actions.ts` ke `discordId` dan menambahkan directive anti-cache di `app/dashboard/settings/page.tsx`.
+  - Memperbarui `/api/manage/security` (menambahkan `dbConnect()`, anti-cache `jsonNoCache`, dan endpoint `PATCH` resolve alert) serta tampilan `/dashboard/manage/security` dengan label alert sesi dan waktu WIB.
+  - Menambahkan global HTTP security headers di `next.config.ts` (`Strict-Transport-Security`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`).
 
 ### Fixed
 - **Docker / GitHub Actions Build Hang (`lib/redis.ts`, `lib/webConfig.ts`, `app/page.tsx`):**
