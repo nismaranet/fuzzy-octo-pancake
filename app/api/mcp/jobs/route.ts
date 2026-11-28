@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     // Mengambil semua job dari user berdasarkan discordId (tersimpan sebagai driverId di jobhistories)
     const jobs = await db
       .collection("jobhistories")
-      .find({ driverId: discordId })
+      .find({ driverId: discordId }, { projection: { routePath: 0 } })
       .sort({ createdAt: -1 })
       .toArray();
 

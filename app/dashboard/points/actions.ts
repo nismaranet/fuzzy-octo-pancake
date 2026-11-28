@@ -214,12 +214,15 @@ export async function getEligibleJobsForValidation(userId: string) {
     // 2. Cari job yang layak, tapi TIDAK ada di daftar validatedIds
     const jobs = await db
       .collection("jobhistories")
-      .find({
-        driverId: userId,
-        jobStatus: "COMPLETED",
-        hardcoreRating: { $gte: 4 }, // hardcore rating 4 keatas
-        jobId: { $nin: validatedIds }, // Pastikan jobId tidak ada di koleksi validatedjobs
-      })
+      .find(
+        {
+          driverId: userId,
+          jobStatus: "COMPLETED",
+          hardcoreRating: { $gte: 4 }, // hardcore rating 4 keatas
+          jobId: { $nin: validatedIds }, // Pastikan jobId tidak ada di koleksi validatedjobs
+        },
+        { projection: { routePath: 0 } }
+      )
       .sort({ completedAt: -1 })
       .toArray();
 
@@ -276,10 +279,13 @@ export async function validateJobPoints(jobId: string) {
     const db = client.db();
 
     // 1. Ambil data job asli
-    const job = await db.collection("jobhistories").findOne({
-      _id: new ObjectId(jobId),
-      driverId: userId,
-    });
+    const job = await db.collection("jobhistories").findOne(
+      {
+        _id: new ObjectId(jobId),
+        driverId: userId,
+      },
+      { projection: { routePath: 0 } }
+    );
 
     if (!job) throw new Error("Job tidak ditemukan.");
 
@@ -478,10 +484,13 @@ export async function exchangeJobForTickets(jobId: string) {
     const db = client.db();
 
     // 1. Ambil data job asli
-    const job = await db.collection("jobhistories").findOne({
-      _id: new ObjectId(jobId),
-      driverId: userId,
-    });
+    const job = await db.collection("jobhistories").findOne(
+      {
+        _id: new ObjectId(jobId),
+        driverId: userId,
+      },
+      { projection: { routePath: 0 } }
+    );
 
     if (!job) throw new Error("Job tidak ditemukan.");
 

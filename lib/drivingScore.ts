@@ -263,7 +263,10 @@ export async function recalculateUserDrivingScore(
 
   const completedJobs = await db
     .collection("jobhistories")
-    .find({ driverId: idStr, jobStatus: "COMPLETED" })
+    .find(
+      { driverId: idStr, jobStatus: "COMPLETED" },
+      { projection: { routePath: 0 } }
+    )
     .sort({ completedAt: -1, createdAt: -1 })
     .limit(ACTIVE_SAMPLE_LIMIT)
     .toArray();

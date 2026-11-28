@@ -72,7 +72,7 @@ export default async function JobsIndexPage({ searchParams }: JobsPageProps) {
 
   const rawJobs = await db
     .collection("jobhistories")
-    .find(query)
+    .find(query, { projection: { routePath: 0 } })
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(ITEMS_PER_PAGE)

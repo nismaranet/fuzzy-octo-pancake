@@ -80,21 +80,27 @@ export default async function CoachTerminalPage() {
         .toArray(),
       db
         .collection("jobhistories")
-        .find({
-          ...coachJobFilter,
-          jobStatus: { $ne: "CANCELED" },
-          completedAt: { $exists: false },
-        })
+        .find(
+          {
+            ...coachJobFilter,
+            jobStatus: { $ne: "CANCELED" },
+            completedAt: { $exists: false },
+          },
+          { projection: { routePath: 0 } },
+        )
         .sort({ createdAt: -1 })
         .limit(20)
         .toArray(),
       db
         .collection("jobhistories")
-        .find({
-          ...coachJobFilter,
-          jobStatus: { $ne: "CANCELED" },
-          completedAt: { $exists: true },
-        })
+        .find(
+          {
+            ...coachJobFilter,
+            jobStatus: { $ne: "CANCELED" },
+            completedAt: { $exists: true },
+          },
+          { projection: { routePath: 0 } },
+        )
         .sort({ completedAt: -1, createdAt: -1 })
         .limit(20)
         .toArray(),

@@ -38,7 +38,7 @@ export async function fetchJobs(
 
   const rawJobs = await db
     .collection("jobhistories")
-    .find(queryFilter)
+    .find(queryFilter, { projection: { routePath: 0 } })
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
