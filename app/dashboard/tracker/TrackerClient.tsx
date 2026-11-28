@@ -3,67 +3,89 @@
 import React, { useState, useEffect } from "react";
 import {
   Download,
-  KeyRound,
-  Copy,
-  CheckCircle,
   RefreshCw,
-  Eye,
-  EyeOff,
-  ExternalLink,
-  ShieldCheck,
   Monitor,
   Terminal,
   Sparkles,
-  Check,
-  Loader2,
-  HelpCircle,
   Radio,
   FileCode,
   Laptop,
+  ShieldBan,
+  RotateCcw,
+  Trash2,
+  Gamepad2,
+  LogOut,
 } from "lucide-react";
 import { showAlert, showConfirm } from "@/lib/dialog";
-import { generateTrackerToken, revokeTrackerToken } from "./actions";
+import {
+  revokeTrackerToken,
+  getTrackerInfo,
+  revokeTrackerDevice,
+  restoreTrackerDevice,
+  removeTrackerDevice,
+} from "./actions";
+
+interface TrackerDeviceItem {
+  deviceId: string;
+  deviceName: string;
+  platform: string;
+  clientType: "plugin" | "companion";
+  clientVersion: string | null;
+  lastGame: string | null;
+  activeGame: string | null;
+  lastInGameSyncAt: string | null;
+  firstSeenAt: string | null;
+  lastSyncAt: string | null;
+  revoked: boolean;
+  revokedAt: string | null;
+}
 
 interface ReleaseDownloads {
   windowsExe: string;
-  windowsMsi: string;
+  windowsMsi: string | null;
   windowsDll: string;
   linuxAppImage: string;
-  linuxDeb: string;
-  linuxRpm: string;
-  macosDmg: string;
-  macosTar: string;
+  linuxDeb: string | null;
 }
 
 interface ReleaseData {
   tagName: string;
   name: string;
   publishedAt: string;
-  htmlUrl: string;
   downloads: ReleaseDownloads;
 }
 
 interface TrackerClientProps {
-  initialToken: string | null;
   trackerLastSync: string | null;
   trackerVersion: string | null;
+  trackerLastGame: string | null;
+  initialDevices: TrackerDeviceItem[];
   release: ReleaseData;
 }
 
+function getShortGameCode(gameName: string | null): string {
+  if (!gameName) return "";
+  const low = gameName.toLowerCase();
+  if (low.includes("euro truck") || low === "ets2" || low === "eut2") return "ETS2";
+  if (low.includes("american truck") || low === "ats" || low === "amtrucks") return "ATS";
+  return gameName;
+}
+
 export default function TrackerClient({
-  initialToken,
   trackerLastSync,
   trackerVersion,
+  trackerLastGame,
+  initialDevices,
   release,
 }: TrackerClientProps) {
-  const [token, setToken] = useState<string | null>(initialToken);
-  const [showToken, setShowToken] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isRevoking, setIsRevoking] = useState(false);
-  const [detectedOs, setDetectedOs] = useState<"windows" | "linux" | "macos">(
-    "windows",
-  );
+  const [devices, setDevices] = useState<TrackerDeviceItem[]>(initialDevices || []);
+  const [lastSync, setLastSync] = useState<string | null>(trackerLastSync);
+  const [lastVersion, setLastVersion] = useState<string | null>(trackerVersion);
+  const [lastGame, setLastGame] = useState<string | null>(trackerLastGame);
+  const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
+  const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
+  const [isRevokingAll, setIsRevokingAll] = useState(false);
+  const [detectedOs, setDetectedOs] = useState<"windows" | "linux" | "macos">("windows");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -78,79 +100,105 @@ export default function TrackerClient({
     }
   }, []);
 
-  const handleCopy = async () => {
-    if (!token) return;
+  const handleRefreshDevices = async () => {
+    setIsRefreshingDevices(true);
     try {
-      await navigator.clipboard.writeText(token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-      await showAlert(
-        "Nismara Tracker Token berhasil disalin ke clipboard!",
-        "Berhasil",
-      );
-    } catch {
-      await showAlert("Gagal menyalin token ke clipboard.", "Error");
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (token) {
-      const confirmed = await showConfirm(
-        "Membuat token baru akan memutuskan sesi in-game atau companion yang menggunakan token lama. Lanjutkan?",
-        "Perbarui Token",
-      );
-      if (!confirmed) return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const res = await generateTrackerToken();
-      if (res.success && res.token) {
-        setToken(res.token);
-        setShowToken(true);
-        await showAlert(res.message, "Sukses");
-      } else {
-        await showAlert(res.message, "Gagal");
+      const res = await getTrackerInfo();
+      if (res.success) {
+        if (Array.isArray(res.trackerDevices)) setDevices(res.trackerDevices);
+        setLastSync(res.trackerLastSync ?? null);
+        setLastVersion(res.trackerVersion ?? null);
+        setLastGame(res.trackerLastGame ?? null);
       }
     } catch (err) {
       console.error(err);
-      await showAlert(
-        "Terjadi kesalahan jaringan saat membuat token.",
-        "Error",
-      );
     } finally {
-      setIsGenerating(false);
+      setIsRefreshingDevices(false);
     }
   };
 
-  const handleRevoke = async () => {
+  const handleRevokeDevice = async (dev: TrackerDeviceItem) => {
     const confirmed = await showConfirm(
-      "Apakah Anda yakin ingin menonaktifkan token tracker Anda?",
-      "Nonaktifkan Token",
+      `Cabut akses untuk perangkat "${dev.deviceName}"? Perangkat tersebut tidak akan bisa mengirim telemetri sampai diizinkan kembali atau login ulang via Discord.`,
+      "Cabut Akses Perangkat"
+    );
+    if (!confirmed) return;
+    setBusyDeviceId(dev.deviceId);
+    try {
+      const res = await revokeTrackerDevice(dev.deviceId);
+      if (res.success && Array.isArray(res.trackerDevices)) {
+        setDevices(res.trackerDevices);
+        await showAlert(res.message, "Berhasil");
+      } else {
+        await showAlert(res.message || "Gagal mencabut akses perangkat.", "Gagal");
+      }
+    } finally {
+      setBusyDeviceId(null);
+    }
+  };
+
+  const handleRestoreDevice = async (dev: TrackerDeviceItem) => {
+    setBusyDeviceId(dev.deviceId);
+    try {
+      const res = await restoreTrackerDevice(dev.deviceId);
+      if (res.success && Array.isArray(res.trackerDevices)) {
+        setDevices(res.trackerDevices);
+        await showAlert(res.message, "Berhasil");
+      } else {
+        await showAlert(res.message || "Gagal memulihkan akses perangkat.", "Gagal");
+      }
+    } finally {
+      setBusyDeviceId(null);
+    }
+  };
+
+  const handleRemoveDevice = async (dev: TrackerDeviceItem) => {
+    const confirmed = await showConfirm(
+      `Hapus "${dev.deviceName}" dari daftar perangkat?`,
+      "Hapus Perangkat"
+    );
+    if (!confirmed) return;
+    setBusyDeviceId(dev.deviceId);
+    try {
+      const res = await removeTrackerDevice(dev.deviceId);
+      if (res.success && Array.isArray(res.trackerDevices)) {
+        setDevices(res.trackerDevices);
+      } else {
+        await showAlert(res.message || "Gagal menghapus perangkat.", "Gagal");
+      }
+    } finally {
+      setBusyDeviceId(null);
+    }
+  };
+
+  const handleRevokeAllSessions = async () => {
+    const confirmed = await showConfirm(
+      "Putuskan semua perangkat yang terhubung? Semua sesi Nismara Companion dan plugin game akan keluar, dan Anda cukup Login with Discord kembali di perangkat Anda.",
+      "Putuskan Semua Perangkat"
     );
     if (!confirmed) return;
 
-    setIsRevoking(true);
+    setIsRevokingAll(true);
     try {
       const res = await revokeTrackerToken();
       if (res.success) {
-        setToken(null);
+        setDevices([]);
         await showAlert(res.message, "Sukses");
       } else {
         await showAlert(res.message, "Gagal");
       }
     } catch (err) {
       console.error(err);
-      await showAlert("Gagal menonaktifkan token tracker.", "Error");
+      await showAlert("Gagal memutuskan semua sesi perangkat.", "Error");
     } finally {
-      setIsRevoking(false);
+      setIsRevokingAll(false);
     }
   };
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
       {/* ======================================================== */}
-      {/* HERO HEADER                                             */}
+      {/* HERO HEADER                                              */}
       {/* ======================================================== */}
       <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-cyan-950/40 via-black/60 to-purple-950/30 border border-cyan-500/20 p-8 md:p-10 shadow-2xl backdrop-blur-xl">
         <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -166,10 +214,10 @@ export default function TrackerClient({
               Nismara Tracker & Companion
             </h1>
             <p className="text-sm md:text-base text-gray-400 max-w-2xl leading-relaxed">
-              In-game telemetry plugin{" "}
-              <strong className="text-cyan-300">Nismara Transport</strong> untuk
-              Euro Truck Simulator 2 & American Truck Simulator, serta aplikasi
-              desktop Companion hub modern.
+              Unduh <strong className="text-cyan-300">Nismara Companion</strong> untuk
+              Euro Truck Simulator 2 & American Truck Simulator. Cukup buka aplikasi dan
+              klik <strong className="text-white">Login with Discord</strong> — tanpa perlu
+              menyalin token manual lagi.
             </p>
           </div>
 
@@ -186,143 +234,6 @@ export default function TrackerClient({
       </div>
 
       {/* ======================================================== */}
-      {/* DRIVER AUTHENTICATION TOKEN CARD                         */}
-      {/* ======================================================== */}
-      <div className="glass-panel p-8 rounded-[2rem] border-cyan-500/30 bg-black/40 relative overflow-hidden">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">
-                Driver Tracker Token
-              </h2>
-              <p className="text-xs text-gray-400">
-                Token autentikasi aman untuk menghubungkan game & companion ke
-                akun Anda.
-              </p>
-            </div>
-          </div>
-
-          {token ? (
-            <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
-              <CheckCircle className="w-3.5 h-3.5" /> Token Aktif
-            </span>
-          ) : (
-            <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5" /> Belum Ada Token
-            </span>
-          )}
-        </div>
-
-        {token ? (
-          <div className="space-y-4 pt-2">
-            <div className="p-4 rounded-2xl bg-black/60 border border-cyan-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex-1 font-mono text-base tracking-wider text-cyan-300 select-all overflow-x-auto py-1">
-                {showToken ? token : token.replace(/([^-]{3})[^-]+/g, "$1••••")}
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all"
-                >
-                  {showToken ? (
-                    <EyeOff className="w-3.5 h-3.5" />
-                  ) : (
-                    <Eye className="w-3.5 h-3.5" />
-                  )}
-                  <span>{showToken ? "Sembunyikan" : "Lihat"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-500/20"
-                >
-                  {copied ? (
-                    <Check className="w-3.5 h-3.5" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                  <span>{copied ? "Tersalin!" : "Salin Token"}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
-              <div className="text-xs text-gray-400 flex items-center gap-2">
-                {trackerLastSync ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span>
-                      Sinkronisasi in-game terakhir:{" "}
-                      <strong className="text-gray-200">
-                        {new Date(trackerLastSync).toLocaleString("id-ID")}
-                      </strong>
-                      {trackerVersion ? ` (Plugin v${trackerVersion})` : ""}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                    <span>
-                      Belum pernah disinkronkan dari dalam game ETS2/ATS.
-                    </span>
-                  </>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`}
-                  />
-                  <span>Perbarui Token</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRevoke}
-                  disabled={isRevoking}
-                  className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-semibold rounded-xl transition-all disabled:opacity-50"
-                >
-                  <span>Nonaktifkan</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-gray-400 leading-relaxed">
-              Anda belum memiliki Nismara Tracker Token. Buat token Anda
-              sekarang untuk mulai melacak pekerjaan, armada truk, garasi, dan
-              poin penalti Anda secara otomatis langsung dari kabin truk ETS2 &
-              ATS.
-            </p>
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold rounded-xl transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-cyan-500/25 text-sm"
-            >
-              {isGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <KeyRound className="w-4 h-4" />
-              )}
-              <span>Generate Tracker Token Sekarang</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ======================================================== */}
       {/* DOWNLOAD CENTER                                          */}
       {/* ======================================================== */}
       <div id="downloads" className="space-y-6">
@@ -335,31 +246,29 @@ export default function TrackerClient({
             <p className="text-xs md:text-sm text-gray-400 mt-1">
               Pilih paket instalasi sesuai dengan sistem operasi komputer Anda.
               Versi rilis:{" "}
-              <strong className="text-cyan-400 font-mono">
-                {release.tagName}
-              </strong>
+              <strong className="text-cyan-400 font-mono">{release.tagName}</strong>
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold">
-              ✓ Auto-Updater Enabled
+              ✓ Login with Discord & Auto-Updater
             </span>
           </div>
         </div>
 
-        {/* Multi-OS Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Multi-OS Grid (Windows & Linux Proton/Wine) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* WINDOWS CARD */}
           <div
             className={`glass-panel p-6 rounded-[2rem] border transition-all flex flex-col justify-between ${
-              detectedOs === "windows"
+              detectedOs === "windows" || detectedOs === "macos"
                 ? "border-cyan-500/60 bg-cyan-950/20 shadow-xl shadow-cyan-500/10"
                 : "border-border/40 bg-black/40 hover:border-border/80"
             }`}
           >
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
                   <Monitor className="w-6 h-6" />
                 </div>
@@ -368,15 +277,24 @@ export default function TrackerClient({
                     OS Terdeteksi
                   </span>
                 )}
+                {detectedOs === "macos" && (
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                    macOS via Wine / CrossOver
+                  </span>
+                )}
               </div>
 
               <div>
                 <h3 className="text-lg font-bold text-white">
-                  Windows 10 / 11
+                  Windows 10 / 11{" "}
+                  <span className="text-xs font-medium text-gray-400">
+                    (x64 &amp; macOS Wine/CrossOver)
+                  </span>
                 </h3>
                 <p className="text-xs text-gray-400 mt-1">
-                  Arsitektur x64. Kompatibel penuh dengan DirectX 11 dan
-                  instalasi Steam resmi.
+                  Kompatibel penuh dengan DirectX 11, Discord Rich Presence,
+                  instalasi Steam resmi, serta macOS melalui CrossOver / Whisky /
+                  Wine.
                 </p>
               </div>
 
@@ -394,18 +312,18 @@ export default function TrackerClient({
                   </span>
                 </a>
 
-                <a
-                  href={release.downloads.windowsMsi}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-semibold text-xs flex items-center justify-between transition-all"
-                >
-                  <span className="flex items-center gap-2">
-                    <Download className="w-4 h-4 text-gray-400" />
-                    <span>Windows Installer (.msi)</span>
-                  </span>
-                  <span className="text-[10px] font-mono text-gray-400">
-                    MSI
-                  </span>
-                </a>
+                {release.downloads.windowsMsi && (
+                  <a
+                    href={release.downloads.windowsMsi}
+                    className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-semibold text-xs flex items-center justify-between transition-all"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Download className="w-4 h-4 text-gray-400" />
+                      <span>Windows Installer (.msi)</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-400">MSI</span>
+                  </a>
+                )}
 
                 <a
                   href={release.downloads.windowsDll}
@@ -416,16 +334,14 @@ export default function TrackerClient({
                     <FileCode className="w-4 h-4 text-cyan-400" />
                     <span>NismaraTracker.dll Standalone</span>
                   </span>
-                  <span className="text-[10px] font-mono text-cyan-400">
-                    Manual DLL
-                  </span>
+                  <span className="text-[10px] font-mono text-cyan-400">Manual DLL</span>
                 </a>
               </div>
             </div>
 
             <p className="text-[11px] text-gray-500 mt-6 pt-4 border-t border-white/5">
-              Direkomendasikan mengunduh Companion (.exe) untuk auto-install DLL
-              dan launcher game instan.
+              Direkomendasikan mengunduh Companion (.exe) untuk auto-install DLL,
+              auto-update via R2 CDN, dan login Discord 1 klik.
             </p>
           </div>
 
@@ -450,10 +366,13 @@ export default function TrackerClient({
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-white">Linux (x86_64)</h3>
+                <h3 className="text-lg font-bold text-white">
+                  Linux (x86_64 — Proton / Wine)
+                </h3>
                 <p className="text-xs text-gray-400 mt-1">
-                  Mendukung Steam Proton / Wine serta distribusi modern (Ubuntu,
-                  Debian, Fedora, Arch).
+                  Sudah membundel <code className="text-gray-300">NismaraTracker.dll</code>{" "}
+                  untuk ETS2/ATS yang berjalan lewat Steam Proton, Wine, atau
+                  Steam Deck.
                 </p>
               </div>
 
@@ -471,31 +390,18 @@ export default function TrackerClient({
                   </span>
                 </a>
 
-                <a
-                  href={release.downloads.linuxDeb}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-semibold text-xs flex items-center justify-between transition-all"
-                >
-                  <span className="flex items-center gap-2">
-                    <Download className="w-4 h-4 text-gray-400" />
-                    <span>Debian / Ubuntu (.deb)</span>
-                  </span>
-                  <span className="text-[10px] font-mono text-gray-400">
-                    DEB
-                  </span>
-                </a>
-
-                <a
-                  href={release.downloads.linuxRpm}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-semibold text-xs flex items-center justify-between transition-all"
-                >
-                  <span className="flex items-center gap-2">
-                    <Download className="w-4 h-4 text-gray-400" />
-                    <span>Fedora / RHEL (.rpm)</span>
-                  </span>
-                  <span className="text-[10px] font-mono text-gray-400">
-                    RPM
-                  </span>
-                </a>
+                {release.downloads.linuxDeb && (
+                  <a
+                    href={release.downloads.linuxDeb}
+                    className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-semibold text-xs flex items-center justify-between transition-all"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Download className="w-4 h-4 text-gray-400" />
+                      <span>Debian / Ubuntu (.deb)</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-400">DEB</span>
+                  </a>
+                )}
               </div>
             </div>
 
@@ -504,74 +410,207 @@ export default function TrackerClient({
               eksekusi (<code className="text-gray-400">chmod +x</code>).
             </p>
           </div>
-
-          {/* MACOS CARD */}
-          <div
-            className={`glass-panel p-6 rounded-[2rem] border transition-all flex flex-col justify-between ${
-              detectedOs === "macos"
-                ? "border-cyan-500/60 bg-cyan-950/20 shadow-xl shadow-cyan-500/10"
-                : "border-border/40 bg-black/40 hover:border-border/80"
-            }`}
-          >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                  <Laptop className="w-6 h-6" />
-                </div>
-                {detectedOs === "macos" && (
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-cyan-500 text-black">
-                    OS Terdeteksi
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold text-white">macOS</h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  Apple Silicon (M1/M2/M3/M4) dengan performa grafis tinggi dan
-                  efisiensi memori.
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <a
-                  href={release.downloads.macosDmg}
-                  className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-between transition-all shadow-md shadow-purple-600/20"
-                >
-                  <span className="flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    <span>Apple Silicon DMG (.dmg)</span>
-                  </span>
-                  <span className="text-[10px] font-mono bg-black/30 px-2 py-0.5 rounded">
-                    ARM64
-                  </span>
-                </a>
-
-                <a
-                  href={release.downloads.macosTar}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-semibold text-xs flex items-center justify-between transition-all"
-                >
-                  <span className="flex items-center gap-2">
-                    <Download className="w-4 h-4 text-gray-400" />
-                    <span>Tarball Archive (.tar.gz)</span>
-                  </span>
-                  <span className="text-[10px] font-mono text-gray-400">
-                    TAR
-                  </span>
-                </a>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-gray-500 mt-6 pt-4 border-t border-white/5">
-              Buka disk image `.dmg` lalu seret Nismara Companion ke folder
-              Applications Anda.
-            </p>
-          </div>
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* QUICK START GUIDE (3 LANGKAH MUDAH)                       */}
+      {/* ACTIVE DEVICES & SESSION SECURITY CARD                   */}
+      {/* ======================================================== */}
+      <div className="glass-panel p-8 rounded-[2rem] border-white/10 bg-black/40 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <Monitor className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Perangkat Terhubung</h2>
+              <p className="text-xs text-gray-400">
+                Pantau PC yang terhubung ke akun driver Anda dan cabut akses segera jika ada perangkat asing.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefreshDevices}
+              disabled={isRefreshingDevices}
+              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingDevices ? "animate-spin" : ""}`} />
+              <span>Muat Ulang</span>
+            </button>
+
+            {devices.length > 0 && (
+              <button
+                type="button"
+                onClick={handleRevokeAllSessions}
+                disabled={isRevokingAll}
+                className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Putuskan Semua</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {(lastSync || lastGame) && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-gray-400 mb-5 pb-4 border-b border-white/10">
+            {lastSync && (
+              <span className="inline-flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                Sinkronisasi terakhir:{" "}
+                <strong className="text-gray-200">
+                  {new Date(lastSync).toLocaleString("id-ID")}
+                </strong>
+                {lastVersion ? ` (v${lastVersion})` : ""}
+              </span>
+            )}
+            {lastGame && (
+              <span className="inline-flex items-center gap-1.5 text-cyan-300">
+                <Gamepad2 className="w-3.5 h-3.5" />
+                Last Game: <strong className="text-white">{lastGame}</strong>
+              </span>
+            )}
+          </div>
+        )}
+
+        {devices.length === 0 ? (
+          <div className="p-5 rounded-2xl bg-black/50 border border-white/10 text-xs text-gray-400">
+            Belum ada perangkat yang terhubung. Unduh{" "}
+            <strong className="text-gray-200">Nismara Companion</strong> di atas lalu
+            klik <strong className="text-white">Login with Discord</strong> agar
+            perangkat Anda otomatis muncul di sini.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {devices.map((dev) => {
+              const nowMs = Date.now();
+              const lastSyncMs = dev.lastSyncAt ? new Date(dev.lastSyncAt).getTime() : 0;
+              const lastInGameMs = dev.lastInGameSyncAt
+                ? new Date(dev.lastInGameSyncAt).getTime()
+                : 0;
+              const isConnectedToGame =
+                !dev.revoked &&
+                Boolean(dev.activeGame) &&
+                lastInGameMs > 0 &&
+                nowMs - lastInGameMs < 90_000;
+              const isCompanionOnline =
+                !dev.revoked &&
+                !isConnectedToGame &&
+                lastSyncMs > 0 &&
+                nowMs - lastSyncMs < 120_000;
+              const isBusy = busyDeviceId === dev.deviceId;
+
+              return (
+                <div
+                  key={dev.deviceId}
+                  className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
+                    dev.revoked
+                      ? "bg-rose-950/20 border-rose-500/25 opacity-80"
+                      : isConnectedToGame
+                      ? "bg-emerald-950/20 border-emerald-500/30"
+                      : "bg-black/60 border-white/10"
+                  }`}
+                >
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="font-bold text-sm text-white flex items-center gap-1.5">
+                        <Laptop className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span>{dev.deviceName}</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white/5 text-gray-300 border border-white/10">
+                        {dev.platform}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                        {dev.clientType === "plugin" ? "In-Game Plugin" : "Companion"}
+                        {dev.clientVersion ? ` v${dev.clientVersion}` : ""}
+                      </span>
+
+                      {dev.revoked ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                          Akses Dicabut
+                        </span>
+                      ) : isConnectedToGame ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Connected to {getShortGameCode(dev.activeGame)}
+                        </span>
+                      ) : isCompanionOnline ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30 inline-flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                          Companion Online
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/5 text-gray-400 border border-white/10">
+                          Offline
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Gamepad2 className="w-3.5 h-3.5 text-cyan-400" />
+                        Last Game:{" "}
+                        <strong className="text-gray-200">
+                          {dev.lastGame || "Belum terhubung ke game"}
+                        </strong>
+                      </span>
+                      <span>
+                        Sinkronisasi terakhir:{" "}
+                        <strong className="text-gray-200">
+                          {dev.lastSyncAt
+                            ? new Date(dev.lastSyncAt).toLocaleString("id-ID")
+                            : "-"}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!dev.revoked ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeDevice(dev)}
+                        disabled={isBusy}
+                        className="px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                      >
+                        <ShieldBan className="w-3.5 h-3.5" />
+                        <span>Cabut Akses</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreDevice(dev)}
+                          disabled={isBusy}
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/25 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Izinkan Lagi</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDevice(dev)}
+                          disabled={isBusy}
+                          className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ======================================================== */}
+      {/* QUICK START GUIDE (3 LANGKAH MUDAH)                      */}
       {/* ======================================================== */}
       <div className="glass-panel p-8 rounded-[2rem] border-border/40 bg-black/30 space-y-6">
         <h3 className="text-xl font-bold text-white flex items-center gap-2.5">
@@ -584,9 +623,7 @@ export default function TrackerClient({
             <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 font-extrabold flex items-center justify-center text-sm border border-cyan-500/30">
               1
             </div>
-            <h4 className="font-bold text-white text-sm">
-              Unduh Nismara Companion
-            </h4>
+            <h4 className="font-bold text-white text-sm">Unduh Nismara Companion</h4>
             <p className="text-xs text-gray-400 leading-relaxed">
               Unduh installer sesuai OS Anda di bagian atas dan lakukan
               instalasi. Companion akan otomatis menyiapkan plugin game untuk
@@ -598,13 +635,11 @@ export default function TrackerClient({
             <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 font-extrabold flex items-center justify-center text-sm border border-cyan-500/30">
               2
             </div>
-            <h4 className="font-bold text-white text-sm">
-              Masukkan Driver Token
-            </h4>
+            <h4 className="font-bold text-white text-sm">Klik Login with Discord</h4>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Buka tab <strong>Settings</strong> di Nismara Companion, tempel
-              token Anda dari card di atas, lalu klik{" "}
-              <strong>Simpan Token ke Game Config</strong>.
+              Buka Nismara Companion lalu klik{" "}
+              <strong className="text-white">Login with Discord</strong>. Akun
+              driver dan sesi plugin ETS2/ATS langsung terhubung secara otomatis.
             </p>
           </div>
 

@@ -5,6 +5,34 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 import { revalidatePath } from "next/cache";
 
+function serializeDevices(rawDevices: unknown) {
+  if (!Array.isArray(rawDevices)) return [];
+  return rawDevices
+    .filter((d): d is Record<string, unknown> => Boolean(d && typeof d === "object"))
+    .map((d) => ({
+      deviceId: String(d.deviceId || ""),
+      deviceName: String(d.deviceName || "Unknown PC"),
+      platform: String(d.platform || "Windows"),
+      clientType: d.clientType === "plugin" ? ("plugin" as const) : ("companion" as const),
+      clientVersion: d.clientVersion ? String(d.clientVersion) : null,
+      lastGame: d.lastGame ? String(d.lastGame) : null,
+      activeGame: d.activeGame ? String(d.activeGame) : null,
+      lastInGameSyncAt: d.lastInGameSyncAt
+        ? new Date(d.lastInGameSyncAt as string | Date).toISOString()
+        : null,
+      firstSeenAt: d.firstSeenAt
+        ? new Date(d.firstSeenAt as string | Date).toISOString()
+        : null,
+      lastSyncAt: d.lastSyncAt
+        ? new Date(d.lastSyncAt as string | Date).toISOString()
+        : null,
+      revoked: Boolean(d.revoked),
+      revokedAt: d.revokedAt
+        ? new Date(d.revokedAt as string | Date).toISOString()
+        : null,
+    }));
+}
+
 export async function getTrackerInfo() {
   const session = await getServerSession(authOptions);
   if (!session || !session.user?.email) {
@@ -32,6 +60,8 @@ export async function getTrackerInfo() {
       trackerToken: user.trackerToken || null,
       trackerLastSync: user.trackerLastSync ? new Date(user.trackerLastSync).toISOString() : null,
       trackerVersion: user.trackerVersion || null,
+      trackerLastGame: user.trackerLastGame || null,
+      trackerDevices: serializeDevices(user.trackerDevices),
       isDriver: Boolean(user.isDriver),
     };
   } catch (error) {
@@ -84,6 +114,7 @@ export async function generateTrackerToken() {
       {
         $set: {
           trackerToken: newToken,
+          trackerDevices: [],
           updatedAt: new Date(),
         },
       }
@@ -131,6 +162,7 @@ export async function revokeTrackerToken() {
       {
         $set: {
           trackerToken: null,
+          trackerDevices: [],
           updatedAt: new Date(),
         },
       }
@@ -141,11 +173,147 @@ export async function revokeTrackerToken() {
 
     return {
       success: true,
-      message: "Nismara Tracker Token berhasil dinonaktifkan.",
+      message: "Semua sesi perangkat berhasil diputuskan. Silakan Login with Discord ulang di perangkat Anda.",
     };
   } catch (error) {
     console.error("Revoke Tracker Token Error:", error);
     return { success: false, message: "Gagal menonaktifkan token tracker." };
+  }
+}
+
+export async function revokeTrackerDevice(deviceId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.email) {
+    return { success: false, message: "Unauthorized. Silakan login kembali." };
+  }
+
+  const cleanId = String(deviceId || "").trim();
+  if (!cleanId) {
+    return { success: false, message: "ID perangkat tidak valid." };
+  }
+
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+    const usersCol = db.collection("users");
+    const user = await usersCol.findOne({ email: session.user.email });
+
+    if (!user || !user.test_participation) {
+      return { success: false, message: "Akses ditolak." };
+    }
+
+    const now = new Date();
+    const devices = Array.isArray(user.trackerDevices) ? user.trackerDevices : [];
+    const updated = devices.map((d: Record<string, unknown>) =>
+      d && d.deviceId === cleanId
+        ? { ...d, revoked: true, revokedAt: now, activeGame: null }
+        : d
+    );
+
+    await usersCol.updateOne(
+      { _id: user._id },
+      { $set: { trackerDevices: updated, updatedAt: now } }
+    );
+
+    revalidatePath("/dashboard/tracker");
+    return {
+      success: true,
+      message: "Akses perangkat berhasil dicabut.",
+      trackerDevices: serializeDevices(updated),
+    };
+  } catch (error) {
+    console.error("Revoke Tracker Device Error:", error);
+    return { success: false, message: "Gagal mencabut akses perangkat." };
+  }
+}
+
+export async function restoreTrackerDevice(deviceId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.email) {
+    return { success: false, message: "Unauthorized. Silakan login kembali." };
+  }
+
+  const cleanId = String(deviceId || "").trim();
+  if (!cleanId) {
+    return { success: false, message: "ID perangkat tidak valid." };
+  }
+
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+    const usersCol = db.collection("users");
+    const user = await usersCol.findOne({ email: session.user.email });
+
+    if (!user || !user.test_participation) {
+      return { success: false, message: "Akses ditolak." };
+    }
+
+    const now = new Date();
+    const devices = Array.isArray(user.trackerDevices) ? user.trackerDevices : [];
+    const updated = devices.map((d: Record<string, unknown>) =>
+      d && d.deviceId === cleanId
+        ? { ...d, revoked: false, revokedAt: null }
+        : d
+    );
+
+    await usersCol.updateOne(
+      { _id: user._id },
+      { $set: { trackerDevices: updated, updatedAt: now } }
+    );
+
+    revalidatePath("/dashboard/tracker");
+    return {
+      success: true,
+      message: "Akses perangkat berhasil diizinkan kembali.",
+      trackerDevices: serializeDevices(updated),
+    };
+  } catch (error) {
+    console.error("Restore Tracker Device Error:", error);
+    return { success: false, message: "Gagal memulihkan akses perangkat." };
+  }
+}
+
+export async function removeTrackerDevice(deviceId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.email) {
+    return { success: false, message: "Unauthorized. Silakan login kembali." };
+  }
+
+  const cleanId = String(deviceId || "").trim();
+  if (!cleanId) {
+    return { success: false, message: "ID perangkat tidak valid." };
+  }
+
+  try {
+    const client = await clientPromise;
+    const db = client.db();
+    const usersCol = db.collection("users");
+    const user = await usersCol.findOne({ email: session.user.email });
+
+    if (!user || !user.test_participation) {
+      return { success: false, message: "Akses ditolak." };
+    }
+
+    const now = new Date();
+    const devices = Array.isArray(user.trackerDevices) ? user.trackerDevices : [];
+    const updated = devices.filter(
+      (d: Record<string, unknown>) => d && d.deviceId !== cleanId
+    );
+
+    await usersCol.updateOne(
+      { _id: user._id },
+      { $set: { trackerDevices: updated, updatedAt: now } }
+    );
+
+    revalidatePath("/dashboard/tracker");
+    return {
+      success: true,
+      message: "Perangkat dihapus dari riwayat sesi.",
+      trackerDevices: serializeDevices(updated),
+    };
+  } catch (error) {
+    console.error("Remove Tracker Device Error:", error);
+    return { success: false, message: "Gagal menghapus perangkat." };
   }
 }
 

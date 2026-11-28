@@ -16,6 +16,10 @@ import {
   type DrivingScoreData,
 } from "@/lib/drivingScore";
 import {
+  fetchDriverPresence,
+  formatLastOnlineRelative,
+} from "@/lib/trackerPresence";
+import {
   Truck,
   Bus,
   Users,
@@ -95,6 +99,7 @@ export default async function DashboardPage() {
     ncIncomes,
     initialDLink,
     pointPenalties,
+    driverPresence,
   ] = await Promise.all([
     db.collection("users").findOne(
       { discordId: discordId },
@@ -108,6 +113,8 @@ export default async function DashboardPage() {
           discordRole: 1,
           role: 1,
           topManager: 1,
+          trackerLastSync: 1,
+          trackerLastInGameSync: 1,
         },
       },
     ),
@@ -121,19 +128,28 @@ export default async function DashboardPage() {
     }),
     db
       .collection("jobhistories")
-      .find({ driverId: discordId, jobStatus: "ONGOING" })
+      .find(
+        { driverId: discordId, jobStatus: "ONGOING" },
+        { projection: { routePath: 0 } },
+      )
       .sort({ createdAt: -1 })
       .limit(3)
       .toArray(),
     db
       .collection("jobhistories")
-      .find({ driverId: discordId, jobStatus: "COMPLETED" })
+      .find(
+        { driverId: discordId, jobStatus: "COMPLETED" },
+        { projection: { routePath: 0 } },
+      )
       .sort({ createdAt: -1 })
       .limit(3)
       .toArray(),
     db
       .collection("jobhistories")
-      .find({ driverId: discordId, jobStatus: "CANCELED" })
+      .find(
+        { driverId: discordId, jobStatus: "CANCELED" },
+        { projection: { routePath: 0 } },
+      )
       .sort({ createdAt: -1 })
       .limit(3)
       .toArray(),
@@ -281,6 +297,7 @@ export default async function DashboardPage() {
       .sort({ createdAt: -1 })
       .limit(5)
       .toArray(),
+    fetchDriverPresence(discordId),
   ]);
 
   let drivingScore: DrivingScoreData | null =
@@ -358,6 +375,13 @@ export default async function DashboardPage() {
       : "-",
   };
 
+  const lastOnlineSource =
+    driverPresence?.lastOnlineAt ||
+    userDoc?.trackerLastInGameSync ||
+    userDoc?.trackerLastSync ||
+    null;
+  const lastOnlineRelative = formatLastOnlineRelative(lastOnlineSource);
+
   return (
     <main className="max-w-7xl mx-auto px-4 py-12">
       {/* Header Profile Dashboard */}
@@ -378,7 +402,7 @@ export default async function DashboardPage() {
             <h1 className="text-3xl font-bold text-(-primary-foreground) mb-1">
               {session.user.name}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <span
                 className="px-3 py-1 rounded-full text-xs font-bold border"
                 style={{
@@ -393,6 +417,69 @@ export default async function DashboardPage() {
                 ID: {truckyId}
               </span>
             </div>
+
+            {/* Live Tracker Presence & Location */}
+            {(driverPresence?.online || driverPresence?.lastLocation || lastOnlineRelative) && (
+              <div className="flex flex-wrap items-center gap-2 mt-2.5 text-xs">
+                {driverPresence?.online ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                      </span>
+                      {driverPresence.statusLabel}
+                    </span>
+                    {driverPresence.locationLabel && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/25 font-medium">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {driverPresence.locationLabel}
+                      </span>
+                    )}
+                    {driverPresence.jobSummary?.sourceCity &&
+                      driverPresence.jobSummary?.destinationCity && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/25 font-medium">
+                          {driverPresence.jobSummary.jobCategory === "coach" ? (
+                            <Bus className="w-3.5 h-3.5" />
+                          ) : (
+                            <Truck className="w-3.5 h-3.5" />
+                          )}
+                          {driverPresence.jobSummary.sourceCity} →{" "}
+                          {driverPresence.jobSummary.destinationCity}
+                        </span>
+                      )}
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-500/15 text-zinc-400 border border-zinc-500/25 font-medium">
+                      <span className="h-2 w-2 rounded-full bg-zinc-500" />
+                      Offline
+                    </span>
+                    {driverPresence?.lastLocation && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                        Last Location: {driverPresence.lastLocation}
+                      </span>
+                    )}
+                    {lastOnlineRelative && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 text-gray-400 border border-white/10"
+                        title={
+                          lastOnlineSource
+                            ? new Date(lastOnlineSource).toLocaleString("id-ID", {
+                                timeZone: "Asia/Jakarta",
+                              }) + " WIB"
+                            : undefined
+                        }
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        Last Online: {lastOnlineRelative}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -7,80 +7,77 @@ import clientPromise from "@/lib/mongodb";
 
 export const metadata = {
   title: "Nismara Tracker & Companion Hub",
-  description: "Unduh Nismara Companion dan kelola token in-game telemetry plugin Anda.",
+  description: "Unduh Nismara Companion dan kelola perangkat yang terhubung ke akun driver Anda.",
 };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const RELEASES_BASE_URL = (
+  process.env.RELEASES_BASE_URL ||
+  process.env.NEXT_PUBLIC_RELEASES_BASE_URL ||
+  "https://releases.nismara.web.id"
+)
+  .trim()
+  .replace(/\/+$/, "");
+
 async function getLatestRelease() {
   const fallback = {
-    tagName: "v1.0.0",
-    name: "Nismara Companion v1.0.0",
+    tagName: "v1.0.4-beta",
+    name: "Nismara Companion v1.0.4-beta",
     publishedAt: new Date().toISOString(),
-    htmlUrl: "https://github.com/mhazm/fortune-cookie-client/releases/latest",
     downloads: {
-      windowsExe:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/Nismara.Companion_1.0.0_x64-setup.exe",
-      windowsMsi:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/Nismara.Companion_1.0.0_x64_en-US.msi",
-      windowsDll:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/NismaraTracker.dll",
-      linuxAppImage:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/Nismara.Companion_1.0.0_amd64.AppImage",
-      linuxDeb:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/Nismara.Companion_1.0.0_amd64.deb",
-      linuxRpm:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/Nismara.Companion-1.0.0-1.x86_64.rpm",
-      macosDmg:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/Nismara.Companion_1.0.0_aarch64.dmg",
-      macosTar:
-        "https://github.com/mhazm/fortune-cookie-client/releases/latest/download/Nismara.Companion_aarch64.app.tar.gz",
+      windowsExe: `${RELEASES_BASE_URL}/latest/Nismara-Companion-Setup.exe`,
+      windowsMsi: null as string | null,
+      windowsDll: `${RELEASES_BASE_URL}/latest/NismaraTracker.dll`,
+      linuxAppImage: `${RELEASES_BASE_URL}/latest/Nismara-Companion.AppImage`,
+      linuxDeb: null as string | null,
     },
   };
 
   try {
-    const res = await fetch(
-      "https://api.github.com/repos/mhazm/fortune-cookie-client/releases/latest",
-      {
-        next: { revalidate: 60 },
-        headers: {
-          "User-Agent": "Nismara-Logistics-Hub",
-          Accept: "application/vnd.github.v3+json",
-        },
-      }
-    );
+    const res = await fetch(`${RELEASES_BASE_URL}/version.json`, {
+      next: { revalidate: 60 },
+      headers: {
+        "User-Agent": "Nismara-Logistics-Hub",
+        Accept: "application/json",
+      },
+    });
 
     if (!res.ok) return fallback;
 
     const data = await res.json();
-    const assets: Array<{ name: string; browser_download_url: string }> =
-      data.assets || [];
-
-    const findUrl = (regex: RegExp) =>
-      assets.find((a) => regex.test(a.name))?.browser_download_url;
+    const tagName =
+      data.tag ||
+      (data.version
+        ? String(data.version).startsWith("v")
+          ? String(data.version)
+          : `v${data.version}`
+        : fallback.tagName);
 
     return {
-      tagName: data.tag_name || fallback.tagName,
-      name: data.name || fallback.name,
-      publishedAt: data.published_at || fallback.publishedAt,
-      htmlUrl: data.html_url || fallback.htmlUrl,
+      tagName,
+      name: `Nismara Companion ${tagName}`,
+      publishedAt: data.pub_date || fallback.publishedAt,
       downloads: {
         windowsExe:
-          findUrl(/_x64-setup\.exe$/i) || fallback.downloads.windowsExe,
-        windowsMsi: findUrl(/\.msi$/i) || fallback.downloads.windowsMsi,
+          data.downloads?.windows_setup ||
+          data.stable_latest?.windows_setup ||
+          fallback.downloads.windowsExe,
+        windowsMsi: data.downloads?.windows_msi || null,
         windowsDll:
-          findUrl(/NismaraTracker\.dll$/i) || fallback.downloads.windowsDll,
+          data.downloads?.plugin_dll ||
+          data.stable_latest?.plugin_dll ||
+          fallback.downloads.windowsDll,
         linuxAppImage:
-          findUrl(/\.AppImage$/i) || fallback.downloads.linuxAppImage,
-        linuxDeb: findUrl(/\.deb$/i) || fallback.downloads.linuxDeb,
-        linuxRpm: findUrl(/\.rpm$/i) || fallback.downloads.linuxRpm,
-        macosDmg: findUrl(/\.dmg$/i) || fallback.downloads.macosDmg,
-        macosTar: findUrl(/\.app\.tar\.gz$/i) || fallback.downloads.macosTar,
+          data.downloads?.linux_appimage ||
+          data.stable_latest?.linux_appimage ||
+          fallback.downloads.linuxAppImage,
+        linuxDeb: data.downloads?.linux_deb || null,
       },
     };
   } catch (err) {
-    console.warn("Failed to fetch latest release from GitHub API:", err);
+    console.warn("Failed to fetch latest release from Cloudflare R2:", err);
     return fallback;
   }
 }
@@ -113,15 +110,40 @@ export default async function TrackerPage() {
 
   const release = await getLatestRelease();
 
+  const rawDevices = Array.isArray(user.trackerDevices) ? user.trackerDevices : [];
+  const serializedDevices = rawDevices.map((d: Record<string, unknown>) => ({
+    deviceId: String(d.deviceId || ""),
+    deviceName: String(d.deviceName || "Unknown PC"),
+    platform: String(d.platform || "Windows"),
+    clientType: d.clientType === "plugin" ? ("plugin" as const) : ("companion" as const),
+    clientVersion: d.clientVersion ? String(d.clientVersion) : null,
+    lastGame: d.lastGame ? String(d.lastGame) : null,
+    activeGame: d.activeGame ? String(d.activeGame) : null,
+    lastInGameSyncAt: d.lastInGameSyncAt
+      ? new Date(d.lastInGameSyncAt as string | Date).toISOString()
+      : null,
+    firstSeenAt: d.firstSeenAt
+      ? new Date(d.firstSeenAt as string | Date).toISOString()
+      : null,
+    lastSyncAt: d.lastSyncAt
+      ? new Date(d.lastSyncAt as string | Date).toISOString()
+      : null,
+    revoked: Boolean(d.revoked),
+    revokedAt: d.revokedAt
+      ? new Date(d.revokedAt as string | Date).toISOString()
+      : null,
+  }));
+
   return (
     <TrackerClient
-      initialToken={user.trackerToken || null}
       trackerLastSync={
         user.trackerLastSync
           ? new Date(user.trackerLastSync).toISOString()
           : null
       }
       trackerVersion={user.trackerVersion || null}
+      trackerLastGame={user.trackerLastGame || null}
+      initialDevices={serializedDevices}
       release={release}
     />
   );
