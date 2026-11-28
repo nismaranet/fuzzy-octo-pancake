@@ -20,17 +20,21 @@ import {
   recalculateUserDrivingScore,
   type DrivingScoreData,
 } from "@/lib/drivingScore";
+import {
+  fetchDriverPresence,
+  formatLastOnlineRelative,
+} from "@/lib/trackerPresence";
 import { notFound } from "next/navigation";
 import {
   Truck,
   Bus,
   Users,
   MapPin,
+  Clock,
   Globe,
   Trophy,
   Activity,
   Package,
-  Coins,
   TriangleAlert,
   Medal,
   Gamepad2,
@@ -54,10 +58,43 @@ import { formatDistanceToNow, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 
 import type { Metadata } from "next";
+import { cache } from "react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
+
+// Deduplicates MongoDB user + driverLink lookup between generateMetadata and PublicProfilePage in a single request
+const getProfileIdentity = cache(async (truckyId: string) => {
+  const client = await clientPromise;
+  const db = client.db();
+  const GUILD_ID = process.env.DISCORD_GUILD_ID || "863959415702028318";
+
+  let [initialUser, driverLink] = await Promise.all([
+    db.collection("users").findOne({
+      $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
+    }),
+    db.collection("driverlinks").findOne({
+      $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
+      guildId: GUILD_ID,
+    }),
+  ]);
+
+  if (!driverLink && initialUser?.discordId) {
+    driverLink = await db.collection("driverlinks").findOne({
+      userId: initialUser.discordId,
+      guildId: GUILD_ID,
+    });
+  }
+
+  if (!initialUser && driverLink?.userId) {
+    initialUser = await db.collection("users").findOne({
+      $or: [{ discordId: driverLink.userId }, { id: driverLink.userId }],
+    });
+  }
+
+  return { initialUser, driverLink };
+});
 
 export async function generateMetadata(props: {
   params: Promise<{ truckyId: string }>;
@@ -65,26 +102,15 @@ export async function generateMetadata(props: {
   const { truckyId } = await props.params;
   
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const GUILD_ID = process.env.DISCORD_GUILD_ID || "863959415702028318";
-    
-    let user = await db.collection("users").findOne({
-      $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
-    });
+    const { initialUser, driverLink } = await getProfileIdentity(truckyId);
+    let user: any = initialUser;
 
-    if (!user) {
-      const driverLink = await db.collection("driverlinks").findOne({
-        $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
-        guildId: GUILD_ID,
-      });
-      if (driverLink) {
-        user = {
-          name: driverLink.truckyName || `Driver #${truckyId}`,
-          image: `https://cdn.truckyapp.com/public/users/${truckyId}/avatar.png`,
-          discordRole: "user",
-        } as any;
-      }
+    if (!user && driverLink) {
+      user = {
+        name: driverLink.truckyName || `Driver #${truckyId}`,
+        image: `https://cdn.truckyapp.com/public/users/${truckyId}/avatar.png`,
+        discordRole: "user",
+      };
     }
 
     if (user) {
@@ -148,29 +174,8 @@ export default async function PublicProfilePage(props: {
   const isManager =
     session?.user?.role === "manager" || session?.user?.role === "admin";
 
-  // 1. Fetch user & driverLink in parallel
-  let [initialUser, driverLink] = await Promise.all([
-    db.collection("users").findOne({
-      $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
-    }),
-    db.collection("driverlinks").findOne({
-      $or: [{ truckyId: truckyId }, { truckyId: Number(truckyId) }],
-      guildId: GUILD_ID,
-    }),
-  ]);
-
-  if (!driverLink && initialUser?.discordId) {
-    driverLink = await db.collection("driverlinks").findOne({
-      userId: initialUser.discordId,
-      guildId: GUILD_ID,
-    });
-  }
-
-  if (!initialUser && driverLink?.userId) {
-    initialUser = await db.collection("users").findOne({
-      $or: [{ discordId: driverLink.userId }, { id: driverLink.userId }],
-    });
-  }
+  // 1. Reuse request-cached user & driverLink lookup (shared with generateMetadata)
+  const { initialUser, driverLink } = await getProfileIdentity(truckyId);
 
   if (!initialUser && !driverLink) notFound();
 
@@ -251,16 +256,13 @@ export default async function PublicProfilePage(props: {
 
   // Parallel fetches for stats & history
   const [
-    currencies,
     points,
     latestJobs,
     userAchievements,
     jobStatsRaw,
     userCollectibles,
+    driverPresence,
   ] = await Promise.all([
-    db
-      .collection("currencies")
-      .findOne({ userId: userDiscordId, guildId: GUILD_ID }),
     db
       .collection("points")
       .findOne({ userId: userDiscordId, guildId: GUILD_ID }),
@@ -268,7 +270,7 @@ export default async function PublicProfilePage(props: {
       .collection("jobhistories")
       .find(
         { guildId: GUILD_ID, truckyId: truckyId, jobStatus: "COMPLETED" },
-        { sort: { completedAt: -1 } },
+        { sort: { completedAt: -1 }, projection: { routePath: 0 } },
       )
       .limit(3)
       .toArray(),
@@ -383,6 +385,7 @@ export default async function PublicProfilePage(props: {
       .find({ discordId: userDiscordId })
       .sort({ createdAt: -1 })
       .toArray(),
+    fetchDriverPresence(userDiscordId),
   ]);
 
   const jobStats = jobStatsRaw[0] || {
@@ -448,6 +451,13 @@ export default async function PublicProfilePage(props: {
     isBooster: user.isBooster === true,
   });
 
+  const lastOnlineSource =
+    driverPresence?.lastOnlineAt ||
+    user.trackerLastInGameSync ||
+    user.trackerLastSync ||
+    null;
+  const lastOnlineRelative = formatLastOnlineRelative(lastOnlineSource);
+
   return (
     <ProfileVisualShell
       isOwner={isOwner}
@@ -458,9 +468,9 @@ export default async function PublicProfilePage(props: {
       rankColor={rankColor}
       resolvedTheme={resolvedProfileTheme}
     >
-      {/* Content Container (Bottom half) directly attached to banner */}
+      {/* Content Container (Bottom half) directly attached to banner — solid high-opacity surface avoids 3000px-tall backdrop-blur-xl scroll lag */}
       <div
-        className="bg-background/80 backdrop-blur-xl border border-border/50 border-t-0 rounded-b-3xl px-6 md:px-10 pb-12 pt-0 shadow-2xl relative z-10 mb-8"
+        className="bg-background/92 border border-border/50 border-t-0 rounded-b-3xl px-6 md:px-10 pb-12 pt-0 shadow-2xl relative z-10 mb-8"
         style={
           resolvedProfileTheme.surfaceGradient
             ? { background: resolvedProfileTheme.surfaceGradient }
@@ -500,46 +510,113 @@ export default async function PublicProfilePage(props: {
                       className="w-7 h-7 md:w-9 md:h-9"
                     />
                   </div>
-                  <p className="text-muted-foreground font-medium mt-1 md:mt-2 text-sm md:text-base flex items-center justify-center md:justify-start gap-2">
-                    <MapPin className="w-4 h-4" />{" "}
+                  <p className="text-foreground/85 font-medium mt-1 md:mt-2 text-sm md:text-base flex items-center justify-center md:justify-start gap-2 drop-shadow-sm">
+                    <MapPin className="w-4 h-4 opacity-80" />{" "}
                     {user.nationality || "Indonesia"}
                   </p>
+
+                  {/* Live Tracker Presence, Driving Location & Last Online */}
+                  {(driverPresence?.online || driverPresence?.lastLocation || lastOnlineRelative) && (
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-2.5 text-xs">
+                      {driverPresence?.online ? (
+                        <>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950/75 text-emerald-300 border border-emerald-400/50 font-semibold shadow-sm">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                            </span>
+                            {driverPresence.statusLabel}
+                          </span>
+                          {driverPresence.locationLabel && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-950/75 text-sky-300 border border-sky-400/45 font-medium shadow-sm">
+                              <MapPin className="w-3.5 h-3.5" />
+                              {driverPresence.locationLabel}
+                            </span>
+                          )}
+                          {driverPresence.jobSummary?.sourceCity &&
+                            driverPresence.jobSummary?.destinationCity && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-950/75 text-violet-300 border border-violet-400/45 font-medium shadow-sm">
+                                {driverPresence.jobSummary.jobCategory === "coach" ? (
+                                  <Bus className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Truck className="w-3.5 h-3.5" />
+                                )}
+                                {driverPresence.jobSummary.sourceCity} →{" "}
+                                {driverPresence.jobSummary.destinationCity}
+                              </span>
+                            )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950/75 text-zinc-200 border border-white/15 font-medium shadow-sm">
+                            <span className="h-2 w-2 rounded-full bg-zinc-400" />
+                            Offline
+                          </span>
+                          {lastOnlineRelative && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-950/75 text-zinc-200 border border-white/15 font-medium shadow-sm"
+                              title={
+                                lastOnlineSource
+                                  ? new Date(lastOnlineSource).toLocaleString("id-ID", {
+                                      timeZone: "Asia/Jakarta",
+                                    }) + " WIB"
+                                  : undefined
+                              }
+                            >
+                              <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                              Last Online: {lastOnlineRelative}
+                            </span>
+                          )}
+                          {driverPresence?.lastLocation && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-950/75 text-zinc-100 border border-white/15 font-medium shadow-sm">
+                              <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+                              Last Location: {driverPresence.lastLocation}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Level Badge (Steam Style) */}
                 <div className="flex flex-col items-center md:items-end">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                  <span className="text-xs font-bold text-foreground/80 uppercase tracking-widest mb-1 drop-shadow-sm">
                     Level
                   </span>
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center border-[3px] shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                    className="w-14 h-14 rounded-full flex items-center justify-center border-[3px] bg-zinc-950/80 text-white"
                     style={{
                       borderColor: rankColor,
-                      color: rankColor,
-                      backgroundColor: `${rankColor}22`,
+                      boxShadow: `0 0 18px ${rankColor}55, 0 4px 12px rgba(0,0,0,0.5)`,
                     }}
                   >
-                    <span className="text-xl font-black">{level}</span>
+                    <span className="text-xl font-black drop-shadow-sm">{level}</span>
                   </div>
                 </div>
               </div>
 
               {/* Badges / Roles */}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-4 relative z-20">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 mt-4 relative z-20">
                 <span
-                  className="px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md border"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md border bg-zinc-950/75 text-white shadow-sm"
                   style={{
-                    color: rankColor,
-                    borderColor: `${rankColor}55`,
-                    backgroundColor: `${rankColor}11`,
+                    borderColor: `${rankColor}cc`,
                   }}
                 >
+                  <span
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: rankColor,
+                      boxShadow: `0 0 8px ${rankColor}`,
+                    }}
+                  />
                   {user.truckyRank || user.discordRole || "Driver"}
                 </span>
                 {user.nismaraplus?.status && (
-                  <span className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-linear-to-r from-amber-500/20 to-orange-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1 cursor-help">
-                    <Star className="w-3 h-3" /> Nismara+
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/80 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
+                  <span className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-zinc-950/75 text-amber-300 border border-amber-400/50 shadow-sm flex items-center gap-1.5 cursor-help">
+                    <Star className="w-3 h-3 text-amber-300" /> Nismara+
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/90 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
                       Aktif sejak{" "}
                       {user.nismaraplus.startedAt
                         ? format(
@@ -548,22 +625,22 @@ export default async function PublicProfilePage(props: {
                             { locale: localeId },
                           )
                         : "sekarang"}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/80" />
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/90" />
                     </div>
                   </span>
                 )}
                 {user.isBooster === true && (
-                  <span className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-fuchsia-500/10 text-fuchsia-500 border border-fuchsia-500/20 flex items-center gap-1 cursor-help">
-                    <Gem className="w-3 h-3" /> Server Booster
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/80 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
+                  <span className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-zinc-950/75 text-fuchsia-300 border border-fuchsia-400/50 shadow-sm flex items-center gap-1.5 cursor-help">
+                    <Gem className="w-3 h-3 text-fuchsia-300" /> Server Booster
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/90 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
                       Discord Server Booster
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/80" />
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/90" />
                     </div>
                   </span>
                 )}
                 {user.isDriver && (
-                  <span className="px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Verified Driver
+                  <span className="px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-zinc-950/75 text-emerald-300 border border-emerald-400/50 shadow-sm flex items-center gap-1.5">
+                    <ShieldCheck className="w-3 h-3 text-emerald-300" /> Verified Driver
                   </span>
                 )}
                 {(user.isTmpDriver || user.truckersmpId) && (
@@ -572,29 +649,29 @@ export default async function PublicProfilePage(props: {
                       href={`https://truckersmp.com/user/${user.truckersmpId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 hover:border-orange-500/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-orange-500/5"
+                      className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-zinc-950/75 text-orange-300 border border-orange-400/50 hover:bg-zinc-900/90 hover:border-orange-400/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
-                      <Truck className="w-3.5 h-3.5 text-orange-400" />
+                      <Truck className="w-3.5 h-3.5 text-orange-300" />
                       <span>TruckersMP Driver</span>
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/80 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/90 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
                         ID: {user.truckersmpId} &bull; Klik untuk lihat profil TruckersMP
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/80" />
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/90" />
                       </div>
                     </a>
                   ) : (
-                    <span className="px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center gap-1.5 shadow-sm shadow-orange-500/5">
-                      <Truck className="w-3.5 h-3.5 text-orange-400" />
+                    <span className="px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-zinc-950/75 text-orange-300 border border-orange-400/50 flex items-center gap-1.5 shadow-sm">
+                      <Truck className="w-3.5 h-3.5 text-orange-300" />
                       <span>TruckersMP Driver</span>
                     </span>
                   )
                 )}
                 {user.isHaulmpDriver && (
-                  <span className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-1.5 cursor-help shadow-sm shadow-cyan-500/5">
-                    <Truck className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="group relative px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-zinc-950/75 text-cyan-300 border border-cyan-400/50 flex items-center gap-1.5 cursor-help shadow-sm">
+                    <Truck className="w-3.5 h-3.5 text-cyan-300" />
                     <span>HaulMP Driver</span>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/80 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-black/90 backdrop-blur-sm text-white text-[11px] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg border border-white/10 font-medium normal-case tracking-normal pointer-events-none">
                       {user.haulmpId ? `ID: ${user.haulmpId} • ` : ""}Driver Resmi VTC HaulMP
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/80" />
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/90" />
                     </div>
                   </span>
                 )}
@@ -707,16 +784,7 @@ export default async function PublicProfilePage(props: {
               </div>
 
               {/* Overall Stats (Nismara Info) */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors">
-                  <Coins className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
-                  <p className="text-xl font-black text-foreground">
-                    {formatNum(currencies?.totalNC || 0)}
-                  </p>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">
-                    Saldo NC
-                  </p>
-                </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors">
                   <Package className="w-6 h-6 mx-auto mb-2 text-emerald-500" />
                   <p className="text-xl font-black text-foreground">
@@ -744,7 +812,7 @@ export default async function PublicProfilePage(props: {
                     Total Convoy
                   </p>
                 </div>
-                <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors col-span-2 sm:col-span-1">
+                <div className="bg-card/40 backdrop-blur-sm p-5 rounded-2xl border border-border/50 text-center hover:bg-card/60 transition-colors">
                   <TriangleAlert className="w-6 h-6 mx-auto mb-2 text-red-500" />
                   <p className="text-xl font-black text-foreground">
                     {formatNum(points?.totalPoints || 0)}

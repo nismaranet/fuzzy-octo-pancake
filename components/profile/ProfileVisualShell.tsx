@@ -198,23 +198,32 @@ export default function ProfileVisualShell({
   const bannerPosCss = formatObjectPosition(bannerPos.x, bannerPos.y);
   const bgPosCss = formatObjectPosition(bgPos.x, bgPos.y);
 
+  // Horizontal pan fallback when wallpaper aspect ratio matches/is narrower than viewport under `bg-cover`
+  const bgShiftXPct = (50 - bgPos.x) * 0.16;
+  const bgScale = 1 + Math.abs(bgShiftXPct) * 0.022;
+
   return (
     <main
-      className="min-h-screen pt-24 pb-20 relative bg-background bg-fixed bg-cover overflow-x-clip"
-      style={{
-        ...(resolvedTheme?.vars as React.CSSProperties | undefined),
-        backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : "none",
-        backgroundPosition: bgPosCss,
-      }}
+      className="min-h-screen pt-24 pb-20 relative bg-background overflow-x-clip"
+      style={resolvedTheme?.vars as React.CSSProperties | undefined}
     >
-      {/* Background Overlay */}
+      {/* Clipped strictly to <main> via clipPath so GPU-composited fixed wallpaper NEVER bleeds over Footer */}
       <div
-        className={`absolute inset-0 pointer-events-none z-0 transition-all duration-300 ${
-          isEditing && editTarget === "wallpaper"
-            ? "bg-background/15 backdrop-blur-none"
-            : "bg-background/50 backdrop-blur-[2px]"
-        }`}
-      />
+        aria-hidden="true"
+        className="absolute inset-0 z-0 pointer-events-none"
+        style={{ clipPath: "inset(0)" }}
+      >
+        {backgroundUrl && (
+          <div
+            className="fixed inset-0 bg-cover bg-no-repeat will-change-transform"
+            style={{
+              backgroundImage: `url(${backgroundUrl})`,
+              backgroundPosition: bgPosCss,
+              transform: `translate3d(${bgShiftXPct.toFixed(2)}%, 0, 0) scale(${bgScale.toFixed(4)})`,
+            }}
+          />
+        )}
+      </div>
 
       {/* Fullscreen Drag Surface saat mengedit Wallpaper */}
       {isEditing && editTarget === "wallpaper" && backgroundUrl && (
