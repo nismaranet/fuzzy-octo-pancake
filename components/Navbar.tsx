@@ -11,6 +11,7 @@ export default async function Navbar() {
     <NavbarClient
       session={session}
       isSeasonPassEnabled={featureStatus.isEnabled}
+      isLiveMapEnabled={Boolean(session?.user?.test_participation)}
     />
   );
 }

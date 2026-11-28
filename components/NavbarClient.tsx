@@ -52,6 +52,7 @@ import {
   Store,
   Settings,
   ArrowUpRight,
+  Map as MapIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -85,9 +86,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export default function NavbarClient({
   session,
   isSeasonPassEnabled = true,
+  isLiveMapEnabled = false,
 }: {
   session: any;
   isSeasonPassEnabled?: boolean;
+  isLiveMapEnabled?: boolean;
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -129,9 +132,10 @@ export default function NavbarClient({
 
   const pathname = usePathname();
   const isDashboard = pathname?.startsWith("/dashboard");
-  const effectiveIsScrolled = isScrolled && !isDashboard;
+  const isLiveMap = pathname?.startsWith("/livemap");
+  const effectiveIsScrolled = isScrolled && !isDashboard && !isLiveMap;
 
-  // Standard top-level items (excluding Home, Jobs, Events, Community, Market which are custom handled)
+  // Standard top-level items (excluding Home, Live Map, Jobs, Events, Community, Market which are custom handled)
   const mainMenuItems = [
     { name: "Convoy", href: "/convoy", icon: Truck },
     { name: "TimeZone", href: "/timezone", icon: Gamepad2 },
@@ -140,6 +144,7 @@ export default function NavbarClient({
   // Mobile-specific menu items (flattened)
   const rawMobileMenuItems = [
     { name: "Home", href: "/", icon: Home },
+    { name: "Live Map", href: "/livemap", icon: MapIcon },
     { name: "Season Pass", href: "/dashboard/season-pass", icon: Trophy },
     { name: "Jobs Details", href: "/jobs", icon: Briefcase },
     { name: "Coach Terminal", href: "/coach-terminal", icon: Bus },
@@ -175,9 +180,11 @@ export default function NavbarClient({
     { name: "Coupons", href: "/coupons", icon: Ticket },
   ];
 
-  const mobileMenuItems = isSeasonPassEnabled
-    ? rawMobileMenuItems
-    : rawMobileMenuItems.filter((item) => item.href !== "/dashboard/season-pass");
+  const mobileMenuItems = rawMobileMenuItems.filter((item) => {
+    if (!isSeasonPassEnabled && item.href === "/dashboard/season-pass") return false;
+    if (!isLiveMapEnabled && item.href === "/livemap") return false;
+    return true;
+  });
 
   return (
     <>
@@ -221,6 +228,23 @@ export default function NavbarClient({
                       Home
                     </NavigationMenuLink>
                   </NavigationMenuItem>
+
+                  {/* Live Map (Top-Level — Beta Testers Only) */}
+                  {isLiveMapEnabled && (
+                    <NavigationMenuItem>
+                      <NavigationMenuLink
+                        render={<Link href="/livemap" />}
+                        className={navigationMenuTriggerStyle()}
+                      >
+                        <MapIcon className="mr-2 h-4 w-4 text-emerald-400" />
+                        <span>Live Map</span>
+                        <span className="ml-1.5 relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                        </span>
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+                  )}
 
                   {/* Jobs Mega Menu */}
                   <NavigationMenuItem>

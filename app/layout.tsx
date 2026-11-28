@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import ConditionalFooter from "@/components/ConditionalFooter";
 import NismaraPlusAdPopup from "@/components/NismaraPlusAdPopup";
 import { Providers } from "@/components/Providers";
 import { GoogleAnalytics } from "@next/third-parties/google";
@@ -137,7 +138,9 @@ export default async function RootLayout({
           <div className="flex-1 w-full max-w-full overflow-x-clip">
             {children}
           </div>
-          <Footer />
+          <ConditionalFooter>
+            <Footer />
+          </ConditionalFooter>
           <NismaraPlusAdPopup />
           <GlobalPopupAd />
           <HalloweenDecorations enabled={seasonTheme === "halloween"} />
