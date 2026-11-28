@@ -1,308 +1,98 @@
 <!-- BEGIN:nextjs-agent-rules -->
-
 # This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-
+This version has breaking changes — APIs, conventions, and file structure may differ from training data. Read `node_modules/next/dist/docs/` before writing code and heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Nismara Transport - Project Context & Rules
-
-## 1. Project Overview
-
-Nismara Transport is a web platform for a virtual trucking community (VTC). It integrates with Discord (for authentication and roles) and Trucky (for in-game data, `truckyId`, `truckyRank`). The platform includes features such as a Social Gallery, Market, Fuel Market, Cargo Market, Convoy management, and a Driver directory.
-
-## 2. Technology Stacks
-
-- **Language:** TypeScript (Strict typing, interfaces/types defined inline or in models).
-- **Framework:** Next.js (App Router, Server Components & Server Actions).
-- **Styling:** Tailwind CSS (Vanilla CSS/Tailwind without complex UI component libraries, relies on custom implementation).
-- **Icons:** `lucide-react`.
-- **Database (MongoDB):** MongoDB (using native `mongodb` driver). **CRITICAL:** Always use Mongo connection pooling via `clientPromise` from `@/lib/mongodb` rather than opening new connections.
-- **Cache / High-Performance Store (Redis):** Uses `ioredis` (exported from `@/lib/redis`). Use Redis for high-frequency, temporary, or time-sensitive tasks (like the "Scratchers" mechanic) where MongoDB would be too slow or expensive.
-- **Storage:** Cloudflare R2 (S3-compatible API for all media uploads, combined with WebP compression).
-- **Authentication:** NextAuth (Discord Provider).
-- **Bot Protection:** Cloudflare Turnstile. Use `TurnstileWidget` (client) and `verifyTurnstileToken` (server) — see Section 11.
-- **Deployment:** PM2 / Custom Node Server (via `ecosystem.config.js`).
-
-## 3. Core Domains & Conventions
-
-- **User Identification:** The primary identifier is usually `discordId`. Ensure database queries use `discordId` when dealing with user relations. **HOWEVER**, be extremely careful with specific collections! For example, `gallery_posts` and `gallery_comments` use `userId` (which stores the discordId), NOT `discordId`. Always verify the schema (e.g. by checking existing insertion logic) before assuming the field name is `discordId`.
-- **Trucky Integration:** Users have a `truckyId` and `truckyRank`. Ensure these are passed down when rendering user profiles or comments.
-- **Nismara Plus:** A premium subscription tier represented by `nismaraplus.status === true`. It provides perks like larger upload limits (5MB vs 3MB default), market discounts, GIF upload support, and a special UI badge.
-- **Roles & Permissions:** Users can have `discordRole` or `role` set to `"manager"` or `"admin"`. Always check for these roles when showing destructive actions (like deleting posts).
-
-## 4. File Upload & Storage (Cloudflare R2) Rules
-
-- **Deferred Uploads (Client-Side):** DO NOT upload images directly to R2 on an `onChange` event in a form. Instead, store the `File` object in state (e.g., `useState<File | null>`) and show a local preview using `URL.createObjectURL()`. Only perform the actual compression and upload to R2 inside the `handleSubmit` or form `action` block when the user explicitly clicks "Save" or "Submit". This prevents ghost files if the user cancels or changes the image multiple times.
-- **Image Compression & WebP Conversion:** ALL image uploads must use the existing utility at `@/lib/imageUtils` (specifically the `compressImageToWebP` function) to compress and convert files to WebP.
-- **Upload Limits & Formats:**
-  - **Standard Drivers:** Maximum 3MB per file. Allowed formats: PNG, JPEG, JPG. (All must be converted to WebP).
-  - **Nismara+ Drivers:** Maximum 5MB per file. Allowed formats: PNG, JPEG, JPG, and **GIF**. (GIFs must **NOT** be converted to WebP; keep original).
-- **Storage Hygiene:** When a user updates or replaces an existing image (e.g., changing a profile picture or gallery image), the old file **MUST** be deleted from R2 to prevent orphaned and unused files taking up space.
-
-## 5. Economy, Currency & Penalty System
-
-- **Currency (`currencies` collection):** Nismara Coin (NC) balances are stored here. **CRITICAL:** Every query and update **MUST** include both `userId` (discordId) and `guildId` (usually `process.env.GUILD_ID` or `"863959415702028318"`). To modify a balance, use `$inc: { totalNC: amount }`.
-- **Currency History (`currencyhistories` collection):** Every time you modify `totalNC`, you **MUST** insert a log into this collection. The document must contain:
-  - `userId`: The user's discordId.
-  - `guildId`: The server's ID.
-  - `amount`: The amount of NC added or deducted.
-  - `type`: Either `"earn"` or `"spend"`.
-  - `reason`: A string describing the transaction (e.g. `"Membeli Mod Market: Scania"`).
-  - `createdAt`: `new Date()`.
-- **Transaction History (`transactions` collection):** This is the user-facing shopping and order history (e.g. Fleet purchases, Maintenance, Market Mod buys). It is separate from `currencyhistories` which tracks raw NC mutations. When processing a user purchase, you **MUST** insert a document here with fields such as `trxId`, `discordId`, `userId`, `title`, `category` (fleet/maintenance/nismaraplus/market), `amount`, `currency` (NC/IDR), and `metadata`. Avoid creating duplicate history pages; all user purchases should be directed to the unified `/dashboard/transactions` page.
-- **Penalty Points (`points` collection):** "Points" in this project strictly means **Penalty Points (Hukuman)**, not reward points. Balances are stored in `totalPoints`. Like currencies, queries **MUST** include `userId` and `guildId`. Use `$inc: { totalPoints: amount }` to modify. **CRITICAL:** Penalty points can NEVER be negative (minimum 0). Always check current balance and clamp deductions if necessary.
-- **Penalty History (`pointhistories` collection):** Every time penalty points are modified, a log must be inserted containing:
-  - `userId` (discordId of the penalized user) and `guildId`.
-  - `managerId`: the discordId of the admin/manager applying or removing the penalty (or the user themselves if paying off a penalty).
-  - `points`: The amount of points added or removed.
-  - `type`: Either `"add"` (giving penalty) or `"remove"` (paying/removing penalty).
-  - `reason`: String explanation.
-  - `createdAt`: `new Date()`.
-
-## 6. UI/UX & Styling Guidelines
-
-- **Badges:** All user role, premium, and rank badges MUST be rendered using the centralized `<UserBadges />` component located at `components/icons/UserBadges.tsx`. Do not hardcode individual icons (like crowns or checkmarks) across different pages.
-- **Gallery & Comments:** The gallery uses a "Threaded / Instagram Style" for comments. Comments support nested replies (1-level deep via `parentId` and `replyToUser`) and optimistic UI updates for "Likes".
-- **Modern & Dynamic:** Follow the "Web Application Development" rules: use modern typography, vibrant/dark mode colors, smooth gradients, and micro-animations (e.g., hover effects, scale transforms).
-- **Z-Index & Tooltips:** Use Tailwind's `group` and `group-hover` strategically to avoid stacking context issues when rendering lists of items with tooltips/badges. ALWAYS add `relative z-10 hover:z-50` to the row/card container to ensure tooltips render above subsequent rows. Furthermore, BEWARE of `line-clamp-1` or `overflow: hidden` on parent containers (like flex wrappers), as this will completely clip and hide absolute tooltips inside them. Apply text truncation strictly to inner text spans instead.
-- **Destructive/Critical Actions & Alerts:** NEVER use the native browser `alert()` or `confirm()` dialogs. Instead, ALWAYS import and use `showAlert` and `showConfirm` from `@/lib/dialog`. These functions return Promises and trigger our custom global `<Modal />` component. Example usage: `await showAlert("Berhasil!")` or `if (await showConfirm("Yakin hapus?")) { ... }`. This prevents ugly browser pop-ups and avoids polluting components with manual modal state.
-
-## 7. Data Formatting Standards
-- **Timezone (WIB/Jakarta):** Always format dates and times explicitly to `Asia/Jakarta` using `toLocaleString("id-ID", { timeZone: 'Asia/Jakarta', ... })` and append " WIB" where contextually appropriate, especially on charts, feeds, and market history.
-- **Date Parsing & Inputs:** Always use `parseWIBDate()` and `formatWIBDateTimeLocal()` from `@/lib/utils` for all date operations involving form inputs or database queries. See Section 18 for full guidelines.
-- **Currency (NC):** Always format Nismara Coin (NC) balances to standard Indonesian currency format (e.g. `2.000,00 NC`) using `.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })`. Do NOT use `.toFixed(2)` for frontend display of user balances.
-- **Fuel (Liter):** Fuel amounts should always be displayed as flat integers without decimals (e.g. `500 L`). Use `Math.floor()` before formatting with `.toLocaleString("id-ID")`.
-
-## 8. Domain Configuration
-
-- **Production URL:** `https://transport.nismara.web.id`.
-- **Beta URL/Preview:** `https://beta.nismara.web.id`.
-
-## 8. Documentation & Walkthroughs
-
-- **Convention:** Whenever creating new major features or system mechanics, agents should reference or update the documentation in this folder (e.g., `sistem-mekanik.md`, `sistem-notifikasi.md`). This acts as the project's historical log and knowledge base.
-
-## 9. Next.js 15+ / 16 & CSS Layout Gotchas
-
-- **searchParams (Next.js 15+):** In Server Components, `searchParams` is a Promise and **MUST** be unwrapped (e.g. `const resolvedParams = await searchParams;`) before accessing its properties (like `resolvedParams.tag`).
-- **Sticky Positioning & Overflow:** NEVER use `overflow-x-hidden` on `<html>`, `<body>`, or outer layout wrappers if you intend to use `position: sticky` on descendant elements. It establishes a new block formatting context that completely breaks sticky positioning relative to the viewport. Use `overflow-x-clip` instead, which clips horizontal overflow without breaking sticky behavior.
-- **Client State Re-hydration:** When a Server Component passes new props to a Client Component due to URL navigation (like changing `searchParams`), standard `useState(initialProp)` will NOT automatically update. Always use a `useEffect` to sync the state when the props change to ensure the UI reflects the new data without requiring a full manual reload.
-
-## 10. Recent Architectural Patterns & Conventions
-
-- **Fleet Assignment & Ownership:** When dealing with Fleet Assignments, ALWAYS use the `owner` field rather than `driver` to determine ownership. The `driver` field is maintained on the backend for legacy sync but should not be relied upon in frontend state. When rendering dropdowns to assign users (e.g. in Modals or Buy pages), NEVER use a native `<select>` due to the large number of users. Instead, use a custom searchable dropdown that allows filtering by `name`, `discordId`, and `truckyId`.
-- **Ticket Auto-fill via URL:** The Ticket System (`TicketClient.tsx`) supports automatic form filling via URL parameters. When linking users to report a feature (e.g. reporting a comment), pass rich context in the URL (e.g. `?commentId=...&postId=...&reportedUser=...&commentText=...`). The TicketClient will automatically detect these, select the appropriate Category (like "Report Komentar"), and construct a detailed description payload to help Managers quickly identify the issue without manual investigation.
-- **Modal vs Detail Page Consistency:** When building features that exist both on a standalone page (e.g., `PostDetailClient`) and a quick-view modal (e.g., `GalleryModal`), ensure complete feature parity. Actions like Edit, Delete, and Report must be fully synchronized and functional in both contexts with Optimistic UI updates.
-- **Hybrid Session Caching:** The NextAuth `session` callback utilizes a hybrid caching strategy using Redis. Do not perform heavy MongoDB queries or external API calls (Discord, Trucky) directly inside the `session` callback on every request. Always check for a cached profile in Redis (`session:profile:${user.id}`) first. If a cache miss occurs, perform the queries and save the result to Redis with a 15-minute TTL (`900` seconds) before returning the session.
-- **Session Garbage Collection:** The MongoDB `sessions` collection must have a TTL index on the `expires` field (`{ "expires": 1 }, { expireAfterSeconds: 0 }`) to automatically delete expired sessions and prevent database bloat. Do not rely on application-level cron jobs to clean up expired NextAuth sessions.
-- **Radix UI `SelectValue` Gotcha:** In this project's Shadcn/Radix `Select` component, `<SelectValue />` (without children) can render the raw `value` string instead of the selected `SelectItem`'s label text when the dropdown is closed — especially when the `value` prop is set programmatically (e.g., from `defaultValues`). **Always provide explicit label children** to `SelectValue` using a value-to-label mapping object. Example:
-  ```tsx
-  const LABELS = { all: "Semua Driver", nismara_plus: "Nismara+ Aktif" };
-  <SelectValue>{LABELS[field.value] || "Pilih..."}</SelectValue>
-  ```
-  Never rely on `<SelectValue placeholder="..." />` alone to display the correct human-readable text for an already-selected value.
-
-## 11. Cloudflare Turnstile (Bot Protection)
-
-Turnstile is the standard bot-protection mechanism for all public-facing user submission forms (survey answers, etc.). The integration consists of two parts:
-
-### Files
-- **`lib/turnstile.ts`** — Server-side token verifier. Import and call `verifyTurnstileToken(token)` in any Server Action or API Route that needs bot protection.
-- **`components/ui/TurnstileWidget.tsx`** — Client-side React widget. Renders the Cloudflare challenge inside any Client Component form.
-
-### Environment Variables (`.env.local`)
-```
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=   # Public — used by the client widget
-TURNSTILE_SECRET_KEY=             # Secret — used ONLY on the server to verify tokens
-```
-Get keys from [dash.cloudflare.com](https://dash.cloudflare.com) → **Turnstile** → Add Site.
-
-### Client-Side Usage
-```tsx
-import TurnstileWidget from "@/components/ui/TurnstileWidget";
-
-const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-
-// In JSX, place above the submit button:
-<TurnstileWidget
-  onVerify={(token) => setTurnstileToken(token)}
-  onExpire={() => setTurnstileToken(null)}
-  onError={() => setTurnstileToken(null)}
-  theme="auto" // or "light" | "dark"
-/>
-
-// Disable submit until verified:
-<Button type="submit" disabled={!turnstileToken}>Kirim</Button>
-```
-
-### Server-Side Usage (Server Action or API Route)
-```ts
-import { verifyTurnstileToken } from "@/lib/turnstile";
-
-// ALWAYS call this FIRST, before any auth check or DB operation:
-const turnstileResult = await verifyTurnstileToken(data.turnstileToken);
-if (!turnstileResult.success) {
-  return { success: false, error: "Verifikasi keamanan gagal. Coba lagi." };
-}
-```
-
-### Critical Rules
-- **NEVER skip server-side verification.** The client-side token state (`turnstileToken`) is only a UX guard. The real protection is `verifyTurnstileToken()` on the server. A malicious user could bypass the client check and POST directly to the Server Action.
-- **Tokens are single-use.** Each Turnstile token can only be verified once. After a successful verification, the token is consumed. If the submission fails for other reasons (e.g., duplicate response), the widget must be re-solved. The client should call `setTurnstileToken(null)` on error so the widget resets.
-- **Dev mode behavior:** If `TURNSTILE_SECRET_KEY` is not set and `NODE_ENV === "development"`, `verifyTurnstileToken` skips verification and returns `{ success: true }`. This prevents blocking local development. Similarly, `TurnstileWidget` renders a placeholder when `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is absent. **Do NOT use this behavior in production** — always set both keys in the production environment.
-- **Do NOT add Turnstile to admin/manager-only forms** (e.g., survey create/edit, event management). It is only needed for driver-facing public submission forms.
-- **Placement:** Always render `TurnstileWidget` **above** the submit button, after all form questions, so it's the last step before submission.
-
-## 12. Strict Verification (No Guessing)
-
-- **NEVER GUESS THE STRUCTURE:** Do not assume or guess the database schema, field names, or object structures.
-- **ALWAYS VERIFY FIRST:** Before writing queries, aggregation pipelines, or data migration scripts, you **MUST** verify the actual structure by either reading the Mongoose models (e.g., `lib/models/`) or inspecting actual documents in the database.
-- **Why?** Guessing field names (like assuming `endDate` instead of `endAt`) can cause catastrophic data inconsistencies, especially during migrations or when interacting with other services (like the Discord bot) that expect a strict schema.
-
-## 13. Anti-Cache Standards & Invalidation (Vercel, Cloudflare & Browser)
-
-Nismara Logistics runs on Next.js App Router hosted on Vercel with Cloudflare proxying. Because the system deals with real-time financial balances (NC), penalty points, market mod purchases, tickets, and fleet ownership, **stale cache can cause severe user panic and miscommunication**. Always adhere to these standards:
-
-- **Helper Standar Terpusat (`@/lib/antiCache`):** Gunakan fungsi pembungkus siap pakai dari `@/lib/antiCache` agar tidak perlu mengetik header manual:
-  - `jsonNoCache(data, init)`: Drop-in replacement untuk `NextResponse.json()` yang otomatis menyertakan header anti-cache Vercel, Cloudflare, dan browser.
-  - `NO_CACHE_HEADERS`: Objek header anti-cache standar.
-  - `NO_CACHE_FETCH_OPTIONS`: Opsi `fetch` standar untuk client (`cache: "no-store"`).
-- **Server Components & Dashboard Pages:** Every dynamic or dashboard page (`app/dashboard/**/page.tsx`) must export:
-  ```tsx
-  export const dynamic = "force-dynamic";
-  export const revalidate = 0;
-  export const fetchCache = "force-no-store";
-  ```
-- **Route Handlers / API Endpoints:** Every dynamic or mutating API (`app/api/**/route.ts`) must declare `dynamic = "force-dynamic"`, `revalidate = 0`, `fetchCache = "force-no-store"`, and return anti-cache response using `jsonNoCache(data)` from `@/lib/antiCache` (or manual `headers: NO_CACHE_HEADERS`).
-- **Client-Side Data Fetching:** When using `fetch()` in client components (`"use client"`), ALWAYS pass `NO_CACHE_FETCH_OPTIONS` (or `{ cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } }`) to prevent the browser disk cache from serving stale JSON.
-- **Data Mutations & Revalidation:**
-  - On the server (after POST/PUT/DELETE mutations), call `revalidatePath("/path")` for affected pages (e.g. `/dashboard/library`, `/dashboard/transactions`). *Note: `revalidatePath` targets page paths, never API URLs.*
-  - On the client (after mutation succeeds in the UI), call `router.refresh()` from `next/navigation` to invalidate the Next.js in-memory Client Router Cache.
-- **Global `next.config.ts` Rules:** Maintain `experimental.staleTimes.dynamic: 0` and global header rules for `/api/:path*` and `/dashboard/:path*` at all times.
-
-## 14. Concurrency, Atomic Updates & Race Condition Prevention
-
-In financial mutations (NC, Penalty Points), claims (monthly Nismara+ rewards, scratchers, daily bonuses), and order processing (fleet purchases, maintenance tickets), **never rely solely on in-memory validation before updates** (e.g. `if (balance >= price)` then `updateOne`). Doing so introduces Time-of-Check to Time-of-Use (TOCTOU) race conditions when concurrent requests or rapid clicks occur.
-
-- **Pola Atomic Gate:** Always bundle all eligibility conditions (e.g., `{ totalNC: { $gte: price } }` or `{ "nismaraplus.status": true, "nismaraplus.lastClaimAt": { $lte: cooldownLimit } }`) directly into the `updateOne` or `findOneAndUpdate` filter. Check `modifiedCount === 0` (or `null` result) to reject concurrent or duplicate calls immediately.
-- **Pola State Locking:** For multi-step staff workflows (e.g. claiming or completing fleet/maintenance orders), atomically transition the state from initial to processing (e.g., `{ status: "claimed" }` -> `{ status: "processing" }`) using `findOneAndUpdate` before performing balance deductions or external calls.
-- **Pola Rollback Komprehensif:** When an operation spans multiple collections (e.g., locking user cooldown in `users`, deducting NC in `currencies`, and adding slots in `garages`), always maintain a rollback block in `catch` to revert the gate lock if subsequent mutations fail, ensuring user cooldowns or balances are not forfeited without rewards.
-- **Safe Upsert (`$setOnInsert`):** Never run `{ upsert: true }` with only incremented or partial fields on critical collections (like `garages` or `currencies`). Always supply a full schema default under `$setOnInsert` to prevent corrupt partial documents.
-- **Rate Limiting Guard:** Precede sensitive mutation handlers with `checkRateLimit(discordId, key, cooldownMs)` from `@/lib/rateLimit` as an immediate UX defense against automated request floods.
-- **Skill Reference:** For detailed implementation examples and templates, refer to `.agents/skills/anti-race-condition/SKILL.md`.
-
-## 15. SEO, OpenGraph & Metadata Standards (Discord Embeds)
-
-Setiap pembuatan halaman publik atau layout baru harus menyertakan metadata SEO, OpenGraph, dan Twitter Card yang lengkap agar embed pratinjau saat dibagikan ke Discord, WhatsApp, atau media sosial terlihat kaya dan menarik.
-
-- **Aturan Template Title (Anti-Duplikasi):** Root layout (`app/layout.tsx`) sudah memiliki template:
-  `title: { template: "%s - Nismara Transport" }`, `openGraph.title: { template: "%s - Nismara Transport" }`, dan `twitter.title: { template: "%s - Nismara Transport" }`.
-  **DILARANG KERAS** menambahkan suffix ` - Nismara Transport` pada child page atau child layout manapun! Menambahkan suffix manual akan menghasilkan string ganda: `"Judul - Nismara Transport - Nismara Transport"`.
-- **Halaman Statis:** Selalu sertakan `title`, `description`, `openGraph` (`title`, `description`, `url`, `siteName: "Nismara Transport"`, `locale: "id_ID"`, `type: "website"`, `images`), dan `twitter` (`card: "summary_large_image"`, `title`, `description`, `images`).
-- **Halaman Dinamis (`generateMetadata`):** Selalu `await params` (Next.js 15+), cari dokumen di database, gunakan cover image/banner spesifik (dengan fallback ke `https://images.nismara.my.id/227300_188.jpg`), dan tangani status not-found dengan judul bersih (misal: `{ title: "Artikel Tidak Ditemukan" }`).
-- **Halaman Dashboard (`app/dashboard/**`):** Menggunakan template `%s - Dashboard Nismara` dan `robots: { index: false, follow: false }`. Jangan tambahkan OpenGraph atau Twitter Card pada halaman dashboard internal.
-- **Skill Reference:** Untuk instruksi dan contoh template lengkap, rujuk `.agents/skills/seo-metadata/SKILL.md`.
-
-## 16. User Purge & Zero-Orphan Standards
-
-Setiap penambahan koleksi MongoDB baru, Mongoose model, atau fitur yang menyimpan data pengguna (`discordId`, `userId`, `truckyId`, `driverId`), media unggahan Cloudflare R2, atau array keterlibatan pengguna (`participants`, `contributors`, `likes`):
-- **Wajib Didaftarkan ke Purge Engine:** Selalu perbarui `app/api/manage/users/[discordId]/purge/route.ts` agar data pengguna pada fitur baru tersebut terhapus tuntas saat akun di-purge (baik via web dashboard maupun otomatis saat driver keluar dari Trucky).
-- **Pembedaan Owner vs Driver:** Bedakan secara ketat antara aset milik pengguna (dihapus beserta file R2 dan slot garasi dibebaskan) vs aset yang hanya disewa/disetir (cukup unassign driver ke `null`).
-- **Array Footprint:** Untuk dokumen publik bersama, gunakan `$pull` agar dokumen induk tidak terhapus.
-- **Skill Reference:** Panduan implementasi, pola kode, dan checklist lengkap wajib merujuk ke `.agents/skills/user-purge-maintenance/SKILL.md`.
-
-## 17. Standar Penamaan Brand Resmi (Nismara Transport - DILARANG Nismara Logistics)
-
-- **PERINGATAN KERAS:** Nama resmi komunitas, portal, dan platform ini adalah **Nismara Transport**.
-- **DILARANG KERAS** bagi AI Agent maupun developer menulis atau menyebut entitas ini sebagai **Nismara Logistics** di teks UI, metadata, notifikasi web/Discord, dialog alert/modal, maupun dokumentasi baru.
-- Selalu gunakan **Nismara Transport** secara konsisten di seluruh antarmuka dan salinan teks pengguna.
-
-## 18. Standar Parsing Tanggal & Waktu WIB (Anti-Bug Tahun 1970)
-
-DILARANG KERAS melakukan penggabungan string manual seperti `new Date(`${inputDate}+07:00`)` saat memproses tanggal dari form HTML (`<input type="date">` atau `<input type="datetime-local">`).
-
-### Akar Masalah Bug Tahun 1970:
-Standar ISO 8601 **tidak mengizinkan** offset timezone (`+07:00`) ditempelkan langsung setelah tanggal tanpa penanda jam `T` (misalnya `"2026-10-31+07:00"`). Mesin JavaScript V8 mengevaluasi string tersebut menjadi `Invalid Date` (`NaN`). Saat disimpan ke MongoDB, driver BSON menserialisasi `NaN` menjadi timestamp `0` (Unix Epoch), sehingga tanggal tersimpan sebagai **`1970-01-01`**.
-
-### Standardisasi Wajib Menggunakan Helper `@/lib/utils`:
-1. **`parseWIBDate(dateInput, isEndOfDayIfDateOnly = false)`**:
-   - **Wajib digunakan** di semua Server Actions, API routes, atau form handlers saat mengonversi input form ke objek MongoDB `Date`.
-   - Menangani otomatis input ISO utuh, datetime-local (`YYYY-MM-DDTHH:mm`), maupun date-only (`YYYY-MM-DD`).
-   - Jika parameter `isEndOfDayIfDateOnly` diset `true` (misal untuk deadline kontrak/event/giveaway), input date-only otomatis diset ke akhir hari WIB (`T23:59:59+07:00`).
-   - Melemparkan `Error` deskriptif jika format tidak valid untuk mencegah data korup atau `NaN` tersimpan ke database.
-2. **`formatWIBDateTimeLocal(dateInput)`**:
-   - **Wajib digunakan** saat mengisi prop `value` atau `defaultValue` pada elemen `<input type="datetime-local">` dari dokumen database (misal pada halaman Edit).
-   - Menghasilkan string format `YYYY-MM-DDTHH:mm` yang presisi dalam zona waktu `Asia/Jakarta` (WIB) tanpa terpengaruh perbedaan zona waktu lokal server Vercel maupun browser client.
-   - Otomatis mengembalikan string kosong `""` jika tanggal kosong, invalid, atau merupakan tanggal korup tahun 1970 (sehingga form tidak terkunci di tahun 1970).
-3. **Standar Input Form Event & Deadline:**
-   - Selalu prioritaskan `<input type="datetime-local">` dibandingkan `<input type="date">` untuk event atau kontrak baru agar staf/manajer dapat menentukan jam dan menit deadline secara eksplisit.
-   - Selalu validasi `endDt > startDt` baik di client-side (dengan `showAlert` dari `@/lib/dialog`) maupun di backend Server Action sebelum mutasi database.
-
-## 19. Kompatibilitas BSON & ObjectId (`mongodb` Native Driver vs `mongoose`)
-
-Proyek ini menggunakan dua layer akses MongoDB secara bersamaan: native driver `mongodb` (`^6.21.0` dengan `bson` 6.x) melalui `clientPromise` (`@/lib/mongodb`) dan ODM `mongoose` (`^9.5.0` dengan `bson` 7.x) melalui `@/lib/mongoose`.
-
-### Akar Masalah Bug Laten BSON:
-- **PERINGATAN KERAS:** `ObjectId` dari dokumen hasil query **Mongoose** (`User.findOne`, `Garage.findOne`, `Model.create`, atau `new mongoose.Types.ObjectId()`) bertipe **BSON 7.x**. Jika nilai tersebut dikirim langsung ke query, filter, `$set`, `$setOnInsert`, atau `insertOne` milik **native driver** (`db.collection(...)`), driver `mongodb` 6.x akan menolak dan melempar error runtime:
-  `Unsupported BSON version, bson types must be from bson 6.x.x`
-- Bug ini sangat berbahaya menjadi **bug laten atau gagal diam-diam** apabila terjadi di dalam blok `catch` fallback (yang jarang tereksekusi saat kondisi normal) atau di dalam blok `try/catch` non-fatal (misalnya pencatatan riwayat transaksi), sehingga fitur terlihat sukses padahal sebagian data tidak tersimpan.
-
-### Aturan Wajib Saat Mencampur Mongoose & Native Driver:
-1. **Konversi Eksplisit ke `ObjectId` Native (`"mongodb"`):**
-   Setiap kali ID dari dokumen Mongoose (atau parameter `_id` yang sumbernya tidak dijamin berasal dari native driver) dipakai di `db.collection(...)`, **wajib** dikonversi menggunakan `ObjectId` yang diimpor dari `"mongodb"`:
-   ```ts
-   import { ObjectId } from "mongodb";
-
-   // ✅ BENAR
-   userId: user?._id ? new ObjectId(String(user._id)) : null,
-   await db.collection("garages").updateOne({ _id: new ObjectId(String(garage._id)) }, ...);
-
-   // ❌ DILARANG — melempar "Unsupported BSON version, bson types must be from bson 6.x.x"
-   userId: user?._id || null,
-   await db.collection("garages").updateOne({ _id: garage._id }, ...);
-   ```
-2. **Konsistensi Layer dalam Satu Alur:** Usahakan tetap konsisten menggunakan satu layer (sepenuhnya Mongoose Model atau sepenuhnya `db.collection(...)`) dalam satu endpoint/Server Action. Jika harus membuat helper yang menerima `doc` atau `_id` dari pemanggil luar lalu memanggil `db.collection(...)`, selalu lakukan normalisasi defensif `new ObjectId(String(doc._id))`.
-3. **Jangan Gunakan `Model.collection.*` dengan `ObjectId` Native:** Driver internal Mongoose menggunakan BSON 7.x, sedangkan `mongodb` (`clientPromise`) menggunakan BSON 6.x. Hindari memanggil raw `Model.collection.*`; gunakan metode Mongoose standar (`Model.findOne`, `Model.updateOne`, dll.) atau `db.collection(...)` dengan konversi `ObjectId` dari `"mongodb"`.
-
-## 20. Penamaan Publik Bot Discord (Bot Natasya — BUKAN Silvia)
-
-- Untuk seluruh tampilan publik, halaman website, changelog, notifikasi, artikel, dan teks yang dilihat driver, bot Discord resmi Nismara Transport **WAJIB disebut sebagai `Bot Natasya`**.
-- `Silvia` hanyalah nama lama / nama repository internal dan **DILARANG** dipakai pada salinan teks publik untuk pengguna atau driver.
-
-## 21. Standar Rilis Versi & Pengisian Changelog Hub (`/dashboard/manage/changelog`)
-
-Setiap kali merilis versi baru untuk **Web Transport**, **Bot Natasya**, atau **Nismara Tracker**:
-- Agent **WAJIB langsung menyiapkan paket isian siap salin untuk form Changelog Hub** (`/dashboard/manage/changelog`) tanpa perlu diminta ulang, mencakup:
-  - `Produk` (`Web Transport` / `Bot Natasya` / `Nismara Tracker`)
-  - `Nomor Versi`
-  - `Judul Rilis`
-  - `Ringkasan Singkat` (2–3 kalimat non-teknis)
-  - Poin `Fitur Baru`, `Peningkatan`, dan/atau `Perbaikan` dalam bahasa orang umum (non-teknis, tanpa istilah kode, database, atau server)
-  - Opsional `Tautan Fitur` dan `Label Tombol Fitur`
-- Seluruh teks wajib mengikuti `.agents/skills/antislop-copywriting/SKILL.md` (bebas em dash `—`, en dash `–`, emoji hiasan, dan buzzword AI).
-
-<!-- antislop:start -->
-## 22. Standar Anti-Slop & Skill Desain Wajib untuk Semua Pekerjaan UI, Copy & Mobile
-
-Untuk setiap pekerjaan desain, pembuatan, atau perombakan UI/UX, copywriting, aksesibilitas, layout mobile, atau komentar kode, agent **WAJIB** membaca `.agents/skills/antislop/SKILL.md` (core) lalu skill yang relevan sebelum mulai menulis kode:
-- **Referensi & Desain UI (digabung dengan `antislop-ui`):** Gunakan skill **`ui-design`**, **`ui-radar`**, **`ui-styling`**, dan **`ui-ux-pro-max`** untuk riset pola UI nyata, sistem desain, komponen, serta interaksi, lalu saring hasilnya dengan `antislop-ui` agar tidak generik.
-- **UI / Visual:** `.agents/skills/antislop-ui/SKILL.md` (hindari *Default Dashboard Shell*, kartu berlebihan, dan dekorasi tanpa fungsi)
-- **Mobile / Responsif:** `.agents/skills/antislop-layoutmobile/SKILL.md` (reflow mobile terencana, nol horizontal overflow, tap target ≥ 44px)
-- **Aksesibilitas & Manusia:** `.agents/skills/antislop-human/SKILL.md` (kontras WCAG AA, dukungan keyboard & `Escape`, `:focus-visible`, status non-color-only, state loading/error/empty)
-- **Copy & Teks:** `.agents/skills/antislop-copywriting/SKILL.md` (bahasa alami non-teknis, tanpa em/en dash dan tanpa buzzword AI)
-- **Komentar Kode:** `.agents/skills/antislop-code/SKILL.md`
-<!-- antislop:end -->
-
-## 23. Standar MongoDB, Mongoose 9 & Skill Database Wajib
-
-Setiap kali merancang skema/koleksi baru, menulis aggregation pipeline, mengoptimalkan performa query, atau mengubah konfigurasi koneksi MongoDB, agent **WAJIB** menggunakan skill MongoDB yang sesuai:
-- **Perancangan Skema & Index:** **`mongodb-schema-design`** (embed vs reference, hindari unbounded arrays, TTL, lifecycle data, validasi skema).
-- **Optimasi Query & Indexing:** **`mongodb-query-optimizer`** (saat meninjau query lambat, menambahkan compound index, atau merapikan aggregation).
-- **Koneksi & Pooling:** **`mongodb-connection`** (saat mengubah `lib/mongodb.ts`, `lib/mongoose.ts`, connection pool, atau timeout).
-- **Penyusunan Query & Agregasi:** **`mongodb-natural-language-querying`** (untuk menyusun query `find`/agregasi presisi sesuai skema aktual) dan **`mongodb-search-and-ai`** (jika membangun pencarian teks lanjutan / Atlas Search).
-
-### Aturan Kritis Mongoose 9 (`mongoose@^9.5.0`):
-1. **Update Pipeline Wajib `{ updatePipeline: true }`:** Setiap pemanggilan `Model.findOneAndUpdate`, `Model.updateOne`, atau `Model.updateMany` milik **Mongoose** yang menggunakan array *aggregation pipeline* `[ ... ]` **WAJIB** menyertakan `{ updatePipeline: true }` di opsi. Tanpa opsi ini, Mongoose 9 akan melempar error runtime: `Cannot pass an array to query updates unless the 'updatePipeline' option is set.`
-2. **Konflik `timestamps: true` pada `bulkWrite`:** Jangan menyertakan `createdAt` atau `updatedAt` manual di dalam `$setOnInsert` pada `Model.bulkWrite()` jika schema memakai `{ timestamps: true }`, karena Mongoose otomatis menyisipkan `$set.updatedAt` yang akan memicu error konflik path `updatedAt`.
+# AGENTS.md — Nismara Transport (`nismara-logistics`)
+
+Portal web resmi **Nismara Transport** (`https://transport.nismara.web.id`, beta: `https://beta.nismara.web.id`) untuk komunitas VTC ETS2 & ATS.
+
+---
+
+## 1. Tech Stack & Infrastruktur
+
+- **Core**: TypeScript (strict), Next.js App Router (Server Components & Server Actions), Tailwind CSS, `lucide-react`, NextAuth (Discord).
+- **Database**: MongoDB — dual layer: native `mongodb` driver (`clientPromise` via `@/lib/mongodb`, BSON 6.x) & `mongoose@^9.5.0` (`@/lib/mongoose`, BSON 7.x). **Selalu gunakan connection pool `clientPromise`**.
+- **Cache**: Redis (`ioredis` via `@/lib/redis`) untuk fitur high-frequency & hybrid NextAuth session cache (`session:profile:${user.id}`, TTL 900s).
+- **Storage & CDN**:
+  - Media upload user: Cloudflare R2 + kompresi WebP (`@/lib/imageUtils`).
+  - Rilis Companion: Cloudflare R2 (`https://releases.nismara.web.id/version.json`) untuk `/dashboard/tracker`.
+  - Live Map HiDPI tiles: Cloudflare R2 (`https://tiles.nismara.my.id/{ets2,ats}/`), API telemetri dari `https://companion.nismara.web.id`.
+- **Bot Protection**: Cloudflare Turnstile (`components/ui/TurnstileWidget.tsx` + `verifyTurnstileToken` di `lib/turnstile.ts`).
+- **Deploy**: Vercel / PM2 (`ecosystem.config.js`).
+
+---
+
+## 2. Brand, Penamaan & Privasi Publik (WAJIB)
+
+- **Brand Resmi**: Selalu gunakan **Nismara Transport**. **DILARANG** menulis **Nismara Logistics** di teks UI, metadata, notifikasi, alert, atau dokumen baru.
+- **Bot Discord**: Selalu sebut **Bot Natasya** di seluruh tampilan publik, changelog, dan notifikasi. **DILARANG** memakai nama internal `Silvia` di teks publik.
+- **Fitur Beta (`test_participation === true`)**: `/dashboard/tracker` dan `/livemap` (termasuk menu top-level **Live Map**) sementara hanya tampil dan dapat diakses oleh user dengan `test_participation === true`.
+- **Profil Publik**: Jangan tampilkan saldo private (seperti NC) pada halaman `/profile/[truckyId]`.
+
+---
+
+## 3. Database, Ekonomi, BSON & Mongoose 9 (KRITIS!)
+
+- **Verifikasi Skema Dulu**: Jangan pernah menebak nama field (`discordId` vs `userId` — mis. `gallery_posts`/`gallery_comments` memakai `userId` berisi `discordId`). Cek model di `lib/models/` atau dokumen aktual terlebih dahulu.
+- **Kompatibilitas BSON 6.x vs 7.x (KRITIS)**: `ObjectId` dari Mongoose 9 bertipe BSON 7.x; mengirimkannya langsung ke native `db.collection(...)` (BSON 6.x) akan melempar `Unsupported BSON version, bson types must be from bson 6.x.x`.
+  - **WAJIB** konversi eksplisit dengan `new ObjectId(String(doc._id))` menggunakan `ObjectId` dari `"mongodb"` saat mencampur Mongoose & native driver. Hindari `Model.collection.*` dengan ObjectId native.
+- **Mongoose 9 (`mongoose@^9.5.0`)**:
+  1. Setiap `findOneAndUpdate`/`updateOne`/`updateMany` dengan aggregation pipeline `[...]` **WAJIB** menyertakan `{ updatePipeline: true }`.
+  2. Pada `Model.bulkWrite()` dengan `{ timestamps: true }`, jangan isi `createdAt`/`updatedAt` manual di `$setOnInsert` (konflik path `updatedAt`).
+- **Ekonomi & Penalti**:
+  - `currencies` & `points`: WAJIB filter `userId` (`discordId`) + `guildId` (`process.env.GUILD_ID || "863959415702028318"`).
+  - Setiap mutasi `totalNC` WAJIB mencatat ke `currencyhistories` (`earn`/`spend`), dan setiap pembelian/order user WAJIB mencatat ke `transactions` (terpusat di `/dashboard/transactions`).
+  - `points.totalPoints` adalah **poin penalti** (tidak boleh negatif, min 0); setiap perubahan WAJIB dicatat ke `pointhistories`.
+- **Fleet Ownership**: Gunakan `owner` (bukan `driver` legacy) untuk kepemilikan. Pada query non-map `jobhistories`, kecualikan `{ projection: { routePath: 0 } }`.
+- **Anti Race Condition**: Gabungkan syarat kelayakan langsung ke filter atomic `updateOne`/`findOneAndUpdate` (cek `modifiedCount === 0`), gunakan state locking + rollback di `catch`, selalu isi default lengkap pada `$setOnInsert` saat `upsert: true`, dan pasang `checkRateLimit` (`@/lib/rateLimit`). Rujuk `.agents/skills/anti-race-condition/SKILL.md`.
+- **User Purge & Zero-Orphan**: Setiap koleksi/fitur baru yang menyimpan data/media user WAJIB didaftarkan di `app/api/manage/users/[discordId]/purge/route.ts` (bedakan aset milik sendiri vs sewa; gunakan `$pull` pada dokumen bersama). Rujuk `.agents/skills/user-purge-maintenance/SKILL.md`.
+- **Session TTL**: Koleksi `sessions` menggunakan TTL index `{ expires: 1 }, { expireAfterSeconds: 0 }`.
+- **Skill Database**: Gunakan skill MongoDB yang relevan (`mongodb-schema-design`, `mongodb-query-optimizer`, `mongodb-connection`, `mongodb-natural-language-querying`).
+
+---
+
+## 4. Upload Media (R2), Anti-Cache & Turnstile
+
+- **Cloudflare R2 Upload**:
+  - **Deferred Upload**: Jangan upload di `onChange`; simpan `File` di state + preview `URL.createObjectURL()`, baru kompres & upload saat submit.
+  - Kompres semua gambar lewat `compressImageToWebP` (`@/lib/imageUtils`). Limit: standar **3 MB** (PNG/JPG/JPEG → WebP), **Nismara+** **5 MB** (+ **GIF**, jangan ubah GIF ke WebP).
+  - Hapus file lama di R2 setiap kali user mengganti gambar agar tidak ada file orphan.
+- **Anti-Cache (Vercel + Cloudflare + Browser)**:
+  - Halaman dinamis/dashboard: ekspor `dynamic = "force-dynamic"`, `revalidate = 0`, `fetchCache = "force-no-store"`.
+  - API dinamis/mutasi: gunakan `jsonNoCache(data)` / `NO_CACHE_HEADERS` dari `@/lib/antiCache`.
+  - Fetch client: selalu sertakan `NO_CACHE_FETCH_OPTIONS` (`cache: "no-store"`).
+  - Setelah mutasi: panggil `revalidatePath("/path")` di server (bukan path `/api/...`) dan `router.refresh()` di client. Pertahankan `experimental.staleTimes.dynamic: 0` di `next.config.ts`.
+- **Cloudflare Turnstile**: Wajib pada form publik driver (bukan form admin/manager). Render `<TurnstileWidget />` tepat di atas tombol submit, **selalu** panggil `verifyTurnstileToken()` paling awal di server sebelum auth/DB, dan reset token (`setTurnstileToken(null)`) bila submit gagal karena token bersifat single-use.
+
+---
+
+## 5. Tanggal WIB (Anti-Bug 1970) & Format Data
+
+- **Anti-Bug 1970**: **DILARANG** menggabungkan string `new Date(\`${inputDate}+07:00\`)` (date-only tanpa `T` menjadi `Invalid Date` → `1970-01-01`).
+  - Wajib pakai `parseWIBDate(dateInput, isEndOfDayIfDateOnly)` untuk simpan ke DB dan `formatWIBDateTimeLocal(dateInput)` untuk form `<input type="datetime-local">`. Validasi `endDt > startDt` di client & server.
+- **Format Tampilan**:
+  - Waktu: `toLocaleString("id-ID", { timeZone: "Asia/Jakarta", ... })` + `" WIB"`.
+  - NC: `.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })` (bukan `.toFixed(2)`).
+  - BBM: `Math.floor(val).toLocaleString("id-ID") + " L"`.
+
+---
+
+## 6. UI/UX, Next.js 15+/16, SEO & Standar Penulisan
+
+- **Next.js 15+/16 & CSS**:
+  - `await searchParams` & `await params` di Server Components / `generateMetadata`.
+  - Jangan pakai `overflow-x-hidden` pada `<html>`/`<body>`/wrapper jika ada `position: sticky` di dalamnya — gunakan `overflow-x-clip`.
+  - Sinkronkan state client saat prop dari Server Component berubah via `useEffect`.
+  - Untuk halaman full-bleed seperti `/livemap`, bungkus `<main className="isolate z-0">` agar Leaflet tidak menutupi dropdown Navbar.
+- **Komponen Wajib**:
+  - Badge user: selalu pakai `<UserBadges />` (`components/icons/UserBadges.tsx`).
+  - Dialog/Konfirmasi: **DILARANG** `window.alert()`/`confirm()` — gunakan `showAlert`/`showConfirm` dari `@/lib/dialog`.
+  - Dropdown pilih user: gunakan searchable dropdown (jangan `<select>` native).
+  - Radix `SelectValue`: selalu berikan explicit children label mapping (`<SelectValue>{LABELS[val] || "Pilih..."}</SelectValue>`).
+  - Tooltip di list/table: tambahkan `relative z-10 hover:z-50` pada row dan jangan taruh `overflow-hidden`/`line-clamp-1` pada wrapper tooltip.
+  - Parity Modal vs Detail Page + Ticket auto-fill via query params (`?commentId=...`).
+- **SEO & Metadata**: Root layout sudah memakai template `%s - Nismara Transport` — **DILARANG** menambah suffix `- Nismara Transport` secara manual di child page. Dashboard memakai `robots: { index: false, follow: false }` tanpa OG/Twitter card. Fallback OG image: `https://images.nismara.my.id/227300_188.jpg`. Rujuk `.agents/skills/seo-metadata/SKILL.md`.
+- **Changelog & Anti-Slop (WAJIB)**:
+  - Setiap rilis versi (`Web Transport`, `Bot Natasya`, `Nismara Tracker`), siapkan paket isian `/dashboard/manage/changelog` dengan bahasa **non-teknis untuk driver** (tanpa istilah kode/database/server, tanpa em/en dash, tanpa emoji hiasan, tanpa buzzword AI).
+  - Untuk pekerjaan UI, copy, & mobile, baca `.agents/skills/antislop/SKILL.md` serta skill relevan (`antislop-ui`, `antislop-layoutmobile`, `antislop-human`, `antislop-copywriting`, `antislop-code`, `ui-design`, `ui-radar`, `ui-styling`, `ui-ux-pro-max`).
